@@ -1,0 +1,192 @@
+เอกสารออกแบบและข้อกำหนด: ปลั๊กอิน TPAK DQ System
+เวอร์ชัน: 1.0
+วันที่: 30 กรกฎาคม 2568
+
+1. บทนำ (Introduction)
+1.1 วัตถุประสงค์ (Purpose)
+เอกสารนี้มีวัตถุประสงค์เพื่อกำหนดแนวทางการออกแบบและข้อกำหนดทางเทคนิคสำหรับการพัฒนาปลั๊กอิน WordPress ชื่อ "TPAK DQ System" ซึ่งจะทำหน้าที่เป็นเครื่องมือกลางในการนำเข้า, ตรวจสอบคุณภาพ, และจัดการข้อมูลที่ได้รับจากระบบ TPAK Survey System (LimeSurvey) ให้เป็นไปตามกระบวนการตรวจสอบ 3 ขั้นตอน (3-Step Verification Workflow) ที่กำหนดไว้
+
+1.2 ขอบเขต (Scope)
+ปลั๊กอินนี้จะถูกพัฒนาให้ทำงานได้อย่างสมบูรณ์ภายใน WordPress โดยมีขอบเขตการทำงานดังนี้:
+
+เชื่อมต่อกับ LimeSurvey API เพื่อดึงข้อมูลแบบสอบถามโดยอัตโนมัติ
+
+สร้างและจัดการโครงสร้างข้อมูลสำหรับจัดเก็บชุดข้อมูลตรวจสอบ
+
+กำหนดสิทธิ์ผู้ใช้งาน 4 ระดับ (Administrator, Interviewer, Supervisor, Examiner)
+
+จัดการกระบวนการทำงาน (Workflow) การส่งต่อและอนุมัติข้อมูล
+
+แสดงผลข้อมูลและสถานะในหน้า Dashboard ที่ปรับแต่งตามสิทธิ์ผู้ใช้
+
+บันทึกประวัติการตรวจสอบ (Audit Trail) ในทุกขั้นตอน
+
+(ข้อเสนอแนะ) ระบบแจ้งเตือนผ่านอีเมลเมื่อมีงานใหม่เข้ามา
+
+1.3 ภาพรวมระบบ (System Overview)
+ระบบทำงานโดยการดึงข้อมูลจาก LimeSurvey ผ่าน API มาสร้างเป็น "ชุดข้อมูลตรวจสอบ" ใน WordPress จากนั้นข้อมูลจะถูกส่งต่อไปตามลำดับการตรวจสอบ 3 ขั้นตอน: Interviewer (A) > Supervisor (B) > Examiner (C) โดยในแต่ละขั้นตอนจะมีตัวเลือกในการ "ยืนยัน" เพื่อส่งต่อ หรือ "ส่งกลับ" เพื่อแก้ไข พร้อมบันทึกประวัติและสถานะอย่างชัดเจน
+
+2. สถาปัตยกรรมและเทคโนโลยี (Architecture & Technology)
+2.1 แพลตฟอร์ม (Platform)
+WordPress: เวอร์ชันล่าสุด
+
+PHP: เวอร์ชัน 7.4 ขึ้นไป
+
+Database: MySQL (ตามมาตรฐาน WordPress)
+
+2.2 โครงสร้างข้อมูล (Data Structure)
+เราจะใช้ฟังก์ชันหลักของ WordPress (Native Functions) เพื่อสร้างโครงสร้างข้อมูลทั้งหมด
+
+Custom Post Type:
+
+Slug: verification_batch
+
+Name: ชุดข้อมูลตรวจสอบ
+
+Purpose: ใช้เป็นคอนเทนเนอร์หลักในการจัดเก็บข้อมูลจากแบบสอบถามแต่ละชุดที่นำเข้ามา
+
+Custom Taxonomy (สำหรับจัดการสถานะ):
+
+Slug: verification_status
+
+Name: สถานะการตรวจสอบ
+
+Terms (สถานะต่างๆ):
+
+pending_a (รอการตรวจสอบ A)
+
+pending_b (รอการตรวจสอบ B)
+
+pending_c (รอการตรวจสอบ C)
+
+rejected_by_b (ส่งกลับจาก B)
+
+rejected_by_c (ส่งกลับจาก C)
+
+finalized (ตรวจสอบเสร็จสมบูรณ์)
+
+finalized_by_sampling (เสร็จสมบูรณ์โดยการสุ่ม)
+
+Custom Fields (Post Meta):
+
+จะถูกสร้างผ่าน add_meta_box() ไม่ใช้ปลั๊กอินภายนอก
+
+_survey_data: จัดเก็บข้อมูลคำตอบทั้งหมดในรูปแบบ JSON หรือ Serialized Array
+
+_audit_trail: จัดเก็บประวัติการตรวจสอบในรูปแบบ Array of Objects โดยแต่ละ Object จะมีข้อมูล: user_id, user_name, action (e.g., 'approved', 'rejected'), comment, timestamp
+
+_lime_survey_id: จัดเก็บ ID ของแบบสอบถามจาก LimeSurvey เพื่อป้องกันการนำเข้าซ้ำ
+
+2.3 โครงสร้างไฟล์ปลั๊กอิน (Plugin File Structure)
+/tpak-dq-system/
+|-- tpak-dq-system.php         # ไฟล์หลักของปลั๊กอิน
+|-- uninstall.php              # สคริปต์สำหรับลบข้อมูลเมื่อถอนการติดตั้ง
+|-- /includes/
+|   |-- class-post-types.php     # ลงทะเบียน Post Type และ Taxonomy
+|   |-- class-roles.php          # สร้างและจัดการ User Roles
+|   |-- class-api-handler.php    # จัดการการเชื่อมต่อ LimeSurvey API
+|   |-- class-cron.php           # จัดการ WP-Cron สำหรับดึงข้อมูลอัตโนมัติ
+|   |-- class-workflow.php       # จัดการ Logic การเปลี่ยนสถานะและ Sampling
+|   |-- class-notifications.php  # จัดการการส่งอีเมล
+|
+|-- /admin/
+|   |-- class-admin-menu.php     # สร้างหน้าตั้งค่าและ Dashboard
+|   |-- class-meta-boxes.php     # สร้างและจัดการ Meta Boxes ในหน้าแก้ไขข้อมูล
+|   |-- class-admin-columns.php  # ปรับแต่งคอลัมน์ในหน้าแสดงรายการ
+|
+|-- /assets/
+|   |-- /css/
+|   |   |-- admin-style.css      # CSS สำหรับหน้า Admin
+|   |-- /js/
+|       |-- admin-script.js      # JS สำหรับหน้า Admin
+
+
+3. ผู้ใช้งานและสิทธิ์การเข้าถึง (User Roles & Permissions)
+จะมีการสร้าง Roles ใหม่ 3 Roles และขยายความสามารถของ Administrator โดยใช้ฟังก์ชัน add_role() และ add_cap()
+
+| Role | Slug | สิทธิ์ที่สำคัญ (Capabilities) | คำอธิบาย |
+| ผู้ดูแลระบบ | administrator | manage_options, manage_tpak_settings, edit_others_verification_batches | มีสิทธิ์สูงสุด จัดการการตั้งค่า API, จัดการผู้ใช้, และสามารถแทรกแซงกระบวนการได้ทุกขั้นตอน |
+| ผู้ตรวจสอบขั้นที่ 1 | interviewer | edit_verification_batches, read | สามารถเข้าถึง, แก้ไข, และส่งต่อชุดข้อมูลที่อยู่ในสถานะ pending_a และ rejected_by_b |
+| ผู้ตรวจสอบขั้นที่ 2 | supervisor | read_private_verification_batches | สามารถเข้าถึง (อ่านอย่างเดียว) ชุดข้อมูลในสถานะ pending_b และ rejected_by_c เพื่อยืนยันหรือส่งกลับ |
+| ผู้ตรวจสอบขั้นที่ 3 | examiner | read_private_verification_batches | สามารถเข้าถึง (อ่านอย่างเดียว) ชุดข้อมูลในสถานะ pending_c เพื่ออนุมัติขั้นสุดท้ายหรือส่งกลับ |
+
+4. ฟังก์ชันการทำงาน (Functional Requirements)
+4.1 การนำเข้าข้อมูล (Data Import)
+หน้าตั้งค่า API: ผู้ดูแลระบบสามารถเข้าไปที่เมนู "TPAK DQ System" > "Settings" เพื่อกรอก URL, Username, และ Password สำหรับ LimeSurvey RemoteControl 2 API
+
+Cron Job อัตโนมัติ: ระบบจะใช้ WP-Cron ทำงานทุกๆ ชั่วโมง (หรือตามที่ตั้งค่า) เพื่อเรียกใช้ฟังก์ชันดึงข้อมูลจาก LimeSurvey
+
+การสร้าง Post: สคริปต์จะดึงข้อมูลที่ยังไม่เคยนำเข้า (ตรวจสอบจาก _lime_survey_id) มาสร้างเป็น Post ใหม่ใน Custom Post Type verification_batch และกำหนดสถานะเริ่มต้นเป็น pending_a
+
+4.2 กระบวนการตรวจสอบและ Workflow
+Dashboard (หน้าแสดงรายการ):
+
+ผู้ใช้แต่ละ Role จะเห็นเฉพาะรายการข้อมูลที่รอการดำเนินการจากตนเองเท่านั้น (ควบคุมด้วย pre_get_posts)
+
+ผู้ดูแลระบบจะเห็นข้อมูลทุกสถานะ
+
+ตารางจะแสดงคอลัมน์ที่จำเป็น: ID, ชื่อ-สกุล (ถ้ามี), จังหวัด (ถ้ามี), วันที่นำเข้า, สถานะ, ผู้รับผิดชอบปัจจุบัน
+
+หน้าแก้ไข/ดูรายละเอียดข้อมูล:
+
+ส่วนแสดงข้อมูล: แสดงข้อมูลคำตอบทั้งหมดในรูปแบบที่อ่านง่าย (Read-only สำหรับ Role B, C)
+
+ส่วนประวัติการตรวจสอบ: แสดง Audit Trail ทั้งหมดที่เคยเกิดขึ้นกับข้อมูลชุดนี้
+
+ส่วนดำเนินการ (Action Box):
+
+Interviewer (Role A):
+
+สามารถแก้ไขข้อมูลใน Field ต่างๆ ได้
+
+ปุ่ม "ยืนยันและส่งต่อให้ Supervisor"
+
+Supervisor (Role B):
+
+ปุ่ม "ยืนยันข้อมูล"
+
+ปุ่ม "ส่งกลับเพื่อแก้ไข" พร้อมช่องกรอก "ความคิดเห็น" (บังคับกรอก)
+
+Examiner (Role C):
+
+ปุ่ม "อนุมัติขั้นสุดท้าย (Finalize)"
+
+ปุ่ม "ส่งกลับเพื่อตรวจสอบอีกครั้ง" พร้อมช่องกรอก "ความคิดเห็น" (บังคับกรอก)
+
+Sampling Gate Logic:
+
+เมื่อ Supervisor กด "ยืนยันข้อมูล" ฟังก์ชันใน class-workflow.php จะทำงาน
+
+ระบบจะสุ่มตัวเลข 1-100
+
+ถ้าได้ 1-70 (70%): สถานะของ Post จะเปลี่ยนเป็น finalized_by_sampling และ Workflow สิ้นสุด
+
+ถ้าได้ 71-100 (30%): สถานะของ Post จะเปลี่ยนเป็น pending_c และส่งแจ้งเตือนไปยัง Examiner
+
+4.3 ระบบแจ้งเตือน (Notification System)
+เมื่อมีการเปลี่ยนสถานะที่ต้องส่งต่องาน (เช่น pending_a -> pending_b) ระบบจะใช้ wp_mail() เพื่อส่งอีเมลไปยังผู้ใช้ทุกคนใน Role ถัดไป (เช่น ส่งหา Supervisors ทุกคน)
+
+เนื้อหาอีเมลจะระบุว่ามีชุดข้อมูลใหม่ (ID: [XXX]) รอการตรวจสอบ
+
+5. แผนภาพการทำงานสรุป (Workflow Summary)
+เริ่มต้น: WP-Cron ดึงข้อมูลจาก LimeSurvey API มาสร้าง Post และตั้งสถานะเป็น pending_a
+
+Interviewer (A): เข้ามาตรวจสอบและแก้ไขข้อมูล > กด "ยืนยัน" > ระบบอัปเดตสถานะเป็น pending_b และบันทึกประวัติ
+
+Supervisor (B): ได้รับการแจ้งเตือน > เข้ามาตรวจสอบ (Read-only)
+
+กรณีส่งกลับ: กรอก Comment > กด "ส่งกลับ" > ระบบอัปเดตสถานะเป็น rejected_by_b > แจ้งเตือน Role A
+
+กรณียืนยัน: กด "ยืนยัน" > ระบบเข้าสู่ Sampling Gate
+
+(70%) อัปเดตสถานะเป็น finalized_by_sampling > สิ้นสุด
+
+(30%) อัปเดตสถานะเป็น pending_c > แจ้งเตือน Role C
+
+Examiner (C): ได้รับการแจ้งเตือน > เข้ามาตรวจสอบ (Read-only)
+
+กรณีส่งกลับ: กรอก Comment > กด "ส่งกลับ" > ระบบอัปเดตสถานะเป็น rejected_by_c > แจ้งเตือน Role B
+
+กรณียืนยัน: กด "อนุมัติ" > ระบบอัปเดตสถานะเป็น finalized > สิ้นสุด
+
+สิ้นสุด: ข้อมูลที่ผ่านการตรวจสอบจะมีสถานะ finalized หรือ finalized_by_sampling
