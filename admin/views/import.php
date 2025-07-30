@@ -233,7 +233,11 @@ if (!defined('ABSPATH')) {
             
             <div class="tpak-stats-grid">
                 <?php
-                $total_imported = wp_count_posts('verification_batch')->publish;
+                // Get total imported count
+                $total_imported = wp_count_posts('verification_batch');
+                $total_count = $total_imported->publish + $total_imported->private + $total_imported->draft;
+                
+                // Get today's imported count
                 $today_imported = get_posts(array(
                     'post_type' => 'verification_batch',
                     'posts_per_page' => -1,
@@ -244,11 +248,60 @@ if (!defined('ABSPATH')) {
                     )
                 ));
                 $today_count = count($today_imported);
+                
+                // Get status counts using taxonomy
+                $pending_a_count = count(get_posts(array(
+                    'post_type' => 'verification_batch',
+                    'posts_per_page' => -1,
+                    'tax_query' => array(
+                        array(
+                            'taxonomy' => 'verification_status',
+                            'field' => 'slug',
+                            'terms' => 'pending_a'
+                        )
+                    )
+                )));
+                
+                $pending_b_count = count(get_posts(array(
+                    'post_type' => 'verification_batch',
+                    'posts_per_page' => -1,
+                    'tax_query' => array(
+                        array(
+                            'taxonomy' => 'verification_status',
+                            'field' => 'slug',
+                            'terms' => 'pending_b'
+                        )
+                    )
+                )));
+                
+                $pending_c_count = count(get_posts(array(
+                    'post_type' => 'verification_batch',
+                    'posts_per_page' => -1,
+                    'tax_query' => array(
+                        array(
+                            'taxonomy' => 'verification_status',
+                            'field' => 'slug',
+                            'terms' => 'pending_c'
+                        )
+                    )
+                )));
+                
+                $finalized_count = count(get_posts(array(
+                    'post_type' => 'verification_batch',
+                    'posts_per_page' => -1,
+                    'tax_query' => array(
+                        array(
+                            'taxonomy' => 'verification_status',
+                            'field' => 'slug',
+                            'terms' => array('finalized', 'finalized_by_sampling')
+                        )
+                    )
+                )));
                 ?>
                 
                 <div class="tpak-stat-card">
                     <h3><?php _e('นำเข้าทั้งหมด', 'tpak-dq-system'); ?></h3>
-                    <div class="tpak-stat-number"><?php echo $total_imported; ?></div>
+                    <div class="tpak-stat-number"><?php echo $total_count; ?></div>
                 </div>
                 
                 <div class="tpak-stat-card">

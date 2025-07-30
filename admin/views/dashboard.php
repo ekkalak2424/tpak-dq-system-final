@@ -197,7 +197,7 @@ if (!defined('ABSPATH')) {
                 
                 <div class="tpak-info-item">
                     <h4><?php _e('ฐานข้อมูล', 'tpak-dq-system'); ?></h4>
-                    <p><?php echo $wpdb->db_version(); ?></p>
+                    <p><?php global $wpdb; echo $wpdb->db_version(); ?></p>
                 </div>
             </div>
         </div>
