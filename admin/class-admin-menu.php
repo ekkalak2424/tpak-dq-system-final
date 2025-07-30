@@ -18,6 +18,9 @@ class TPAK_DQ_Admin_Menu {
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_init', array($this, 'register_settings'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
+        
+        // AJAX actions
+        add_action('wp_ajax_tpak_test_api', array($this, 'test_api_connection'));
     }
     
     /**
@@ -352,5 +355,34 @@ class TPAK_DQ_Admin_Menu {
         $value = isset($options['sampling_percentage']) ? $options['sampling_percentage'] : 70;
         echo '<input type="number" name="sampling_percentage" value="' . esc_attr($value) . '" min="1" max="100" />';
         echo '<p class="description">' . __('Percentage of batches to finalize by sampling (1-100)', 'tpak-dq-system') . '</p>';
+    }
+    
+    /**
+     * Test API connection via AJAX
+     */
+    public function test_api_connection() {
+        // Check nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'tpak_workflow_nonce')) {
+            wp_send_json_error(array('message' => __('Security check failed', 'tpak-dq-system')));
+        }
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('You do not have permission to perform this action', 'tpak-dq-system')));
+        }
+        
+        // Get API handler
+        $api_handler = new TPAK_DQ_API_Handler();
+        
+        // Test connection
+        if ($api_handler->is_configured()) {
+            if ($api_handler->test_connection()) {
+                wp_send_json_success(array('message' => __('API connection successful!', 'tpak-dq-system')));
+            } else {
+                wp_send_json_error(array('message' => __('API connection failed. Please check your settings.', 'tpak-dq-system')));
+            }
+        } else {
+            wp_send_json_error(array('message' => __('API is not configured. Please fill in all required fields.', 'tpak-dq-system')));
+        }
     }
 } 

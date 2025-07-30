@@ -58,8 +58,10 @@ jQuery(document).ready(function($) {
         
         var button = $(this);
         var originalText = button.text();
+        var resultSpan = $('#tpak-api-test-result');
         
-        button.text('Testing...').prop('disabled', true);
+        button.text('กำลังทดสอบ...').prop('disabled', true);
+        resultSpan.html('');
         
         $.ajax({
             url: tpak_dq_ajax.ajax_url,
@@ -70,13 +72,13 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    showNotification('API connection successful!', 'success');
+                    resultSpan.html('<span style="color: green; font-weight: bold;">✓ ' + response.data.message + '</span>');
                 } else {
-                    showNotification('API connection failed: ' + response.data.message, 'error');
+                    resultSpan.html('<span style="color: red; font-weight: bold;">✗ ' + response.data.message + '</span>');
                 }
             },
             error: function() {
-                showNotification('API test failed. Please try again.', 'error');
+                resultSpan.html('<span style="color: red; font-weight: bold;">✗ การทดสอบล้มเหลว กรุณาลองใหม่อีกครั้ง</span>');
             },
             complete: function() {
                 button.text(originalText).prop('disabled', false);
@@ -307,10 +309,12 @@ jQuery(document).ready(function($) {
         return filters;
     }
     
-    // Initialize tooltips
-    $('[data-tooltip]').tooltip({
-        position: { my: 'left+5 center', at: 'right center' }
-    });
+    // Initialize tooltips (if jQuery UI is available)
+    if ($.fn.tooltip) {
+        $('[data-tooltip]').tooltip({
+            position: { my: 'left+5 center', at: 'right center' }
+        });
+    }
     
     // Initialize datepickers
     $('.tpak-date-input').datepicker({
