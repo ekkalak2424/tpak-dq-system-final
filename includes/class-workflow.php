@@ -16,6 +16,7 @@ class TPAK_DQ_Workflow {
      */
     public function __construct() {
         add_action('wp_ajax_tpak_approve_batch', array($this, 'approve_batch'));
+        add_action('wp_ajax_tpak_approve_batch_supervisor', array($this, 'approve_batch_supervisor'));
         add_action('wp_ajax_tpak_reject_batch', array($this, 'reject_batch'));
         add_action('wp_ajax_tpak_finalize_batch', array($this, 'finalize_batch'));
     }
@@ -208,7 +209,7 @@ class TPAK_DQ_Workflow {
     /**
      * Approve batch (Supervisor action with sampling)
      */
-    public function approve_batch() {
+    public function approve_batch_supervisor() {
         if (!wp_verify_nonce($_POST['nonce'], 'tpak_workflow_nonce')) {
             wp_die(__('Security check failed', 'tpak-dq-system'));
         }
@@ -355,7 +356,7 @@ class TPAK_DQ_Workflow {
                 
             case 'supervisor':
                 if ($current_status === 'pending_b') {
-                    $actions[] = 'approve_b';
+                    $actions[] = 'approve_batch_supervisor';
                     $actions[] = 'reject_b';
                 }
                 break;
@@ -375,7 +376,7 @@ class TPAK_DQ_Workflow {
                         $actions[] = 'approve_a';
                         break;
                     case 'pending_b':
-                        $actions[] = 'approve_b';
+                        $actions[] = 'approve_batch_supervisor';
                         $actions[] = 'reject_b';
                         break;
                     case 'pending_c':
@@ -396,6 +397,7 @@ class TPAK_DQ_Workflow {
         $action_names = array(
             'approve_a' => __('ยืนยันและส่งต่อให้ Supervisor', 'tpak-dq-system'),
             'approve_b' => __('ยืนยันข้อมูล', 'tpak-dq-system'),
+            'approve_batch_supervisor' => __('ยืนยันข้อมูล', 'tpak-dq-system'),
             'reject_b' => __('ส่งกลับเพื่อแก้ไข', 'tpak-dq-system'),
             'finalize' => __('อนุมัติขั้นสุดท้าย', 'tpak-dq-system'),
             'reject_c' => __('ส่งกลับเพื่อตรวจสอบอีกครั้ง', 'tpak-dq-system')

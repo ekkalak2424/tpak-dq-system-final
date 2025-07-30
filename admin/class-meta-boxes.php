@@ -280,6 +280,7 @@ class TPAK_DQ_Meta_Boxes {
         $button_classes = array(
             'approve_a' => 'primary',
             'approve_b' => 'success',
+            'approve_batch_supervisor' => 'success',
             'reject_b' => 'danger',
             'reject_c' => 'danger',
             'finalize' => 'success'
