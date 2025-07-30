@@ -71,13 +71,15 @@ jQuery(document).ready(function($) {
                 nonce: tpak_dq_ajax.nonce
             },
             success: function(response) {
+                console.log('API Test Response:', response);
                 if (response.success) {
                     resultSpan.html('<span style="color: green; font-weight: bold;">✓ ' + response.data.message + '</span>');
                 } else {
                     resultSpan.html('<span style="color: red; font-weight: bold;">✗ ' + response.data.message + '</span>');
                 }
             },
-            error: function() {
+            error: function(xhr, status, error) {
+                console.log('API Test Error:', {xhr: xhr, status: status, error: error});
                 resultSpan.html('<span style="color: red; font-weight: bold;">✗ การทดสอบล้มเหลว กรุณาลองใหม่อีกครั้ง</span>');
             },
             complete: function() {

@@ -379,7 +379,17 @@ class TPAK_DQ_Admin_Menu {
             if ($api_handler->test_connection()) {
                 wp_send_json_success(array('message' => __('API connection successful!', 'tpak-dq-system')));
             } else {
-                wp_send_json_error(array('message' => __('API connection failed. Please check your settings.', 'tpak-dq-system')));
+                // Get more detailed error information
+                $options = get_option('tpak_dq_system_options', array());
+                $url = isset($options['limesurvey_url']) ? $options['limesurvey_url'] : '';
+                $username = isset($options['limesurvey_username']) ? $options['limesurvey_username'] : '';
+                
+                $error_message = __('API connection failed. Please check:', 'tpak-dq-system') . '<br>';
+                $error_message .= '- ' . __('URL: ', 'tpak-dq-system') . ($url ? $url : __('Not set', 'tpak-dq-system')) . '<br>';
+                $error_message .= '- ' . __('Username: ', 'tpak-dq-system') . ($username ? $username : __('Not set', 'tpak-dq-system')) . '<br>';
+                $error_message .= '- ' . __('Password: ', 'tpak-dq-system') . (isset($options['limesurvey_password']) && $options['limesurvey_password'] ? __('Set', 'tpak-dq-system') : __('Not set', 'tpak-dq-system'));
+                
+                wp_send_json_error(array('message' => $error_message));
             }
         } else {
             wp_send_json_error(array('message' => __('API is not configured. Please fill in all required fields.', 'tpak-dq-system')));

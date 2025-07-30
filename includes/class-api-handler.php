@@ -74,6 +74,11 @@ class TPAK_DQ_API_Handler {
             return $this->session_key;
         }
         
+        // Log error for debugging
+        if ($response) {
+            error_log('TPAK DQ System API Error: ' . json_encode($response));
+        }
+        
         return false;
     }
     
@@ -110,11 +115,17 @@ class TPAK_DQ_API_Handler {
             return false;
         }
         
+        $status_code = wp_remote_retrieve_response_code($response);
+        if ($status_code !== 200) {
+            error_log('TPAK DQ System API Error: HTTP ' . $status_code);
+            return false;
+        }
+        
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
         
         if (json_last_error() !== JSON_ERROR_NONE) {
-            error_log('TPAK DQ System API Error: Invalid JSON response');
+            error_log('TPAK DQ System API Error: Invalid JSON response - ' . $body);
             return false;
         }
         
@@ -200,8 +211,17 @@ class TPAK_DQ_API_Handler {
      * Test API connection
      */
     public function test_connection() {
-        $session_key = $this->get_session_key();
-        return $session_key !== false;
+        try {
+            if (!$this->is_configured()) {
+                return false;
+            }
+            
+            $session_key = $this->get_session_key();
+            return $session_key !== false;
+        } catch (Exception $e) {
+            error_log('TPAK DQ System API Test Error: ' . $e->getMessage());
+            return false;
+        }
     }
     
     /**
