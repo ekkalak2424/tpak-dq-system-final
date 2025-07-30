@@ -1,0 +1,363 @@
+/**
+ * TPAK DQ System - Meta Box Styles
+ */
+
+/* Reject Dialog Styles */
+.tpak-reject-dialog {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 999999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tpak-dialog-content {
+    background: #fff;
+    border-radius: 8px;
+    padding: 30px;
+    max-width: 500px;
+    width: 90%;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.tpak-dialog-content h3 {
+    margin: 0 0 20px 0;
+    color: #333;
+    border-bottom: 2px solid #0073aa;
+    padding-bottom: 10px;
+}
+
+.tpak-dialog-content p {
+    margin: 0 0 15px 0;
+    color: #666;
+}
+
+.tpak-dialog-content textarea {
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 10px;
+    font-size: 14px;
+    resize: vertical;
+    min-height: 100px;
+}
+
+.tpak-dialog-buttons {
+    margin-top: 20px;
+    text-align: right;
+}
+
+.tpak-dialog-buttons .button {
+    margin-left: 10px;
+}
+
+/* Survey Data Enhancements */
+.tpak-survey-data .tpak-data-item {
+    position: relative;
+}
+
+.tpak-survey-data .tpak-data-value {
+    word-break: break-word;
+}
+
+.tpak-toggle-text {
+    margin-left: 10px;
+    font-size: 12px;
+    padding: 2px 8px;
+}
+
+.tpak-short-text,
+.tpak-full-text {
+    display: inline;
+}
+
+/* Audit Trail Enhancements */
+.tpak-audit-trail .tpak-audit-item {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.tpak-audit-trail .tpak-audit-item:hover {
+    background-color: #e9ecef;
+    transform: translateX(5px);
+}
+
+.tpak-audit-item .audit-action.tpak-action-approved {
+    color: #28a745;
+    font-weight: 600;
+}
+
+.tpak-audit-item .audit-action.tpak-action-rejected {
+    color: #dc3545;
+    font-weight: 600;
+}
+
+.tpak-audit-item .audit-action.tpak-action-finalized {
+    color: #0073aa;
+    font-weight: 600;
+}
+
+.tpak-audit-item .audit-time {
+    cursor: help;
+}
+
+/* Status Indicator Enhancements */
+.tpak-status-indicator {
+    position: relative;
+    cursor: help;
+}
+
+.tpak-status-indicator::after {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: 50%;
+    background: transparent;
+    transition: all 0.3s ease;
+}
+
+.tpak-status-indicator:hover::after {
+    background: rgba(0, 115, 170, 0.1);
+}
+
+/* Form Validation Styles */
+.tpak-error {
+    border-color: #dc3545 !important;
+    box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+}
+
+.tpak-field-error {
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 5px;
+    display: block;
+}
+
+/* Auto-save Notification */
+.tpak-auto-save-notification {
+    position: fixed;
+    top: 50px;
+    right: 20px;
+    background: #28a745;
+    color: #fff;
+    padding: 10px 20px;
+    border-radius: 4px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+    z-index: 999999;
+    animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* Workflow Actions Enhancements */
+.tpak-workflow-actions {
+    position: relative;
+}
+
+.tpak-workflow-actions::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(45deg, #f8f9fa 25%, transparent 25%), 
+                linear-gradient(-45deg, #f8f9fa 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #f8f9fa 75%), 
+                linear-gradient(-45deg, transparent 75%, #f8f9fa 75%);
+    background-size: 20px 20px;
+    background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+    opacity: 0.1;
+    pointer-events: none;
+}
+
+.tpak-action-buttons {
+    position: relative;
+    z-index: 1;
+}
+
+.tpak-action-btn {
+    position: relative;
+    overflow: hidden;
+}
+
+.tpak-action-btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    transition: all 0.3s ease;
+}
+
+.tpak-action-btn:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+/* Status Info Enhancements */
+.tpak-status-info {
+    margin-top: 20px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 4px;
+    border-left: 4px solid #0073aa;
+}
+
+.tpak-status-info h4 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 14px;
+}
+
+.tpak-status-info p {
+    margin: 0;
+    display: flex;
+    align-items: center;
+}
+
+/* Batch Info Enhancements */
+.tpak-batch-info table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.tpak-batch-info th {
+    text-align: left;
+    padding: 8px 0;
+    font-weight: 600;
+    color: #333;
+    width: 40%;
+}
+
+.tpak-batch-info td {
+    padding: 8px 0;
+    color: #666;
+}
+
+/* Loading States */
+.tpak-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(255, 255, 255, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.tpak-loading-spinner {
+    width: 40px;
+    height: 40px;
+    border: 4px solid #f3f3f3;
+    border-top: 4px solid #0073aa;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .tpak-dialog-content {
+        width: 95%;
+        padding: 20px;
+    }
+    
+    .tpak-dialog-buttons {
+        text-align: center;
+    }
+    
+    .tpak-dialog-buttons .button {
+        margin: 5px;
+        width: 100%;
+        max-width: 200px;
+    }
+    
+    .tpak-action-buttons {
+        flex-direction: column;
+    }
+    
+    .tpak-action-btn {
+        margin-bottom: 10px;
+        width: 100%;
+    }
+}
+
+/* Print Styles */
+@media print {
+    .tpak-workflow-actions,
+    .tpak-action-buttons {
+        display: none;
+    }
+    
+    .tpak-audit-trail {
+        page-break-inside: avoid;
+    }
+    
+    .tpak-survey-data {
+        page-break-inside: avoid;
+    }
+}
+
+/* Accessibility Enhancements */
+.tpak-action-btn:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: 2px;
+}
+
+.tpak-status-indicator:focus {
+    outline: 2px solid #0073aa;
+    outline-offset: 2px;
+}
+
+/* High Contrast Mode */
+@media (prefers-contrast: high) {
+    .tpak-status-indicator {
+        border: 2px solid #000;
+    }
+    
+    .tpak-action-btn {
+        border: 2px solid #000;
+    }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    .tpak-audit-trail .tpak-audit-item,
+    .tpak-action-btn::before,
+    .tpak-status-indicator::after {
+        transition: none;
+    }
+    
+    .tpak-auto-save-notification {
+        animation: none;
+    }
+} 

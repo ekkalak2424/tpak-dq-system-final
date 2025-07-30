@@ -1,0 +1,434 @@
+/**
+ * TPAK DQ System - Admin Styles
+ */
+
+/* Dashboard Styles */
+.tpak-dashboard {
+    margin: 20px 0;
+}
+
+.tpak-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.tpak-stat-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.tpak-stat-card h3 {
+    margin: 0 0 10px 0;
+    color: #333;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tpak-stat-number {
+    font-size: 36px;
+    font-weight: bold;
+    color: #0073aa;
+    margin: 0;
+}
+
+.tpak-stat-card.pending-a {
+    border-left: 4px solid #ff9800;
+}
+
+.tpak-stat-card.pending-b {
+    border-left: 4px solid #2196f3;
+}
+
+.tpak-stat-card.pending-c {
+    border-left: 4px solid #9c27b0;
+}
+
+.tpak-stat-card.finalized {
+    border-left: 4px solid #4caf50;
+}
+
+/* Settings Page Styles */
+.tpak-settings-page {
+    max-width: 800px;
+}
+
+.tpak-settings-section {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.tpak-settings-section h3 {
+    margin-top: 0;
+    color: #333;
+    border-bottom: 2px solid #0073aa;
+    padding-bottom: 10px;
+}
+
+.tpak-form-row {
+    margin-bottom: 15px;
+}
+
+.tpak-form-row label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #333;
+}
+
+.tpak-form-row input[type="text"],
+.tpak-form-row input[type="url"],
+.tpak-form-row input[type="password"],
+.tpak-form-row input[type="number"],
+.tpak-form-row select {
+    width: 100%;
+    max-width: 400px;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+.tpak-form-row input[type="checkbox"] {
+    margin-right: 8px;
+}
+
+.tpak-form-row .description {
+    color: #666;
+    font-size: 13px;
+    margin-top: 5px;
+}
+
+/* Import Page Styles */
+.tpak-import-section {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.tpak-import-status {
+    padding: 15px;
+    border-radius: 4px;
+    margin: 15px 0;
+}
+
+.tpak-import-status.success {
+    background-color: #d4edda;
+    border: 1px solid #c3e6cb;
+    color: #155724;
+}
+
+.tpak-import-status.error {
+    background-color: #f8d7da;
+    border: 1px solid #f5c6cb;
+    color: #721c24;
+}
+
+.tpak-import-status.info {
+    background-color: #d1ecf1;
+    border: 1px solid #bee5eb;
+    color: #0c5460;
+}
+
+/* Users Page Styles */
+.tpak-users-table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.tpak-users-table th,
+.tpak-users-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.tpak-users-table th {
+    background-color: #f8f9fa;
+    font-weight: 600;
+    color: #333;
+}
+
+.tpak-users-table tr:hover {
+    background-color: #f8f9fa;
+}
+
+.tpak-role-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tpak-role-badge.administrator {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+.tpak-role-badge.interviewer {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.tpak-role-badge.supervisor {
+    background-color: #17a2b8;
+    color: #fff;
+}
+
+.tpak-role-badge.examiner {
+    background-color: #6f42c1;
+    color: #fff;
+}
+
+/* Workflow Action Buttons */
+.tpak-workflow-actions {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #dee2e6;
+}
+
+.tpak-workflow-actions h4 {
+    margin: 0 0 15px 0;
+    color: #333;
+}
+
+.tpak-action-buttons {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.tpak-action-btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    text-decoration: none;
+    display: inline-block;
+    transition: all 0.3s ease;
+}
+
+.tpak-action-btn.primary {
+    background-color: #0073aa;
+    color: #fff;
+}
+
+.tpak-action-btn.primary:hover {
+    background-color: #005a87;
+}
+
+.tpak-action-btn.secondary {
+    background-color: #6c757d;
+    color: #fff;
+}
+
+.tpak-action-btn.secondary:hover {
+    background-color: #545b62;
+}
+
+.tpak-action-btn.danger {
+    background-color: #dc3545;
+    color: #fff;
+}
+
+.tpak-action-btn.danger:hover {
+    background-color: #c82333;
+}
+
+.tpak-action-btn.success {
+    background-color: #28a745;
+    color: #fff;
+}
+
+.tpak-action-btn.success:hover {
+    background-color: #218838;
+}
+
+/* Audit Trail Styles */
+.tpak-audit-trail {
+    margin: 20px 0;
+}
+
+.tpak-audit-item {
+    padding: 10px 15px;
+    border-left: 3px solid #0073aa;
+    background: #f8f9fa;
+    margin-bottom: 10px;
+    border-radius: 0 4px 4px 0;
+}
+
+.tpak-audit-item .audit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.tpak-audit-item .audit-user {
+    font-weight: 600;
+    color: #333;
+}
+
+.tpak-audit-item .audit-time {
+    font-size: 12px;
+    color: #666;
+}
+
+.tpak-audit-item .audit-action {
+    font-weight: 500;
+    color: #0073aa;
+    text-transform: uppercase;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+}
+
+.tpak-audit-item .audit-comment {
+    color: #555;
+    font-style: italic;
+    margin-top: 5px;
+}
+
+/* Survey Data Display */
+.tpak-survey-data {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.tpak-survey-data h4 {
+    margin: 0 0 15px 0;
+    color: #333;
+    border-bottom: 2px solid #0073aa;
+    padding-bottom: 10px;
+}
+
+.tpak-data-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.tpak-data-item:last-child {
+    border-bottom: none;
+}
+
+.tpak-data-label {
+    font-weight: 600;
+    color: #333;
+    min-width: 150px;
+}
+
+.tpak-data-value {
+    color: #555;
+    flex: 1;
+    text-align: right;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .tpak-stats-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .tpak-action-buttons {
+        flex-direction: column;
+    }
+    
+    .tpak-action-btn {
+        width: 100%;
+        text-align: center;
+    }
+    
+    .tpak-users-table {
+        font-size: 14px;
+    }
+    
+    .tpak-users-table th,
+    .tpak-users-table td {
+        padding: 8px 10px;
+    }
+}
+
+/* Loading States */
+.tpak-loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+.tpak-loading::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 20px;
+    height: 20px;
+    margin: -10px 0 0 -10px;
+    border: 2px solid #f3f3f3;
+    border-top: 2px solid #0073aa;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Status Indicators */
+.tpak-status-indicator {
+    display: inline-block;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    margin-right: 8px;
+}
+
+.tpak-status-indicator.pending-a {
+    background-color: #ff9800;
+}
+
+.tpak-status-indicator.pending-b {
+    background-color: #2196f3;
+}
+
+.tpak-status-indicator.pending-c {
+    background-color: #9c27b0;
+}
+
+.tpak-status-indicator.rejected-by-b,
+.tpak-status-indicator.rejected-by-c {
+    background-color: #f44336;
+}
+
+.tpak-status-indicator.finalized,
+.tpak-status-indicator.finalized-by-sampling {
+    background-color: #4caf50;
+}
+
+/* Import Meta Box Styles */
+@import url('meta-box.css'); 
