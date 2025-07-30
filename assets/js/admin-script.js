@@ -63,13 +63,19 @@ jQuery(document).ready(function($) {
         button.text('กำลังทดสอบ...').prop('disabled', true);
         resultSpan.html('');
         
+        // Debug: Log the request data
+        var requestData = {
+            action: 'tpak_test_api',
+            nonce: tpak_dq_ajax.nonce
+        };
+        console.log('API Test Request Data:', requestData);
+        console.log('AJAX URL:', tpak_dq_ajax.ajax_url);
+        
         $.ajax({
             url: tpak_dq_ajax.ajax_url,
             type: 'POST',
-            data: {
-                action: 'tpak_test_api',
-                nonce: tpak_dq_ajax.nonce
-            },
+            data: requestData,
+            dataType: 'json',
             success: function(response) {
                 console.log('API Test Response:', response);
                 if (response.success) {
@@ -79,7 +85,13 @@ jQuery(document).ready(function($) {
                 }
             },
             error: function(xhr, status, error) {
-                console.log('API Test Error:', {xhr: xhr, status: status, error: error});
+                console.log('API Test Error Details:', {
+                    xhr: xhr,
+                    status: status,
+                    error: error,
+                    responseText: xhr.responseText,
+                    statusText: xhr.statusText
+                });
                 resultSpan.html('<span style="color: red; font-weight: bold;">✗ การทดสอบล้มเหลว กรุณาลองใหม่อีกครั้ง</span>');
             },
             complete: function() {
@@ -312,10 +324,14 @@ jQuery(document).ready(function($) {
     }
     
     // Initialize tooltips (if jQuery UI is available)
-    if ($.fn.tooltip) {
-        $('[data-tooltip]').tooltip({
-            position: { my: 'left+5 center', at: 'right center' }
-        });
+    if (typeof $.fn.tooltip !== 'undefined') {
+        try {
+            $('[data-tooltip]').tooltip({
+                position: { my: 'left+5 center', at: 'right center' }
+            });
+        } catch (e) {
+            console.log('Tooltip initialization failed:', e);
+        }
     }
     
     // Initialize datepickers

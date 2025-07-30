@@ -21,6 +21,9 @@ class TPAK_DQ_Admin_Menu {
         
         // AJAX actions
         add_action('wp_ajax_tpak_test_api', array($this, 'test_api_connection'));
+        
+        // Debug: Log AJAX action registration
+        error_log('TPAK DQ System: AJAX action tpak_test_api registered');
     }
     
     /**
@@ -175,6 +178,9 @@ class TPAK_DQ_Admin_Menu {
                 'ajax_url' => admin_url('admin-ajax.php'),
                 'nonce' => wp_create_nonce('tpak_workflow_nonce')
             ));
+            
+            // Debug: Log the nonce
+            error_log('TPAK DQ System: Generated nonce: ' . wp_create_nonce('tpak_workflow_nonce'));
         }
     }
     
@@ -361,13 +367,19 @@ class TPAK_DQ_Admin_Menu {
      * Test API connection via AJAX
      */
     public function test_api_connection() {
+        // Debug: Log the request
+        error_log('TPAK DQ System: AJAX test_api_connection called');
+        error_log('TPAK DQ System: POST data: ' . print_r($_POST, true));
+        
         // Check nonce
         if (!wp_verify_nonce($_POST['nonce'], 'tpak_workflow_nonce')) {
+            error_log('TPAK DQ System: Nonce verification failed');
             wp_send_json_error(array('message' => __('Security check failed', 'tpak-dq-system')));
         }
         
         // Check permissions
         if (!current_user_can('manage_options')) {
+            error_log('TPAK DQ System: Permission check failed');
             wp_send_json_error(array('message' => __('You do not have permission to perform this action', 'tpak-dq-system')));
         }
         
@@ -376,9 +388,12 @@ class TPAK_DQ_Admin_Menu {
         
         // Test connection
         if ($api_handler->is_configured()) {
+            error_log('TPAK DQ System: API is configured, testing connection');
             if ($api_handler->test_connection()) {
+                error_log('TPAK DQ System: API connection successful');
                 wp_send_json_success(array('message' => __('API connection successful!', 'tpak-dq-system')));
             } else {
+                error_log('TPAK DQ System: API connection failed');
                 // Get more detailed error information
                 $options = get_option('tpak_dq_system_options', array());
                 $url = isset($options['limesurvey_url']) ? $options['limesurvey_url'] : '';
@@ -392,6 +407,7 @@ class TPAK_DQ_Admin_Menu {
                 wp_send_json_error(array('message' => $error_message));
             }
         } else {
+            error_log('TPAK DQ System: API is not configured');
             wp_send_json_error(array('message' => __('API is not configured. Please fill in all required fields.', 'tpak-dq-system')));
         }
     }
