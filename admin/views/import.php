@@ -103,10 +103,11 @@ if (!defined('ABSPATH')) {
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($surveys as $survey): ?>
-                                    <tr>
-                                        <td><?php echo esc_html($survey['sid']); ?></td>
-                                        <td><?php echo esc_html($survey['surveyls_title']); ?></td>
+                                <?php if (is_array($surveys)): ?>
+                                    <?php foreach ($surveys as $survey): ?>
+                                        <tr>
+                                            <td><?php echo esc_html($survey['sid']); ?></td>
+                                            <td><?php echo esc_html($survey['surveyls_title']); ?></td>
                                         <td>
                                             <?php 
                                             $status = $survey['active'] ? __('เปิดใช้งาน', 'tpak-dq-system') : __('ปิดใช้งาน', 'tpak-dq-system');
@@ -121,7 +122,12 @@ if (!defined('ABSPATH')) {
                                             </button>
                                         </td>
                                     </tr>
-                                <?php endforeach; ?>
+                                    <?php endforeach; ?>
+                                <?php else: ?>
+                                    <tr>
+                                        <td colspan="4"><?php _e('ไม่สามารถดึงข้อมูลแบบสอบถามได้', 'tpak-dq-system'); ?></td>
+                                    </tr>
+                                <?php endif; ?>
                             </tbody>
                         </table>
                         <?php else: ?>

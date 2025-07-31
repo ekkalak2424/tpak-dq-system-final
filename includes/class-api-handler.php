@@ -80,6 +80,12 @@ class TPAK_DQ_API_Handler {
         ));
         
         if ($response && isset($response['result'])) {
+            // Check if the result is an error message
+            if (is_array($response['result']) && isset($response['result']['status'])) {
+                error_log('TPAK DQ System: Session key error: ' . $response['result']['status']);
+                return false;
+            }
+            
             $this->session_key = $response['result'];
             error_log('TPAK DQ System: Successfully got session key');
             return $this->session_key;
@@ -103,7 +109,8 @@ class TPAK_DQ_API_Handler {
             return false;
         }
         
-        $url = rtrim($this->api_url, '/') . '/admin/remotecontrol';
+        // Use the API URL directly without appending /admin/remotecontrol
+        $url = $this->api_url;
         
         $request_data = array(
             'method' => $method,
@@ -162,8 +169,11 @@ class TPAK_DQ_API_Handler {
      * Get list of surveys
      */
     public function get_surveys() {
+        error_log('TPAK DQ System: Getting surveys list');
+        
         $session_key = $this->get_session_key();
         if (!$session_key) {
+            error_log('TPAK DQ System: Failed to get session key for surveys list');
             return false;
         }
         
@@ -173,9 +183,11 @@ class TPAK_DQ_API_Handler {
         ));
         
         if ($response && isset($response['result'])) {
+            error_log('TPAK DQ System: Successfully got surveys list');
             return $response['result'];
         }
         
+        error_log('TPAK DQ System: Failed to get surveys list - response: ' . print_r($response, true));
         return false;
     }
     
