@@ -15,6 +15,9 @@ class TPAK_DQ_Admin_Menu {
      * Constructor
      */
     public function __construct() {
+        // Ensure post types are registered immediately
+        $this->ensure_post_types_registered();
+        
         add_action('admin_menu', array($this, 'add_admin_menu'));
         add_action('admin_init', array($this, 'register_settings'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_scripts'));
@@ -32,6 +35,11 @@ class TPAK_DQ_Admin_Menu {
      * Add admin menu
      */
     public function add_admin_menu() {
+        // Ensure post types are registered
+        $post_types = new TPAK_DQ_Post_Types();
+        $post_types->register_post_types();
+        $post_types->register_taxonomies();
+        
         // Main menu
         add_menu_page(
             __('TPAK DQ System', 'tpak-dq-system'),
@@ -251,6 +259,9 @@ class TPAK_DQ_Admin_Menu {
      * Dashboard page
      */
     public function dashboard_page() {
+        // Ensure post types are registered before accessing
+        $this->ensure_post_types_registered();
+        
         $options = get_option('tpak_dq_system_options', array());
         $api_handler = new TPAK_DQ_API_Handler();
         $cron_handler = new TPAK_DQ_Cron();
@@ -269,6 +280,9 @@ class TPAK_DQ_Admin_Menu {
      * Settings page
      */
     public function settings_page() {
+        // Ensure post types are registered before accessing
+        $this->ensure_post_types_registered();
+        
         // Debug: Log POST data
         error_log('TPAK DQ System: POST data in settings_page: ' . print_r($_POST, true));
         
@@ -291,6 +305,9 @@ class TPAK_DQ_Admin_Menu {
      * Import page
      */
     public function import_page() {
+        // Ensure post types are registered before accessing
+        $this->ensure_post_types_registered();
+        
         $api_handler = new TPAK_DQ_API_Handler();
         $cron_handler = new TPAK_DQ_Cron();
         
@@ -305,6 +322,9 @@ class TPAK_DQ_Admin_Menu {
      * Users page
      */
     public function users_page() {
+        // Ensure post types are registered before accessing
+        $this->ensure_post_types_registered();
+        
         $roles = new TPAK_DQ_Roles();
         $users = $roles->get_all_verification_users();
         
@@ -454,6 +474,20 @@ class TPAK_DQ_Admin_Menu {
         $value = isset($options['sampling_percentage']) ? $options['sampling_percentage'] : 70;
         echo '<input type="number" name="sampling_percentage" value="' . esc_attr($value) . '" min="1" max="100" />';
         echo '<p class="description">' . __('Percentage of batches to finalize by sampling (1-100)', 'tpak-dq-system') . '</p>';
+    }
+    
+    /**
+     * Ensure post types are registered
+     */
+    private function ensure_post_types_registered() {
+        if (!post_type_exists('verification_batch')) {
+            $post_types = new TPAK_DQ_Post_Types();
+            $post_types->register_post_types();
+            $post_types->register_taxonomies();
+            
+            // Force flush rewrite rules
+            flush_rewrite_rules();
+        }
     }
     
     /**

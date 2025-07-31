@@ -18,12 +18,21 @@ class TPAK_DQ_Post_Types {
     public function __construct() {
         add_action('init', array($this, 'register_post_types'));
         add_action('init', array($this, 'register_taxonomies'));
+        
+        // Also register on admin_init to ensure they're available in admin
+        add_action('admin_init', array($this, 'register_post_types'));
+        add_action('admin_init', array($this, 'register_taxonomies'));
     }
     
     /**
      * Register custom post types
      */
     public function register_post_types() {
+        // Check if post type is already registered
+        if (post_type_exists('verification_batch')) {
+            return;
+        }
+        
         // Register verification_batch post type
         register_post_type('verification_batch', array(
             'labels' => array(
@@ -95,6 +104,11 @@ class TPAK_DQ_Post_Types {
      * Register custom taxonomies
      */
     public function register_taxonomies() {
+        // Check if taxonomy is already registered
+        if (taxonomy_exists('verification_status')) {
+            return;
+        }
+        
         // Register verification_status taxonomy
         register_taxonomy('verification_status', array('verification_batch'), array(
             'labels' => array(

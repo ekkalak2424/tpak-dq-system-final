@@ -107,6 +107,12 @@ class TPAK_DQ_System {
         
         // Initialize notifications
         new TPAK_DQ_Notifications();
+        
+        // Check if we need to flush rewrite rules
+        if (get_option('tpak_dq_system_flush_rewrite', false)) {
+            flush_rewrite_rules();
+            delete_option('tpak_dq_system_flush_rewrite');
+        }
     }
     
     /**
@@ -133,11 +139,14 @@ class TPAK_DQ_System {
         $post_types->register_post_types();
         $post_types->register_taxonomies();
         
-        // Flush rewrite rules
+        // Flush rewrite rules to ensure custom post types are recognized
         flush_rewrite_rules();
         
         // Set default options
         $this->set_default_options();
+        
+        // Force refresh of permalinks
+        update_option('tpak_dq_system_flush_rewrite', true);
     }
     
     /**
