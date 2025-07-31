@@ -186,8 +186,26 @@ class TPAK_DQ_API_Handler {
         ));
         
         if ($response && isset($response['result'])) {
-            error_log('TPAK DQ System: Successfully got surveys list');
-            return $response['result'];
+            // Check if the result is an error message
+            if (is_array($response['result']) && isset($response['result']['status'])) {
+                error_log('TPAK DQ System: API returned error status for surveys: ' . $response['result']['status']);
+                return false;
+            }
+            
+            // Check if result is a string (error message)
+            if (is_string($response['result'])) {
+                error_log('TPAK DQ System: API returned string result for surveys (likely error): ' . $response['result']);
+                return false;
+            }
+            
+            // Check if result is an array of surveys
+            if (is_array($response['result'])) {
+                error_log('TPAK DQ System: Successfully got surveys list - count: ' . count($response['result']));
+                return $response['result'];
+            }
+            
+            error_log('TPAK DQ System: Unexpected surveys result type: ' . gettype($response['result']));
+            return false;
         }
         
         error_log('TPAK DQ System: Failed to get surveys list - response: ' . print_r($response, true));
@@ -226,8 +244,26 @@ class TPAK_DQ_API_Handler {
         $response = $this->make_api_request('export_responses', $params);
         
         if ($response && isset($response['result'])) {
-            error_log('TPAK DQ System: Successfully got survey responses');
-            return $response['result'];
+            // Check if the result is an error message
+            if (is_array($response['result']) && isset($response['result']['status'])) {
+                error_log('TPAK DQ System: API returned error status: ' . $response['result']['status']);
+                return false;
+            }
+            
+            // Check if result is a string (error message)
+            if (is_string($response['result'])) {
+                error_log('TPAK DQ System: API returned string result (likely error): ' . $response['result']);
+                return false;
+            }
+            
+            // Check if result is an array of responses
+            if (is_array($response['result'])) {
+                error_log('TPAK DQ System: Successfully got survey responses - count: ' . count($response['result']));
+                return $response['result'];
+            }
+            
+            error_log('TPAK DQ System: Unexpected result type: ' . gettype($response['result']));
+            return false;
         }
         
         error_log('TPAK DQ System: Failed to get survey responses - response: ' . print_r($response, true));
@@ -249,9 +285,29 @@ class TPAK_DQ_API_Handler {
         ));
         
         if ($response && isset($response['result'])) {
-            return $response['result'];
+            // Check if the result is an error message
+            if (is_array($response['result']) && isset($response['result']['status'])) {
+                error_log('TPAK DQ System: API returned error status for survey structure: ' . $response['result']['status']);
+                return false;
+            }
+            
+            // Check if result is a string (error message)
+            if (is_string($response['result'])) {
+                error_log('TPAK DQ System: API returned string result for survey structure (likely error): ' . $response['result']);
+                return false;
+            }
+            
+            // Check if result is an array of questions
+            if (is_array($response['result'])) {
+                error_log('TPAK DQ System: Successfully got survey structure - count: ' . count($response['result']));
+                return $response['result'];
+            }
+            
+            error_log('TPAK DQ System: Unexpected survey structure result type: ' . gettype($response['result']));
+            return false;
         }
         
+        error_log('TPAK DQ System: Failed to get survey structure - response: ' . print_r($response, true));
         return false;
     }
     
@@ -282,6 +338,12 @@ class TPAK_DQ_API_Handler {
         $responses = $this->get_survey_responses($survey_id);
         if (!$responses) {
             error_log('TPAK DQ System: Failed to get survey responses for survey ID: ' . $survey_id);
+            return false;
+        }
+        
+        // Ensure responses is an array
+        if (!is_array($responses)) {
+            error_log('TPAK DQ System: Responses is not an array - type: ' . gettype($responses) . ', value: ' . print_r($responses, true));
             return false;
         }
         

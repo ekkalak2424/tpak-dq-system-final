@@ -217,9 +217,9 @@ class TPAK_DQ_Admin_Menu {
         // Get API handler
         $api_handler = new TPAK_DQ_API_Handler();
         
-        // Import survey data
+                // Import survey data
         $result = $api_handler->import_survey_data($survey_id);
-        
+
         if ($result && $result['imported'] > 0) {
             $message = sprintf(__('นำเข้าข้อมูลสำเร็จ %d รายการ', 'tpak-dq-system'), $result['imported']);
             if (!empty($result['errors'])) {
@@ -227,7 +227,12 @@ class TPAK_DQ_Admin_Menu {
             }
             wp_send_json_success(array('message' => $message));
         } else {
-            wp_send_json_error(array('message' => __('นำเข้าข้อมูลล้มเหลว กรุณาลองใหม่อีกครั้ง', 'tpak-dq-system')));
+            // Check if it's an API issue
+            if (!$api_handler->test_connection()) {
+                wp_send_json_error(array('message' => __('ไม่สามารถเชื่อมต่อกับ LimeSurvey API ได้ กรุณาตรวจสอบการตั้งค่า', 'tpak-dq-system')));
+            } else {
+                wp_send_json_error(array('message' => __('ไม่พบข้อมูลในแบบสอบถามนี้ หรือแบบสอบถามไม่มีข้อมูลที่สามารถนำเข้าได้', 'tpak-dq-system')));
+            }
         }
     }
     
