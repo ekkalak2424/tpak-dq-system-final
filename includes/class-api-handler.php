@@ -212,96 +212,114 @@ class TPAK_DQ_API_Handler {
         return false;
     }
     
-    /**
-     * Get survey responses with pagination support
-     */
-    public function get_survey_responses($survey_id, $start_date = null, $end_date = null) {
-        error_log('TPAK DQ System: Getting survey responses for survey ID: ' . $survey_id);
-        
-        $session_key = $this->get_session_key();
-        if (!$session_key) {
-            error_log('TPAK DQ System: Failed to get session key for survey responses');
-            return false;
-        }
-        
-        // Try different language codes or no language code
-        $language_codes = array('en', 'th', ''); // Try English, Thai, then no language code
-        
-        foreach ($language_codes as $lang_code) {
-            error_log('TPAK DQ System: Trying language code: ' . ($lang_code ?: 'none'));
-            
-            // Try to get all responses with pagination
-            $all_responses = $this->get_survey_responses_paginated($survey_id, $lang_code, $start_date, $end_date);
-            
-            if ($all_responses && is_array($all_responses)) {
-                error_log('TPAK DQ System: Successfully got ' . count($all_responses) . ' responses with language ' . ($lang_code ?: 'none'));
-                return $all_responses;
-            }
-        }
-        
-        error_log('TPAK DQ System: All language codes failed for survey ID: ' . $survey_id);
-        return false;
-    }
+         /**
+      * Get survey responses with improved pagination
+      */
+     public function get_survey_responses($survey_id, $start_date = null, $end_date = null) {
+         error_log('TPAK DQ System: Getting survey responses for survey ID: ' . $survey_id);
+         
+         // Try different language codes or no language code
+         $language_codes = array('', 'th', 'en'); // Try no language first, then Thai, then English
+         
+         foreach ($language_codes as $lang_code) {
+             error_log('TPAK DQ System: Trying language code: ' . ($lang_code ?: 'none'));
+             
+             // Try to get all responses with improved pagination
+             $all_responses = $this->get_survey_responses_paginated($survey_id, $lang_code, $start_date, $end_date);
+             
+             if ($all_responses && is_array($all_responses) && !empty($all_responses)) {
+                 error_log('TPAK DQ System: Successfully got ' . count($all_responses) . ' responses with language ' . ($lang_code ?: 'none'));
+                 return $all_responses;
+             }
+         }
+         
+         error_log('TPAK DQ System: All language codes failed for survey ID: ' . $survey_id);
+         return false;
+     }
     
-    /**
-     * Get survey responses with pagination support
-     */
-    private function get_survey_responses_paginated($survey_id, $lang_code, $start_date = null, $end_date = null) {
-        $session_key = $this->get_session_key();
-        if (!$session_key) {
-            return false;
-        }
-        
-        $all_responses = array();
-        $iStart = 0;
-        $iLimit = 1000; // Get 1000 responses per request
-        $has_more_data = true;
-        
-        error_log('TPAK DQ System: Starting paginated data retrieval for survey ID: ' . $survey_id);
-        
-        while ($has_more_data) {
-            $params = array(
-                'sSessionKey' => $session_key,
-                'iSurveyID' => $survey_id,
-                'sDocumentType' => 'json',
-                'iStart' => $iStart,
-                'iLimit' => $iLimit
-            );
-            
-            // Only add language code if it's not empty
-            if (!empty($lang_code)) {
-                $params['sLanguageCode'] = $lang_code;
-            }
-            
-            if ($start_date) {
-                $params['sDateFrom'] = $start_date;
-            }
-            
-            if ($end_date) {
-                $params['sDateTo'] = $end_date;
-            }
-            
-            error_log('TPAK DQ System: Requesting responses ' . $iStart . ' to ' . ($iStart + $iLimit) . ' with language: ' . ($lang_code ?: 'none'));
-            
-            $response = $this->make_api_request('export_responses', $params);
-            
-            if ($response && isset($response['result'])) {
-                // Check if the result is an error message
-                if (is_array($response['result']) && isset($response['result']['status'])) {
-                    error_log('TPAK DQ System: API returned error status: ' . $response['result']['status']);
-                    
-                    // If it's a language error, return false to try next language
-                    if (strpos($response['result']['status'], 'Language code not found') !== false) {
-                        return false;
-                    }
-                    
-                    // For other errors, return false
-                    return false;
-                }
-                
-                                 // Check if result is a string (could be base64 encoded data or error)
+         /**
+      * Get survey responses with improved pagination
+      */
+     private function get_survey_responses_paginated($survey_id, $lang_code, $start_date = null, $end_date = null) {
+         $session_key = $this->get_session_key();
+         if (!$session_key) {
+             return false;
+         }
+         
+         $all_responses = array();
+         $iStart = 0;
+         $iLimit = 500; // Reduced to 500 responses per request for better stability
+         $has_more_data = true;
+         $consecutive_errors = 0;
+         $max_consecutive_errors = 5; // Increased retry attempts
+         $page_count = 0;
+         $max_pages = 200; // Safety limit for number of pages
+         
+         error_log('TPAK DQ System: Starting improved paginated data retrieval for survey ID: ' . $survey_id . ' with language: ' . ($lang_code ?: 'none'));
+         
+         while ($has_more_data && $page_count < $max_pages) {
+             $page_count++;
+             
+             // Get fresh session key for each page to avoid timeout issues
+             if ($page_count > 1) {
+                 $this->clear_session_key();
+                 $session_key = $this->get_session_key();
+                 if (!$session_key) {
+                     error_log('TPAK DQ System: Failed to get session key for page ' . $page_count);
+                     break;
+                 }
+             }
+             
+             $params = array(
+                 'sSessionKey' => $session_key,
+                 'iSurveyID' => $survey_id,
+                 'sDocumentType' => 'json',
+                 'iStart' => $iStart,
+                 'iLimit' => $iLimit
+             );
+             
+             // Only add language code if it's not empty
+             if (!empty($lang_code)) {
+                 $params['sLanguageCode'] = $lang_code;
+             }
+             
+             if ($start_date) {
+                 $params['sDateFrom'] = $start_date;
+             }
+             
+             if ($end_date) {
+                 $params['sDateTo'] = $end_date;
+             }
+             
+             error_log('TPAK DQ System: Page ' . $page_count . ' - Requesting responses ' . $iStart . ' to ' . ($iStart + $iLimit) . ' with language: ' . ($lang_code ?: 'none'));
+             
+             $response = $this->make_api_request('export_responses', $params);
+             
+             if ($response && isset($response['result'])) {
+                 // Check if the result is an error message
+                 if (is_array($response['result']) && isset($response['result']['status'])) {
+                     error_log('TPAK DQ System: Page ' . $page_count . ' - API returned error status: ' . $response['result']['status']);
+                     
+                     // If it's a language error, return false to try next language
+                     if (strpos($response['result']['status'], 'Language code not found') !== false) {
+                         return false;
+                     }
+                     
+                     // For other errors, try to continue with next batch
+                     $consecutive_errors++;
+                     if ($consecutive_errors >= $max_consecutive_errors) {
+                         error_log('TPAK DQ System: Too many consecutive errors, stopping pagination at page ' . $page_count);
+                         break;
+                     }
+                     
+                     // Wait a bit before retrying
+                     sleep(2);
+                     continue;
+                 }
+                 
+                 // Check if result is a string (could be base64 encoded data or error)
                  if (is_string($response['result'])) {
-                     error_log('TPAK DQ System: API returned string result, length: ' . strlen($response['result']));
+                     error_log('TPAK DQ System: Page ' . $page_count . ' - API returned string result, length: ' . strlen($response['result']));
                      
                      // Check if it's an error message
                      if (strpos($response['result'], 'Language code not found') !== false) {
@@ -311,83 +329,102 @@ class TPAK_DQ_API_Handler {
                      
                      if (strpos($response['result'], 'No Data') !== false) {
                          error_log('TPAK DQ System: No data available');
-                         return false;
+                         $has_more_data = false;
+                         break;
                      }
                      
                      // Try to decode as base64 (this is the normal case for LimeSurvey)
                      $decoded = base64_decode($response['result'], true);
                      if ($decoded !== false) {
-                         error_log('TPAK DQ System: Base64 decode success, length: ' . strlen($decoded));
+                         error_log('TPAK DQ System: Page ' . $page_count . ' - Base64 decode success, length: ' . strlen($decoded));
                          
                          // Try to decode as JSON
                          $json_data = json_decode($decoded, true);
                          if (json_last_error() === JSON_ERROR_NONE && is_array($json_data)) {
-                             error_log('TPAK DQ System: JSON decode success, keys: ' . implode(',', array_keys($json_data)));
+                             error_log('TPAK DQ System: Page ' . $page_count . ' - JSON decode success, keys: ' . implode(',', array_keys($json_data)));
                              
                              // Check if it has 'responses' key
                              if (isset($json_data['responses']) && is_array($json_data['responses'])) {
                                  $responses_chunk = $json_data['responses'];
-                                 error_log('TPAK DQ System: Found ' . count($responses_chunk) . ' responses in JSON');
+                                 error_log('TPAK DQ System: Page ' . $page_count . ' - Found ' . count($responses_chunk) . ' responses in JSON');
                                  
                                  if (!empty($responses_chunk)) {
                                      $all_responses = array_merge($all_responses, $responses_chunk);
                                      $iStart += $iLimit;
+                                     $consecutive_errors = 0; // Reset error counter on success
                                      
                                      // If we got fewer responses than requested, we've reached the end
                                      if (count($responses_chunk) < $iLimit) {
                                          $has_more_data = false;
+                                         error_log('TPAK DQ System: Page ' . $page_count . ' - Got fewer responses than requested, ending pagination');
                                      }
                                  } else {
                                      $has_more_data = false;
+                                     error_log('TPAK DQ System: Page ' . $page_count . ' - Empty responses chunk, ending pagination');
                                  }
                              } else {
-                                 error_log('TPAK DQ System: No responses key found, available keys: ' . implode(',', array_keys($json_data)));
+                                 error_log('TPAK DQ System: Page ' . $page_count . ' - No responses key found, available keys: ' . implode(',', array_keys($json_data)));
                                  return false;
                              }
                          } else {
-                             error_log('TPAK DQ System: JSON decode failed: ' . json_last_error_msg());
+                             error_log('TPAK DQ System: Page ' . $page_count . ' - JSON decode failed: ' . json_last_error_msg());
                              return false;
                          }
                      } else {
-                         error_log('TPAK DQ System: Base64 decode failed, treating as error message');
+                         error_log('TPAK DQ System: Page ' . $page_count . ' - Base64 decode failed, treating as error message');
                          return false;
                      }
                  }
-                
-                // Check if result is an array of responses
-                if (is_array($response['result'])) {
-                    $responses_chunk = $response['result'];
-                    error_log('TPAK DQ System: Got ' . count($responses_chunk) . ' responses in this chunk');
-                    
-                    if (!empty($responses_chunk)) {
-                        $all_responses = array_merge($all_responses, $responses_chunk);
-                        $iStart += $iLimit;
-                        
-                        // If we got fewer responses than requested, we've reached the end
-                        if (count($responses_chunk) < $iLimit) {
-                            $has_more_data = false;
-                        }
-                    } else {
-                        $has_more_data = false;
-                    }
-                }
-                
-                
-            } else {
-                error_log('TPAK DQ System: No response or invalid response structure');
-                return false;
-            }
-            
-            // Safety check to prevent infinite loop
-            if (count($all_responses) > 100000) {
-                error_log('TPAK DQ System: Safety limit reached (100,000 responses), stopping pagination');
-                break;
-            }
-        }
-        
-        error_log('TPAK DQ System: Pagination completed, total responses: ' . count($all_responses));
-        return $all_responses;
-    }
+                 
+                 // Check if result is an array of responses
+                 if (is_array($response['result'])) {
+                     $responses_chunk = $response['result'];
+                     error_log('TPAK DQ System: Page ' . $page_count . ' - Got ' . count($responses_chunk) . ' responses in this chunk');
+                     
+                     if (!empty($responses_chunk)) {
+                         $all_responses = array_merge($all_responses, $responses_chunk);
+                         $iStart += $iLimit;
+                         $consecutive_errors = 0; // Reset error counter on success
+                         
+                         // If we got fewer responses than requested, we've reached the end
+                         if (count($responses_chunk) < $iLimit) {
+                             $has_more_data = false;
+                             error_log('TPAK DQ System: Page ' . $page_count . ' - Got fewer responses than requested, ending pagination');
+                         }
+                     } else {
+                         $has_more_data = false;
+                         error_log('TPAK DQ System: Page ' . $page_count . ' - Empty responses chunk, ending pagination');
+                     }
+                 }
+                 
+             } else {
+                 error_log('TPAK DQ System: Page ' . $page_count . ' - No response or invalid response structure');
+                 $consecutive_errors++;
+                 if ($consecutive_errors >= $max_consecutive_errors) {
+                     error_log('TPAK DQ System: Too many consecutive errors, stopping pagination at page ' . $page_count);
+                     break;
+                 }
+                 
+                 // Wait a bit before retrying
+                 sleep(2);
+                 continue;
+             }
+             
+             // Safety check to prevent infinite loop
+             if (count($all_responses) > 100000) {
+                 error_log('TPAK DQ System: Safety limit reached (100,000 responses), stopping pagination at page ' . $page_count);
+                 break;
+             }
+             
+             // Small delay between requests to avoid overwhelming the server
+             if ($has_more_data) {
+                 usleep(500000); // 0.5 second delay
+             }
+         }
+         
+         error_log('TPAK DQ System: Pagination completed after ' . $page_count . ' pages, total responses: ' . count($all_responses));
+         return $all_responses;
+     }
     
     /**
      * Get survey structure (questions)
@@ -447,60 +484,65 @@ class TPAK_DQ_API_Handler {
         }
     }
     
-    /**
-     * Import survey data to WordPress using batch processing
-     */
-    public function import_survey_data($survey_id) {
-        // Increase memory and time limits for large imports
-        @ini_set('memory_limit', '512M');
-        @ini_set('max_execution_time', 300);
-        
-        error_log('TPAK DQ System: Starting batch import for survey ID: ' . $survey_id);
-        
-        // Get survey responses
-        $responses = $this->get_survey_responses($survey_id);
-        if (!$responses) {
-            error_log('TPAK DQ System: Failed to get survey responses for survey ID: ' . $survey_id);
-            return false;
-        }
-        
-        // Ensure responses is an array
-        if (!is_array($responses)) {
-            error_log('TPAK DQ System: Responses is not an array - type: ' . gettype($responses) . ', value: ' . print_r($responses, true));
-            return false;
-        }
-        
-        error_log('TPAK DQ System: Got ' . count($responses) . ' responses for survey ID: ' . $survey_id);
-        
-        // Process in batches
-        $batch_size = 50; // Process 50 responses at a time
-        $batches = array_chunk($responses, $batch_size);
-        $total_imported = 0;
-        $total_errors = array();
-        
-        error_log('TPAK DQ System: Processing ' . count($batches) . ' batches of ' . $batch_size . ' responses each');
-        
-        foreach ($batches as $batch_index => $batch) {
-            $batch_number = $batch_index + 1;
-            error_log('TPAK DQ System: Processing batch ' . $batch_number . ' of ' . count($batches) . ' (' . count($batch) . ' responses)');
-            
-            $batch_result = $this->process_import_batch($batch);
-            $total_imported += $batch_result['imported'];
-            $total_errors = array_merge($total_errors, $batch_result['errors']);
-            
-            error_log('TPAK DQ System: Batch ' . $batch_number . ' completed - Imported: ' . $batch_result['imported'] . ', Errors: ' . count($batch_result['errors']));
-        }
-        
-        error_log('TPAK DQ System: Batch import completed - Total Imported: ' . $total_imported . ', Total Errors: ' . count($total_errors));
-        if (!empty($total_errors)) {
-            error_log('TPAK DQ System: Import errors: ' . print_r($total_errors, true));
-        }
-        
-        return array(
-            'imported' => $total_imported,
-            'errors' => $total_errors
-        );
-    }
+         /**
+      * Import survey data to WordPress using improved pagination and batch processing
+      */
+     public function import_survey_data($survey_id) {
+         // Increase memory and time limits for large imports
+         @ini_set('memory_limit', '1G');
+         @ini_set('max_execution_time', 600); // 10 minutes
+         
+         error_log('TPAK DQ System: Starting improved batch import for survey ID: ' . $survey_id);
+         
+         // Get survey responses with improved pagination
+         $responses = $this->get_survey_responses($survey_id);
+         if (!$responses) {
+             error_log('TPAK DQ System: Failed to get survey responses for survey ID: ' . $survey_id);
+             return false;
+         }
+         
+         // Ensure responses is an array
+         if (!is_array($responses)) {
+             error_log('TPAK DQ System: Responses is not an array - type: ' . gettype($responses) . ', value: ' . print_r($responses, true));
+             return false;
+         }
+         
+         error_log('TPAK DQ System: Successfully retrieved ' . count($responses) . ' responses for survey ID: ' . $survey_id);
+         
+         // Process in smaller batches for better memory management
+         $batch_size = 25; // Reduced batch size for better stability
+         $batches = array_chunk($responses, $batch_size);
+         $total_imported = 0;
+         $total_errors = array();
+         
+         error_log('TPAK DQ System: Processing ' . count($batches) . ' batches of ' . $batch_size . ' responses each');
+         
+         foreach ($batches as $batch_index => $batch) {
+             $batch_number = $batch_index + 1;
+             error_log('TPAK DQ System: Processing batch ' . $batch_number . ' of ' . count($batches) . ' (' . count($batch) . ' responses)');
+             
+             $batch_result = $this->process_import_batch($batch);
+             $total_imported += $batch_result['imported'];
+             $total_errors = array_merge($total_errors, $batch_result['errors']);
+             
+             error_log('TPAK DQ System: Batch ' . $batch_number . ' completed - Imported: ' . $batch_result['imported'] . ', Errors: ' . count($batch_result['errors']));
+             
+             // Small delay between batches to prevent overwhelming the database
+             if ($batch_number < count($batches)) {
+                 usleep(100000); // 0.1 second delay
+             }
+         }
+         
+         error_log('TPAK DQ System: Improved batch import completed - Total Imported: ' . $total_imported . ', Total Errors: ' . count($total_errors));
+         if (!empty($total_errors)) {
+             error_log('TPAK DQ System: Import errors: ' . print_r($total_errors, true));
+         }
+         
+         return array(
+             'imported' => $total_imported,
+             'errors' => $total_errors
+         );
+     }
     
     /**
      * Process a batch of responses for import
@@ -613,16 +655,23 @@ class TPAK_DQ_API_Handler {
         update_post_meta($post_id, '_audit_trail', $audit_trail);
     }
     
-    /**
-     * Get API settings
-     */
-    public function get_settings() {
-        return array(
-            'api_url' => $this->api_url,
-            'username' => $this->username,
-            'password' => $this->password
-        );
-    }
+         /**
+      * Clear session key to force new authentication
+      */
+     protected function clear_session_key() {
+         $this->session_key = null;
+     }
+     
+     /**
+      * Get API settings
+      */
+     public function get_settings() {
+         return array(
+             'api_url' => $this->api_url,
+             'username' => $this->username,
+             'password' => $this->password
+         );
+     }
     
     /**
      * Update API settings
