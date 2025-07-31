@@ -206,8 +206,14 @@ class TPAK_DQ_Admin_Menu {
      * Settings page
      */
     public function settings_page() {
+        // Debug: Log POST data
+        error_log('TPAK DQ System: POST data in settings_page: ' . print_r($_POST, true));
+        
         if (isset($_POST['submit'])) {
+            error_log('TPAK DQ System: Submit button clicked, calling save_settings');
             $this->save_settings();
+        } else {
+            error_log('TPAK DQ System: Submit button not clicked');
         }
         
         $options = get_option('tpak_dq_system_options', array());
@@ -246,14 +252,25 @@ class TPAK_DQ_Admin_Menu {
      * Save settings
      */
     private function save_settings() {
+        // Debug: Check nonce
+        error_log('TPAK DQ System: Nonce verification - _wpnonce: ' . (isset($_POST['_wpnonce']) ? $_POST['_wpnonce'] : 'NOT SET'));
+        
         if (!wp_verify_nonce($_POST['_wpnonce'], 'tpak_dq_settings')) {
+            error_log('TPAK DQ System: Nonce verification failed');
             wp_die(__('Security check failed', 'tpak-dq-system'));
         }
+        
+        error_log('TPAK DQ System: Nonce verification passed');
         
         // Debug: Log POST data
         error_log('TPAK DQ System: POST data in save_settings: ' . print_r($_POST, true));
         
         $options = get_option('tpak_dq_system_options', array());
+        
+        // Debug: Check if form fields exist
+        error_log('TPAK DQ System: limesurvey_url in POST: ' . (isset($_POST['limesurvey_url']) ? $_POST['limesurvey_url'] : 'NOT SET'));
+        error_log('TPAK DQ System: limesurvey_username in POST: ' . (isset($_POST['limesurvey_username']) ? $_POST['limesurvey_username'] : 'NOT SET'));
+        error_log('TPAK DQ System: limesurvey_password in POST: ' . (isset($_POST['limesurvey_password']) ? 'SET' : 'NOT SET'));
         
         $options['limesurvey_url'] = sanitize_url($_POST['limesurvey_url']);
         $options['limesurvey_username'] = sanitize_text_field($_POST['limesurvey_username']);

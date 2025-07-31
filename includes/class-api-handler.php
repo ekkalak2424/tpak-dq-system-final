@@ -63,12 +63,16 @@ class TPAK_DQ_API_Handler {
      */
     private function get_session_key() {
         if ($this->session_key) {
+            error_log('TPAK DQ System: Using existing session key');
             return $this->session_key;
         }
         
         if (!$this->is_configured()) {
+            error_log('TPAK DQ System: API not configured for session key');
             return false;
         }
+        
+        error_log('TPAK DQ System: Getting new session key for user: ' . $this->username);
         
         $response = $this->make_api_request('get_session_key', array(
             'username' => $this->username,
@@ -77,12 +81,15 @@ class TPAK_DQ_API_Handler {
         
         if ($response && isset($response['result'])) {
             $this->session_key = $response['result'];
+            error_log('TPAK DQ System: Successfully got session key');
             return $this->session_key;
         }
         
         // Log error for debugging
         if ($response) {
             error_log('TPAK DQ System API Error: ' . json_encode($response));
+        } else {
+            error_log('TPAK DQ System: No response from get_session_key request');
         }
         
         return false;
@@ -114,6 +121,12 @@ class TPAK_DQ_API_Handler {
             'sslverify' => false
         );
         
+        // Debug: Log the request details
+        error_log('TPAK DQ System API Request - URL: ' . $url);
+        error_log('TPAK DQ System API Request - Method: ' . $method);
+        error_log('TPAK DQ System API Request - Params: ' . print_r($params, true));
+        error_log('TPAK DQ System API Request - Body: ' . json_encode($request_data));
+        
         $response = wp_remote_post($url, $args);
         
         if (is_wp_error($response)) {
@@ -122,12 +135,19 @@ class TPAK_DQ_API_Handler {
         }
         
         $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        $headers = wp_remote_retrieve_headers($response);
+        
+        // Debug: Log the response details
+        error_log('TPAK DQ System API Response - Status: ' . $status_code);
+        error_log('TPAK DQ System API Response - Headers: ' . print_r($headers, true));
+        error_log('TPAK DQ System API Response - Body: ' . $body);
+        
         if ($status_code !== 200) {
-            error_log('TPAK DQ System API Error: HTTP ' . $status_code);
+            error_log('TPAK DQ System API Error: HTTP ' . $status_code . ' - ' . $body);
             return false;
         }
         
-        $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
         
         if (json_last_error() !== JSON_ERROR_NONE) {
@@ -163,8 +183,11 @@ class TPAK_DQ_API_Handler {
      * Get survey responses
      */
     public function get_survey_responses($survey_id, $start_date = null, $end_date = null) {
+        error_log('TPAK DQ System: Getting survey responses for survey ID: ' . $survey_id);
+        
         $session_key = $this->get_session_key();
         if (!$session_key) {
+            error_log('TPAK DQ System: Failed to get session key for survey responses');
             return false;
         }
         
@@ -183,12 +206,16 @@ class TPAK_DQ_API_Handler {
             $params['sDateTo'] = $end_date;
         }
         
+        error_log('TPAK DQ System: Export responses params: ' . print_r($params, true));
+        
         $response = $this->make_api_request('export_responses', $params);
         
         if ($response && isset($response['result'])) {
+            error_log('TPAK DQ System: Successfully got survey responses');
             return $response['result'];
         }
         
+        error_log('TPAK DQ System: Failed to get survey responses - response: ' . print_r($response, true));
         return false;
     }
     
@@ -234,19 +261,27 @@ class TPAK_DQ_API_Handler {
      * Import survey data to WordPress
      */
     public function import_survey_data($survey_id) {
+        error_log('TPAK DQ System: Starting import for survey ID: ' . $survey_id);
+        
         // Get survey responses
         $responses = $this->get_survey_responses($survey_id);
         if (!$responses) {
+            error_log('TPAK DQ System: Failed to get survey responses for survey ID: ' . $survey_id);
             return false;
         }
+        
+        error_log('TPAK DQ System: Got ' . count($responses) . ' responses for survey ID: ' . $survey_id);
         
         $imported_count = 0;
         $errors = array();
         
         foreach ($responses as $response) {
+            error_log('TPAK DQ System: Processing response ID: ' . $response['id']);
+            
             // Check if response already imported
             $existing_post = $this->get_post_by_lime_survey_id($response['id']);
             if ($existing_post) {
+                error_log('TPAK DQ System: Response ID ' . $response['id'] . ' already imported, skipping');
                 continue; // Skip already imported responses
             }
             
@@ -264,9 +299,12 @@ class TPAK_DQ_API_Handler {
                 )
             );
             
+            error_log('TPAK DQ System: Creating post for response ID: ' . $response['id']);
             $post_id = wp_insert_post($post_data);
             
             if ($post_id) {
+                error_log('TPAK DQ System: Successfully created post ID: ' . $post_id . ' for response ID: ' . $response['id']);
+                
                 // Set initial status to pending_a
                 wp_set_object_terms($post_id, 'pending_a', 'verification_status');
                 
@@ -281,8 +319,14 @@ class TPAK_DQ_API_Handler {
                 
                 $imported_count++;
             } else {
+                error_log('TPAK DQ System: Failed to create post for response ID: ' . $response['id']);
                 $errors[] = sprintf(__('ไม่สามารถสร้าง Post สำหรับ Response ID: %s', 'tpak-dq-system'), $response['id']);
             }
+        }
+        
+        error_log('TPAK DQ System: Import completed - Imported: ' . $imported_count . ', Errors: ' . count($errors));
+        if (!empty($errors)) {
+            error_log('TPAK DQ System: Import errors: ' . print_r($errors, true));
         }
         
         return array(
