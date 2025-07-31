@@ -643,4 +643,3 @@ class TPAK_DQ_API_Handler {
         $this->session_key = null;
     }
 } 
-} 
