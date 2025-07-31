@@ -204,6 +204,7 @@ if (!defined('ABSPATH')) {
                     <?php foreach ($recent_imports as $post): ?>
                         <?php
                         $lime_survey_id = get_post_meta($post->ID, '_lime_survey_id', true);
+                        $lime_response_id = get_post_meta($post->ID, '_lime_response_id', true);
                         $import_date = get_post_meta($post->ID, '_import_date', true);
                         $workflow = new TPAK_DQ_Workflow();
                         $status = $workflow->get_batch_status($post->ID);
@@ -214,7 +215,12 @@ if (!defined('ABSPATH')) {
                                     <?php echo esc_html($post->post_title); ?>
                                 </a>
                             </td>
-                            <td><?php echo esc_html($lime_survey_id); ?></td>
+                            <td>
+                                <?php echo esc_html($lime_survey_id); ?>
+                                <?php if ($lime_response_id): ?>
+                                    <br><small><?php echo __('Response ID: ', 'tpak-dq-system') . esc_html($lime_response_id); ?></small>
+                                <?php endif; ?>
+                            </td>
                             <td>
                                 <?php 
                                 if ($import_date) {

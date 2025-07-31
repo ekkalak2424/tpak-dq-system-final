@@ -211,7 +211,8 @@ class TPAK_DQ_Roles {
             'administrator' => __('ผู้ดูแลระบบ', 'tpak-dq-system'),
             'interviewer' => __('ผู้ตรวจสอบขั้นที่ 1', 'tpak-dq-system'),
             'supervisor' => __('ผู้ตรวจสอบขั้นที่ 2', 'tpak-dq-system'),
-            'examiner' => __('ผู้ตรวจสอบขั้นที่ 3', 'tpak-dq-system')
+            'examiner' => __('ผู้ตรวจสอบขั้นที่ 3', 'tpak-dq-system'),
+            'completed' => __('เสร็จสมบูรณ์', 'tpak-dq-system')
         );
         
         return isset($role_names[$role]) ? $role_names[$role] : $role;

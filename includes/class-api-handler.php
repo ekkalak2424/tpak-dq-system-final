@@ -569,7 +569,8 @@ class TPAK_DQ_API_Handler {
                 'post_status' => 'publish',
                 'post_type' => 'verification_batch',
                 'meta_input' => array(
-                    '_lime_survey_id' => $response['id'],
+                    '_lime_survey_id' => $survey_id, // Use actual survey ID, not response ID
+                    '_lime_response_id' => $response['id'], // Store response ID separately
                     '_survey_data' => json_encode($response),
                     '_audit_trail' => array(),
                     '_import_date' => current_time('mysql')
@@ -628,13 +629,13 @@ class TPAK_DQ_API_Handler {
     }
     
     /**
-     * Get post by LimeSurvey ID
+     * Get post by LimeSurvey response ID
      */
-    private function get_post_by_lime_survey_id($lime_survey_id) {
+    private function get_post_by_lime_survey_id($response_id) {
         $posts = get_posts(array(
             'post_type' => 'verification_batch',
-            'meta_key' => '_lime_survey_id',
-            'meta_value' => $lime_survey_id,
+            'meta_key' => '_lime_response_id',
+            'meta_value' => $response_id,
             'posts_per_page' => 1,
             'post_status' => 'any'
         ));

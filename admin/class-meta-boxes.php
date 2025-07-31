@@ -162,6 +162,7 @@ class TPAK_DQ_Meta_Boxes {
      */
     public function batch_info_meta_box($post) {
         $lime_survey_id = get_post_meta($post->ID, '_lime_survey_id', true);
+        $lime_response_id = get_post_meta($post->ID, '_lime_response_id', true);
         $import_date = get_post_meta($post->ID, '_import_date', true);
         $workflow = new TPAK_DQ_Workflow();
         $current_status = $workflow->get_batch_status($post->ID);
@@ -172,6 +173,13 @@ class TPAK_DQ_Meta_Boxes {
         echo '<th>' . __('LimeSurvey ID', 'tpak-dq-system') . '</th>';
         echo '<td>' . esc_html($lime_survey_id) . '</td>';
         echo '</tr>';
+        
+        if ($lime_response_id) {
+            echo '<tr>';
+            echo '<th>' . __('Response ID', 'tpak-dq-system') . '</th>';
+            echo '<td>' . esc_html($lime_response_id) . '</td>';
+            echo '</tr>';
+        }
         
         echo '<tr>';
         echo '<th>' . __('วันที่นำเข้า', 'tpak-dq-system') . '</th>';

@@ -91,9 +91,13 @@ class TPAK_DQ_Admin_Columns {
      */
     private function display_lime_survey_id_column($post_id) {
         $lime_survey_id = get_post_meta($post_id, '_lime_survey_id', true);
+        $lime_response_id = get_post_meta($post_id, '_lime_response_id', true);
         
         if ($lime_survey_id) {
             echo '<span class="tpak-lime-survey-id">' . esc_html($lime_survey_id) . '</span>';
+            if ($lime_response_id) {
+                echo '<br><small class="tpak-response-id">' . __('Response ID: ', 'tpak-dq-system') . esc_html($lime_response_id) . '</small>';
+            }
         } else {
             echo '<span class="tpak-lime-survey-id">' . __('ไม่ระบุ', 'tpak-dq-system') . '</span>';
         }
@@ -160,7 +164,9 @@ class TPAK_DQ_Admin_Columns {
             'rejected_by_b' => 'interviewer',
             'pending_b' => 'supervisor',
             'rejected_by_c' => 'supervisor',
-            'pending_c' => 'examiner'
+            'pending_c' => 'examiner',
+            'finalized' => 'completed',
+            'finalized_by_sampling' => 'completed'
         );
         
         return isset($status_roles[$status]) ? $status_roles[$status] : false;
