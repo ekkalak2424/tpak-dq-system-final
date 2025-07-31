@@ -286,13 +286,18 @@ class TPAK_DQ_API_Handler {
                 
                 // Check if result is a base64 encoded JSON string
                 if (is_string($response['result'])) {
+                    error_log('TPAK DQ System: Got string response, trying to decode base64 - length: ' . strlen($response['result']));
+                    
                     // Try to decode base64
                     $decoded = base64_decode($response['result'], true);
                     if ($decoded !== false) {
+                        error_log('TPAK DQ System: Successfully decoded base64 - decoded length: ' . strlen($decoded));
+                        
                         // Try to decode as JSON
                         $json_data = json_decode($decoded, true);
                         if (json_last_error() === JSON_ERROR_NONE && is_array($json_data)) {
                             error_log('TPAK DQ System: Successfully decoded base64 JSON response with language ' . ($lang_code ?: 'none'));
+                            error_log('TPAK DQ System: Decoded JSON keys: ' . implode(', ', array_keys($json_data)));
                             
                             // Check if it has 'responses' key
                             if (isset($json_data['responses']) && is_array($json_data['responses'])) {
@@ -300,10 +305,12 @@ class TPAK_DQ_API_Handler {
                                 return $json_data['responses'];
                             } else {
                                 error_log('TPAK DQ System: Decoded JSON does not contain responses array');
+                                error_log('TPAK DQ System: Available keys in decoded JSON: ' . implode(', ', array_keys($json_data)));
                                 return false;
                             }
                         } else {
-                            error_log('TPAK DQ System: Failed to decode JSON from base64 response');
+                            error_log('TPAK DQ System: Failed to decode JSON from base64 response - JSON error: ' . json_last_error_msg());
+                            error_log('TPAK DQ System: First 200 chars of decoded data: ' . substr($decoded, 0, 200));
                         }
                     } else {
                         error_log('TPAK DQ System: Failed to decode base64 response');
