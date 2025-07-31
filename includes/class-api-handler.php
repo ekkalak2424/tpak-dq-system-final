@@ -213,7 +213,7 @@ class TPAK_DQ_API_Handler {
     }
     
     /**
-     * Get survey responses
+     * Get survey responses with pagination support
      */
     public function get_survey_responses($survey_id, $start_date = null, $end_date = null) {
         error_log('TPAK DQ System: Getting survey responses for survey ID: ' . $survey_id);
@@ -228,10 +228,44 @@ class TPAK_DQ_API_Handler {
         $language_codes = array('en', 'th', ''); // Try English, Thai, then no language code
         
         foreach ($language_codes as $lang_code) {
+            error_log('TPAK DQ System: Trying language code: ' . ($lang_code ?: 'none'));
+            
+            // Try to get all responses with pagination
+            $all_responses = $this->get_survey_responses_paginated($survey_id, $lang_code, $start_date, $end_date);
+            
+            if ($all_responses && is_array($all_responses)) {
+                error_log('TPAK DQ System: Successfully got ' . count($all_responses) . ' responses with language ' . ($lang_code ?: 'none'));
+                return $all_responses;
+            }
+        }
+        
+        error_log('TPAK DQ System: All language codes failed for survey ID: ' . $survey_id);
+        return false;
+    }
+    
+    /**
+     * Get survey responses with pagination support
+     */
+    private function get_survey_responses_paginated($survey_id, $lang_code, $start_date = null, $end_date = null) {
+        $session_key = $this->get_session_key();
+        if (!$session_key) {
+            return false;
+        }
+        
+        $all_responses = array();
+        $iStart = 0;
+        $iLimit = 1000; // Get 1000 responses per request
+        $has_more_data = true;
+        
+        error_log('TPAK DQ System: Starting paginated data retrieval for survey ID: ' . $survey_id);
+        
+        while ($has_more_data) {
             $params = array(
                 'sSessionKey' => $session_key,
                 'iSurveyID' => $survey_id,
-                'sDocumentType' => 'json'
+                'sDocumentType' => 'json',
+                'iStart' => $iStart,
+                'iLimit' => $iLimit
             );
             
             // Only add language code if it's not empty
@@ -247,18 +281,18 @@ class TPAK_DQ_API_Handler {
                 $params['sDateTo'] = $end_date;
             }
             
-            error_log('TPAK DQ System: Trying export responses with language code: ' . ($lang_code ?: 'none') . ' - params: ' . print_r($params, true));
+            error_log('TPAK DQ System: Requesting responses ' . $iStart . ' to ' . ($iStart + $iLimit) . ' with language: ' . ($lang_code ?: 'none'));
             
             $response = $this->make_api_request('export_responses', $params);
             
             if ($response && isset($response['result'])) {
                 // Check if the result is an error message
                 if (is_array($response['result']) && isset($response['result']['status'])) {
-                    error_log('TPAK DQ System: API returned error status with language ' . ($lang_code ?: 'none') . ': ' . $response['result']['status']);
+                    error_log('TPAK DQ System: API returned error status: ' . $response['result']['status']);
                     
-                    // If it's a language error, try the next language code
+                    // If it's a language error, return false to try next language
                     if (strpos($response['result']['status'], 'Language code not found') !== false) {
-                        continue;
+                        return false;
                     }
                     
                     // For other errors, return false
@@ -267,11 +301,11 @@ class TPAK_DQ_API_Handler {
                 
                 // Check if result is a string (error message)
                 if (is_string($response['result'])) {
-                    error_log('TPAK DQ System: API returned string result (likely error) with language ' . ($lang_code ?: 'none') . ': ' . $response['result']);
+                    error_log('TPAK DQ System: API returned string result (likely error): ' . $response['result']);
                     
-                    // If it's a language error, try the next language code
+                    // If it's a language error, return false to try next language
                     if (strpos($response['result'], 'Language code not found') !== false) {
-                        continue;
+                        return false;
                     }
                     
                     // For other errors, return false
@@ -280,13 +314,25 @@ class TPAK_DQ_API_Handler {
                 
                 // Check if result is an array of responses
                 if (is_array($response['result'])) {
-                    error_log('TPAK DQ System: Successfully got survey responses with language ' . ($lang_code ?: 'none') . ' - count: ' . count($response['result']));
-                    return $response['result'];
+                    $responses_chunk = $response['result'];
+                    error_log('TPAK DQ System: Got ' . count($responses_chunk) . ' responses in this chunk');
+                    
+                    if (!empty($responses_chunk)) {
+                        $all_responses = array_merge($all_responses, $responses_chunk);
+                        $iStart += $iLimit;
+                        
+                        // If we got fewer responses than requested, we've reached the end
+                        if (count($responses_chunk) < $iLimit) {
+                            $has_more_data = false;
+                        }
+                    } else {
+                        $has_more_data = false;
+                    }
                 }
                 
                 // Check if result is a base64 encoded JSON string
                 if (is_string($response['result'])) {
-                    error_log('TPAK DQ System: Got string response, length: ' . strlen($response['result']));
+                    error_log('TPAK DQ System: Got base64 string response, length: ' . strlen($response['result']));
                     
                     // Try to decode base64
                     $decoded = base64_decode($response['result'], true);
@@ -300,29 +346,47 @@ class TPAK_DQ_API_Handler {
                             
                             // Check if it has 'responses' key
                             if (isset($json_data['responses']) && is_array($json_data['responses'])) {
-                                error_log('TPAK DQ System: Found responses: ' . count($json_data['responses']));
-                                return $json_data['responses'];
+                                $responses_chunk = $json_data['responses'];
+                                error_log('TPAK DQ System: Found ' . count($responses_chunk) . ' responses in JSON');
+                                
+                                if (!empty($responses_chunk)) {
+                                    $all_responses = array_merge($all_responses, $responses_chunk);
+                                    $iStart += $iLimit;
+                                    
+                                    // If we got fewer responses than requested, we've reached the end
+                                    if (count($responses_chunk) < $iLimit) {
+                                        $has_more_data = false;
+                                    }
+                                } else {
+                                    $has_more_data = false;
+                                }
                             } else {
                                 error_log('TPAK DQ System: No responses key found, available keys: ' . implode(',', array_keys($json_data)));
                                 return false;
                             }
                         } else {
                             error_log('TPAK DQ System: JSON decode failed: ' . json_last_error_msg());
+                            return false;
                         }
                     } else {
                         error_log('TPAK DQ System: Base64 decode failed');
+                        return false;
                     }
                 }
-                
-                error_log('TPAK DQ System: Unexpected result type with language ' . ($lang_code ?: 'none') . ': ' . gettype($response['result']));
+            } else {
+                error_log('TPAK DQ System: No response or invalid response structure');
                 return false;
             }
             
-            error_log('TPAK DQ System: Failed to get survey responses with language ' . ($lang_code ?: 'none') . ' - response: ' . print_r($response, true));
+            // Safety check to prevent infinite loop
+            if (count($all_responses) > 100000) {
+                error_log('TPAK DQ System: Safety limit reached (100,000 responses), stopping pagination');
+                break;
+            }
         }
         
-        error_log('TPAK DQ System: All language codes failed for survey ID: ' . $survey_id);
-        return false;
+        error_log('TPAK DQ System: Pagination completed, total responses: ' . count($all_responses));
+        return $all_responses;
     }
     
     /**
@@ -384,10 +448,14 @@ class TPAK_DQ_API_Handler {
     }
     
     /**
-     * Import survey data to WordPress
+     * Import survey data to WordPress using batch processing
      */
     public function import_survey_data($survey_id) {
-        error_log('TPAK DQ System: Starting import for survey ID: ' . $survey_id);
+        // Increase memory and time limits for large imports
+        @ini_set('memory_limit', '512M');
+        @ini_set('max_execution_time', 300);
+        
+        error_log('TPAK DQ System: Starting batch import for survey ID: ' . $survey_id);
         
         // Get survey responses
         $responses = $this->get_survey_responses($survey_id);
@@ -404,12 +472,47 @@ class TPAK_DQ_API_Handler {
         
         error_log('TPAK DQ System: Got ' . count($responses) . ' responses for survey ID: ' . $survey_id);
         
+        // Process in batches
+        $batch_size = 50; // Process 50 responses at a time
+        $batches = array_chunk($responses, $batch_size);
+        $total_imported = 0;
+        $total_errors = array();
+        
+        error_log('TPAK DQ System: Processing ' . count($batches) . ' batches of ' . $batch_size . ' responses each');
+        
+        foreach ($batches as $batch_index => $batch) {
+            $batch_number = $batch_index + 1;
+            error_log('TPAK DQ System: Processing batch ' . $batch_number . ' of ' . count($batches) . ' (' . count($batch) . ' responses)');
+            
+            $batch_result = $this->process_import_batch($batch);
+            $total_imported += $batch_result['imported'];
+            $total_errors = array_merge($total_errors, $batch_result['errors']);
+            
+            error_log('TPAK DQ System: Batch ' . $batch_number . ' completed - Imported: ' . $batch_result['imported'] . ', Errors: ' . count($batch_result['errors']));
+        }
+        
+        error_log('TPAK DQ System: Batch import completed - Total Imported: ' . $total_imported . ', Total Errors: ' . count($total_errors));
+        if (!empty($total_errors)) {
+            error_log('TPAK DQ System: Import errors: ' . print_r($total_errors, true));
+        }
+        
+        return array(
+            'imported' => $total_imported,
+            'errors' => $total_errors
+        );
+    }
+    
+    /**
+     * Process a batch of responses for import
+     */
+    private function process_import_batch($responses_batch) {
         $imported_count = 0;
         $errors = array();
         
-        foreach ($responses as $response) {
-            error_log('TPAK DQ System: Processing response ID: ' . $response['id']);
-            
+        // Prepare batch data
+        $posts_to_insert = array();
+        
+        foreach ($responses_batch as $response) {
             // Check if response already imported
             $existing_post = $this->get_post_by_lime_survey_id($response['id']);
             if ($existing_post) {
@@ -417,8 +520,8 @@ class TPAK_DQ_API_Handler {
                 continue; // Skip already imported responses
             }
             
-            // Create new verification batch post
-            $post_data = array(
+            // Prepare post data for batch insert
+            $posts_to_insert[] = array(
                 'post_title' => sprintf(__('ชุดข้อมูลตรวจสอบ #%s', 'tpak-dq-system'), $response['id']),
                 'post_content' => '',
                 'post_status' => 'publish',
@@ -428,14 +531,38 @@ class TPAK_DQ_API_Handler {
                     '_survey_data' => json_encode($response),
                     '_audit_trail' => array(),
                     '_import_date' => current_time('mysql')
-                )
+                ),
+                'response_data' => $response // Store original response for later use
             );
+        }
+        
+        // Batch insert posts
+        if (!empty($posts_to_insert)) {
+            $inserted_posts = $this->batch_insert_posts($posts_to_insert);
+            $imported_count = count($inserted_posts);
+            error_log('TPAK DQ System: Batch insert completed - ' . $imported_count . ' posts created');
+        }
+        
+        return array(
+            'imported' => $imported_count,
+            'errors' => $errors
+        );
+    }
+    
+    /**
+     * Batch insert posts
+     */
+    private function batch_insert_posts($posts_data) {
+        $inserted_posts = array();
+        
+        foreach ($posts_data as $post_data) {
+            $response_data = $post_data['response_data'];
+            unset($post_data['response_data']); // Remove from post data
             
-            error_log('TPAK DQ System: Creating post for response ID: ' . $response['id']);
             $post_id = wp_insert_post($post_data);
             
             if ($post_id) {
-                error_log('TPAK DQ System: Successfully created post ID: ' . $post_id . ' for response ID: ' . $response['id']);
+                error_log('TPAK DQ System: Successfully created post ID: ' . $post_id . ' for response ID: ' . $response_data['id']);
                 
                 // Set initial status to pending_a
                 wp_set_object_terms($post_id, 'pending_a', 'verification_status');
@@ -445,26 +572,17 @@ class TPAK_DQ_API_Handler {
                     'user_id' => 0,
                     'user_name' => 'System',
                     'action' => 'imported',
-                    'comment' => sprintf(__('นำเข้าข้อมูลจาก LimeSurvey ID: %s', 'tpak-dq-system'), $response['id']),
+                    'comment' => sprintf(__('นำเข้าข้อมูลจาก LimeSurvey ID: %s', 'tpak-dq-system'), $response_data['id']),
                     'timestamp' => current_time('mysql')
                 ));
                 
-                $imported_count++;
+                $inserted_posts[] = $post_id;
             } else {
-                error_log('TPAK DQ System: Failed to create post for response ID: ' . $response['id']);
-                $errors[] = sprintf(__('ไม่สามารถสร้าง Post สำหรับ Response ID: %s', 'tpak-dq-system'), $response['id']);
+                error_log('TPAK DQ System: Failed to create post for response ID: ' . $response_data['id']);
             }
         }
         
-        error_log('TPAK DQ System: Import completed - Imported: ' . $imported_count . ', Errors: ' . count($errors));
-        if (!empty($errors)) {
-            error_log('TPAK DQ System: Import errors: ' . print_r($errors, true));
-        }
-        
-        return array(
-            'imported' => $imported_count,
-            'errors' => $errors
-        );
+        return $inserted_posts;
     }
     
     /**
@@ -524,4 +642,5 @@ class TPAK_DQ_API_Handler {
         // Clear session key to force new authentication
         $this->session_key = null;
     }
+} 
 } 

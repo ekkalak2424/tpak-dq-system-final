@@ -336,13 +336,17 @@ if (!defined('ABSPATH')) {
 
 <script>
 jQuery(document).ready(function($) {
-    // Import survey from list
+    // Import survey from list with batch processing support
     $('.tpak-import-survey').on('click', function() {
         var button = $(this);
         var surveyId = button.data('survey-id');
         
-        if (confirm('<?php _e('คุณต้องการนำเข้าแบบสอบถาม ID: ', 'tpak-dq-system'); ?>' + surveyId + '?')) {
+        if (confirm('<?php _e('คุณต้องการนำเข้าแบบสอบถาม ID: ', 'tpak-dq-system'); ?>' + surveyId + '?\n\n<?php _e('หมายเหตุ: การนำเข้าข้อมูลขนาดใหญ่อาจใช้เวลานาน กรุณารอจนกว่าการดำเนินการจะเสร็จสิ้น', 'tpak-dq-system'); ?>')) {
             button.prop('disabled', true).text('<?php _e('กำลังนำเข้า...', 'tpak-dq-system'); ?>');
+            
+            // Show progress message
+            var progressDiv = $('<div class="import-progress" style="margin-top: 10px; padding: 10px; background: #f0f0f0; border-radius: 4px; border-left: 4px solid #0073aa;"><?php _e('กำลังดึงข้อมูลจาก LimeSurvey...', 'tpak-dq-system'); ?></div>');
+            button.after(progressDiv);
             
             $.ajax({
                 url: '<?php echo admin_url('admin-ajax.php'); ?>',
@@ -352,19 +356,29 @@ jQuery(document).ready(function($) {
                     nonce: '<?php echo wp_create_nonce('tpak_import_survey'); ?>',
                     survey_id: surveyId
                 },
+                dataType: 'json',
                 success: function(response) {
                     if (response.success) {
-                        alert('<?php _e('นำเข้าข้อมูลสำเร็จ', 'tpak-dq-system'); ?>');
+                        var message = '<?php _e('นำเข้าข้อมูลสำเร็จ', 'tpak-dq-system'); ?>';
+                        if (response.data.imported > 0) {
+                            message += '\n\n<?php _e('รายละเอียด:', 'tpak-dq-system'); ?>\n- <?php _e('นำเข้าสำเร็จ:', 'tpak-dq-system'); ?> ' + response.data.imported + ' <?php _e('รายการ', 'tpak-dq-system'); ?>';
+                            if (response.data.errors > 0) {
+                                message += '\n- <?php _e('ข้อผิดพลาด:', 'tpak-dq-system'); ?> ' + response.data.errors + ' <?php _e('รายการ', 'tpak-dq-system'); ?>';
+                            }
+                        }
+                        alert(message);
                         location.reload();
                     } else {
                         alert('<?php _e('นำเข้าข้อมูลล้มเหลว: ', 'tpak-dq-system'); ?>' + response.data.message);
                     }
                 },
-                error: function() {
+                error: function(xhr, status, error) {
+                    console.error('Import error:', error);
                     alert('<?php _e('นำเข้าข้อมูลล้มเหลว กรุณาลองใหม่อีกครั้ง', 'tpak-dq-system'); ?>');
                 },
                 complete: function() {
                     button.prop('disabled', false).text('<?php _e('นำเข้า', 'tpak-dq-system'); ?>');
+                    progressDiv.remove();
                 }
             });
         }

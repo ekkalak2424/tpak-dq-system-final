@@ -217,7 +217,7 @@ class TPAK_DQ_Admin_Menu {
         // Get API handler
         $api_handler = new TPAK_DQ_API_Handler();
         
-                // Import survey data
+                // Import survey data with batch processing
         $result = $api_handler->import_survey_data($survey_id);
 
         if ($result && $result['imported'] > 0) {
@@ -225,7 +225,11 @@ class TPAK_DQ_Admin_Menu {
             if (!empty($result['errors'])) {
                 $message .= ' (' . count($result['errors']) . ' ข้อผิดพลาด)';
             }
-            wp_send_json_success(array('message' => $message));
+            wp_send_json_success(array(
+                'message' => $message,
+                'imported' => $result['imported'],
+                'errors' => count($result['errors'])
+            ));
         } else {
             // Check if it's an API issue
             if (!$api_handler->test_connection()) {
