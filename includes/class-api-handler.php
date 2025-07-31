@@ -303,7 +303,7 @@ class TPAK_DQ_API_Handler {
                                 error_log('TPAK DQ System: Found responses: ' . count($json_data['responses']));
                                 return $json_data['responses'];
                             } else {
-                                error_log('TPAK DQ System: No responses key found');
+                                error_log('TPAK DQ System: No responses key found, available keys: ' . implode(',', array_keys($json_data)));
                                 return false;
                             }
                         } else {
