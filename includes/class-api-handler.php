@@ -109,8 +109,11 @@ class TPAK_DQ_API_Handler {
             return false;
         }
         
-        // Use the API URL directly without appending /admin/remotecontrol
+        // Use the API URL directly - it should already contain the full endpoint
         $url = $this->api_url;
+        
+        // Debug: Log the URL being used
+        error_log('TPAK DQ System: Using API URL: ' . $url);
         
         $request_data = array(
             'method' => $method,

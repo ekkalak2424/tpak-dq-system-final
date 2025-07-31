@@ -21,9 +21,11 @@ class TPAK_DQ_Admin_Menu {
         
         // AJAX actions
         add_action('wp_ajax_tpak_test_api', array($this, 'test_api_connection'));
+        add_action('wp_ajax_tpak_import_survey', array($this, 'import_survey_ajax'));
         
         // Debug: Log AJAX action registration
         error_log('TPAK DQ System: AJAX action tpak_test_api registered');
+        error_log('TPAK DQ System: AJAX action tpak_import_survey registered');
     }
     
     /**
@@ -181,6 +183,51 @@ class TPAK_DQ_Admin_Menu {
             
             // Debug: Log the nonce
             error_log('TPAK DQ System: Generated nonce: ' . wp_create_nonce('tpak_workflow_nonce'));
+        }
+    }
+    
+    /**
+     * Import survey via AJAX
+     */
+    public function import_survey_ajax() {
+        // Debug: Log the request
+        error_log('TPAK DQ System: AJAX import_survey_ajax called');
+        error_log('TPAK DQ System: POST data: ' . print_r($_POST, true));
+        
+        // Check nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'tpak_import_survey')) {
+            error_log('TPAK DQ System: Import survey nonce verification failed');
+            wp_send_json_error(array('message' => __('Security check failed', 'tpak-dq-system')));
+        }
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            error_log('TPAK DQ System: Import survey permission check failed');
+            wp_send_json_error(array('message' => __('You do not have permission to perform this action', 'tpak-dq-system')));
+        }
+        
+        // Get survey ID
+        $survey_id = sanitize_text_field($_POST['survey_id']);
+        if (empty($survey_id)) {
+            wp_send_json_error(array('message' => __('Survey ID is required', 'tpak-dq-system')));
+        }
+        
+        error_log('TPAK DQ System: Importing survey ID: ' . $survey_id);
+        
+        // Get API handler
+        $api_handler = new TPAK_DQ_API_Handler();
+        
+        // Import survey data
+        $result = $api_handler->import_survey_data($survey_id);
+        
+        if ($result && $result['imported'] > 0) {
+            $message = sprintf(__('นำเข้าข้อมูลสำเร็จ %d รายการ', 'tpak-dq-system'), $result['imported']);
+            if (!empty($result['errors'])) {
+                $message .= ' (' . count($result['errors']) . ' ข้อผิดพลาด)';
+            }
+            wp_send_json_success(array('message' => $message));
+        } else {
+            wp_send_json_error(array('message' => __('นำเข้าข้อมูลล้มเหลว กรุณาลองใหม่อีกครั้ง', 'tpak-dq-system')));
         }
     }
     

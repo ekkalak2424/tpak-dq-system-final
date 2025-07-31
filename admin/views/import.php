@@ -345,7 +345,7 @@ jQuery(document).ready(function($) {
             button.prop('disabled', true).text('<?php _e('กำลังนำเข้า...', 'tpak-dq-system'); ?>');
             
             $.ajax({
-                url: ajaxurl,
+                url: '<?php echo admin_url('admin-ajax.php'); ?>',
                 type: 'POST',
                 data: {
                     action: 'tpak_import_survey',
