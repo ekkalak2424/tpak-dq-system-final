@@ -284,6 +284,32 @@ class TPAK_DQ_API_Handler {
                     return $response['result'];
                 }
                 
+                // Check if result is a base64 encoded JSON string
+                if (is_string($response['result'])) {
+                    // Try to decode base64
+                    $decoded = base64_decode($response['result'], true);
+                    if ($decoded !== false) {
+                        // Try to decode as JSON
+                        $json_data = json_decode($decoded, true);
+                        if (json_last_error() === JSON_ERROR_NONE && is_array($json_data)) {
+                            error_log('TPAK DQ System: Successfully decoded base64 JSON response with language ' . ($lang_code ?: 'none'));
+                            
+                            // Check if it has 'responses' key
+                            if (isset($json_data['responses']) && is_array($json_data['responses'])) {
+                                error_log('TPAK DQ System: Found ' . count($json_data['responses']) . ' responses in decoded data');
+                                return $json_data['responses'];
+                            } else {
+                                error_log('TPAK DQ System: Decoded JSON does not contain responses array');
+                                return false;
+                            }
+                        } else {
+                            error_log('TPAK DQ System: Failed to decode JSON from base64 response');
+                        }
+                    } else {
+                        error_log('TPAK DQ System: Failed to decode base64 response');
+                    }
+                }
+                
                 error_log('TPAK DQ System: Unexpected result type with language ' . ($lang_code ?: 'none') . ': ' . gettype($response['result']));
                 return false;
             }
