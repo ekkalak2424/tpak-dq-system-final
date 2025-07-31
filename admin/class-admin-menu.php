@@ -211,6 +211,10 @@ class TPAK_DQ_Admin_Menu {
         }
         
         $options = get_option('tpak_dq_system_options', array());
+        
+        // Debug: Log current options
+        error_log('TPAK DQ System: Current options in settings page: ' . print_r($options, true));
+        
         include TPAK_DQ_SYSTEM_PLUGIN_DIR . 'admin/views/settings.php';
     }
     
@@ -246,6 +250,9 @@ class TPAK_DQ_Admin_Menu {
             wp_die(__('Security check failed', 'tpak-dq-system'));
         }
         
+        // Debug: Log POST data
+        error_log('TPAK DQ System: POST data in save_settings: ' . print_r($_POST, true));
+        
         $options = get_option('tpak_dq_system_options', array());
         
         $options['limesurvey_url'] = sanitize_url($_POST['limesurvey_url']);
@@ -256,7 +263,13 @@ class TPAK_DQ_Admin_Menu {
         $options['email_notifications'] = isset($_POST['email_notifications']) ? true : false;
         $options['sampling_percentage'] = intval($_POST['sampling_percentage']);
         
-        update_option('tpak_dq_system_options', $options);
+        // Debug: Log options before saving
+        error_log('TPAK DQ System: Options to save: ' . print_r($options, true));
+        
+        $result = update_option('tpak_dq_system_options', $options);
+        
+        // Debug: Log save result
+        error_log('TPAK DQ System: Save result: ' . ($result ? 'Success' : 'Failed'));
         
         // Update cron schedule
         $cron_handler = new TPAK_DQ_Cron();

@@ -180,11 +180,8 @@ jQuery(document).ready(function($) {
             url: ajaxurl,
             type: 'POST',
             data: {
-                action: 'tpak_test_api_connection',
-                nonce: '<?php echo wp_create_nonce('tpak_test_api'); ?>',
-                url: $('#limesurvey_url').val(),
-                username: $('#limesurvey_username').val(),
-                password: $('#limesurvey_password').val()
+                action: 'tpak_test_api',
+                nonce: '<?php echo wp_create_nonce('tpak_workflow_nonce'); ?>'
             },
             success: function(response) {
                 if (response.success) {

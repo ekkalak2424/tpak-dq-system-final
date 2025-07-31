@@ -40,6 +40,9 @@ class TPAK_DQ_API_Handler {
     private function load_settings() {
         $options = get_option('tpak_dq_system_options', array());
         
+        // Debug: Log raw options
+        error_log('TPAK DQ System: Raw options from database: ' . print_r($options, true));
+        
         $this->api_url = isset($options['limesurvey_url']) ? $options['limesurvey_url'] : '';
         $this->username = isset($options['limesurvey_username']) ? $options['limesurvey_username'] : '';
         $this->password = isset($options['limesurvey_password']) ? $options['limesurvey_password'] : '';
