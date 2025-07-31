@@ -212,13 +212,20 @@ class TPAK_DQ_Admin_Menu {
             wp_send_json_error(array('message' => __('Survey ID is required', 'tpak-dq-system')));
         }
         
-        error_log('TPAK DQ System: Importing survey ID: ' . $survey_id);
+        // Get import type (full or raw)
+        $import_type = isset($_POST['import_type']) ? sanitize_text_field($_POST['import_type']) : 'full';
+        
+        error_log('TPAK DQ System: Importing survey ID: ' . $survey_id . ' with type: ' . $import_type);
         
         // Get API handler
         $api_handler = new TPAK_DQ_API_Handler();
         
-                // Import survey data with batch processing
-        $result = $api_handler->import_survey_data($survey_id);
+        // Import survey data based on type
+        if ($import_type === 'raw') {
+            $result = $api_handler->import_raw_survey_data($survey_id);
+        } else {
+            $result = $api_handler->import_survey_data($survey_id);
+        }
 
         if ($result && $result['imported'] > 0) {
             $message = sprintf(__('นำเข้าข้อมูลสำเร็จ %d รายการ', 'tpak-dq-system'), $result['imported']);

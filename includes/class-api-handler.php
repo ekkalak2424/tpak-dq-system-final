@@ -691,4 +691,348 @@ class TPAK_DQ_API_Handler {
         // Clear session key to force new authentication
         $this->session_key = null;
     }
+
+    /**
+      * Get raw survey responses with minimal data
+      */
+     public function get_raw_survey_responses($survey_id, $start_date = null, $end_date = null) {
+         error_log('TPAK DQ System: Getting raw survey responses for survey ID: ' . $survey_id);
+         
+         // Get full responses first
+         $responses = $this->get_survey_responses($survey_id, $start_date, $end_date);
+         if (!$responses || !is_array($responses)) {
+             error_log('TPAK DQ System: Failed to get survey responses for raw data extraction');
+             return false;
+         }
+         
+         // Extract raw data from responses
+         $raw_data = array();
+         foreach ($responses as $response) {
+             $raw_response = $this->extract_raw_data_from_response($response);
+             if ($raw_response) {
+                 $raw_data[] = $raw_response;
+             }
+         }
+         
+         error_log('TPAK DQ System: Extracted raw data from ' . count($raw_data) . ' responses');
+         return $raw_data;
+     }
+     
+     /**
+      * Extract raw data from a single response
+      */
+     private function extract_raw_data_from_response($response) {
+         if (!isset($response['id'])) {
+             return false;
+         }
+         
+         $raw_data = array(
+             'response_id' => $response['id'],
+             'submit_date' => isset($response['submitteddate']) ? $response['submitteddate'] : '',
+             'questions' => array()
+         );
+         
+         // Extract question data
+         foreach ($response as $key => $value) {
+             // Skip non-question fields
+             if (in_array($key, ['id', 'submitteddate', 'startdate', 'datestamp', 'ipaddr', 'refurl', 'Consent', 'ConsentRe'])) {
+                 continue;
+             }
+             
+             // Extract question code and answer
+             $question_data = $this->parse_question_field($key, $value);
+             if ($question_data) {
+                 $raw_data['questions'][] = $question_data;
+             }
+         }
+         
+         return $raw_data;
+     }
+     
+     /**
+      * Parse question field to extract question code and answer
+      */
+     private function parse_question_field($field_name, $value) {
+         // Handle different question formats
+         if (preg_match('/^([A-Z]\d+)(?:\[(\d+)\])?$/', $field_name, $matches)) {
+             $question_code = $matches[1];
+             $sub_question = isset($matches[2]) ? $matches[2] : null;
+             
+             return array(
+                 'question_code' => $question_code,
+                 'sub_question' => $sub_question,
+                 'raw_answer' => $value,
+                 'field_name' => $field_name
+             );
+         }
+         
+         return false;
+     }
+     
+     /**
+      * Get question mapping for a survey
+      */
+     public function get_question_mapping($survey_id) {
+         // This would typically come from a database or configuration
+         // For now, we'll return a basic mapping structure
+         $mapping = array(
+             'S1' => array(
+                 'question_text' => 'จังหวัด',
+                 'type' => 'single_choice',
+                 'options' => array(
+                     '39' => 'กรุงเทพมหานคร',
+                     '1' => 'กระบี่',
+                     // Add more options as needed
+                 )
+             ),
+             'S2' => array(
+                 'question_text' => 'อำเภอ',
+                 'type' => 'single_choice'
+             ),
+             'Q1' => array(
+                 'question_text' => 'อายุ',
+                 'type' => 'number'
+             ),
+             'Q2' => array(
+                 'question_text' => 'เพศ',
+                 'type' => 'single_choice',
+                 'options' => array(
+                     '35' => 'ชาย',
+                     '36' => 'หญิง'
+                 )
+             ),
+             // Add more question mappings as needed
+         );
+         
+         return $mapping;
+     }
+     
+     /**
+      * Apply mapping to raw data
+      */
+     public function apply_mapping_to_raw_data($raw_data, $mapping) {
+         $mapped_data = array();
+         
+         foreach ($raw_data as $response) {
+             $mapped_response = array(
+                 'response_id' => $response['response_id'],
+                 'submit_date' => $response['submit_date'],
+                 'questions' => array()
+             );
+             
+             foreach ($response['questions'] as $question) {
+                 $question_code = $question['question_code'];
+                 
+                 if (isset($mapping[$question_code])) {
+                     $mapped_question = array(
+                         'question_code' => $question_code,
+                         'question_text' => $mapping[$question_code]['question_text'],
+                         'type' => $mapping[$question_code]['type'],
+                         'raw_answer' => $question['raw_answer'],
+                         'mapped_answer' => $this->map_answer($question['raw_answer'], $mapping[$question_code])
+                     );
+                     
+                     if ($question['sub_question']) {
+                         $mapped_question['sub_question'] = $question['sub_question'];
+                     }
+                     
+                     $mapped_response['questions'][] = $mapped_question;
+                 } else {
+                     // Keep unmapped questions as raw data
+                     $mapped_response['questions'][] = $question;
+                 }
+             }
+             
+             $mapped_data[] = $mapped_response;
+         }
+         
+         return $mapped_data;
+     }
+     
+     /**
+      * Map raw answer to readable answer
+      */
+     private function map_answer($raw_answer, $question_mapping) {
+         if (empty($raw_answer)) {
+             return '';
+         }
+         
+         // Handle different question types
+         switch ($question_mapping['type']) {
+             case 'single_choice':
+                 if (isset($question_mapping['options'][$raw_answer])) {
+                     return $question_mapping['options'][$raw_answer];
+                 }
+                 return $raw_answer;
+                 
+             case 'multiple_choice':
+                 $answers = explode('|', $raw_answer);
+                 $mapped_answers = array();
+                 foreach ($answers as $answer) {
+                     if (isset($question_mapping['options'][$answer])) {
+                         $mapped_answers[] = $question_mapping['options'][$answer];
+                     } else {
+                         $mapped_answers[] = $answer;
+                     }
+                 }
+                 return implode(', ', $mapped_answers);
+                 
+             case 'number':
+                 return $raw_answer;
+                 
+             case 'text':
+                 return $raw_answer;
+                 
+             default:
+                 return $raw_answer;
+         }
+     }
+     
+     /**
+      * Import raw survey data with mapping
+      */
+     public function import_raw_survey_data($survey_id) {
+         // Increase memory and time limits
+         @ini_set('memory_limit', '1G');
+         @ini_set('max_execution_time', 600);
+         
+         error_log('TPAK DQ System: Starting raw data import for survey ID: ' . $survey_id);
+         
+         // Get raw data
+         $raw_data = $this->get_raw_survey_responses($survey_id);
+         if (!$raw_data) {
+             error_log('TPAK DQ System: Failed to get raw survey data for survey ID: ' . $survey_id);
+             return false;
+         }
+         
+         error_log('TPAK DQ System: Got ' . count($raw_data) . ' raw responses for survey ID: ' . $survey_id);
+         
+         // Get mapping
+         $mapping = $this->get_question_mapping($survey_id);
+         
+         // Apply mapping
+         $mapped_data = $this->apply_mapping_to_raw_data($raw_data, $mapping);
+         
+         // Import mapped data
+         $batch_size = 25;
+         $batches = array_chunk($mapped_data, $batch_size);
+         $total_imported = 0;
+         $total_errors = array();
+         
+         error_log('TPAK DQ System: Processing ' . count($batches) . ' batches of mapped data');
+         
+         foreach ($batches as $batch_index => $batch) {
+             $batch_number = $batch_index + 1;
+             error_log('TPAK DQ System: Processing mapped batch ' . $batch_number . ' of ' . count($batches));
+             
+             $batch_result = $this->process_mapped_import_batch($batch, $survey_id);
+             $total_imported += $batch_result['imported'];
+             $total_errors = array_merge($total_errors, $batch_result['errors']);
+             
+             error_log('TPAK DQ System: Mapped batch ' . $batch_number . ' completed - Imported: ' . $batch_result['imported'] . ', Errors: ' . count($batch_result['errors']));
+             
+             if ($batch_number < count($batches)) {
+                 usleep(100000); // 0.1 second delay
+             }
+         }
+         
+         error_log('TPAK DQ System: Raw data import completed - Total Imported: ' . $total_imported . ', Total Errors: ' . count($total_errors));
+         
+         return array(
+             'imported' => $total_imported,
+             'errors' => $total_errors
+         );
+     }
+     
+     /**
+      * Process a batch of mapped data for import
+      */
+     private function process_mapped_import_batch($mapped_batch, $survey_id) {
+         $imported_count = 0;
+         $errors = array();
+         
+         foreach ($mapped_batch as $mapped_response) {
+             // Check if response already imported
+             $existing_post = $this->get_post_by_lime_survey_id($mapped_response['response_id']);
+             if ($existing_post) {
+                 error_log('TPAK DQ System: Response ID ' . $mapped_response['response_id'] . ' already imported, skipping');
+                 continue;
+             }
+             
+             // Create post data with mapped information
+             $post_data = array(
+                 'post_title' => sprintf(__('ชุดข้อมูลตรวจสอบ #%s', 'tpak-dq-system'), $mapped_response['response_id']),
+                 'post_content' => $this->generate_mapped_content($mapped_response),
+                 'post_status' => 'publish',
+                 'post_type' => 'verification_batch',
+                 'meta_input' => array(
+                     '_lime_survey_id' => $mapped_response['response_id'],
+                     '_survey_id' => $survey_id,
+                     '_mapped_data' => json_encode($mapped_response),
+                     '_audit_trail' => array(),
+                     '_import_date' => current_time('mysql')
+                 )
+             );
+             
+             $post_id = wp_insert_post($post_data);
+             
+             if ($post_id) {
+                 error_log('TPAK DQ System: Successfully created mapped post ID: ' . $post_id . ' for response ID: ' . $mapped_response['response_id']);
+                 
+                 // Set initial status to pending_a
+                 wp_set_object_terms($post_id, 'pending_a', 'verification_status');
+                 
+                 // Add initial audit trail entry
+                 $this->add_audit_trail_entry($post_id, array(
+                     'user_id' => 0,
+                     'user_name' => 'System',
+                     'action' => 'imported_mapped',
+                     'comment' => sprintf(__('นำเข้าข้อมูลดิบพร้อม mapping จาก LimeSurvey ID: %s', 'tpak-dq-system'), $mapped_response['response_id']),
+                     'timestamp' => current_time('mysql')
+                 ));
+                 
+                 $imported_count++;
+             } else {
+                 error_log('TPAK DQ System: Failed to create mapped post for response ID: ' . $mapped_response['response_id']);
+                 $errors[] = 'Failed to create post for response ID: ' . $mapped_response['response_id'];
+             }
+         }
+         
+         return array(
+             'imported' => $imported_count,
+             'errors' => $errors
+         );
+     }
+     
+     /**
+      * Generate content from mapped data
+      */
+     private function generate_mapped_content($mapped_response) {
+         $content = '<h3>ข้อมูลการตอบแบบสอบถาม</h3>';
+         $content .= '<p><strong>รหัสการตอบ:</strong> ' . $mapped_response['response_id'] . '</p>';
+         $content .= '<p><strong>วันที่ตอบ:</strong> ' . $mapped_response['submit_date'] . '</p>';
+         
+         $content .= '<h4>คำถามและคำตอบ:</h4>';
+         $content .= '<table class="mapped-questions">';
+         $content .= '<tr><th>รหัสคำถาม</th><th>คำถาม</th><th>คำตอบ</th></tr>';
+         
+         foreach ($mapped_response['questions'] as $question) {
+             $question_text = isset($question['question_text']) ? $question['question_text'] : $question['question_code'];
+             $answer = isset($question['mapped_answer']) ? $question['mapped_answer'] : $question['raw_answer'];
+             
+             $content .= '<tr>';
+             $content .= '<td>' . $question['question_code'];
+             if (isset($question['sub_question'])) {
+                 $content .= '[' . $question['sub_question'] . ']';
+             }
+             $content .= '</td>';
+             $content .= '<td>' . $question_text . '</td>';
+             $content .= '<td>' . $answer . '</td>';
+             $content .= '</tr>';
+         }
+         
+         $content .= '</table>';
+         
+         return $content;
+     }
 } 

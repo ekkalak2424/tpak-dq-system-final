@@ -89,6 +89,14 @@ if (!defined('ABSPATH')) {
                     <!-- Available Surveys -->
                     <div class="tpak-surveys-list">
                         <h3><?php _e('แบบสอบถามที่มีอยู่', 'tpak-dq-system'); ?></h3>
+                        
+                        <div class="tpak-import-info" style="margin-bottom: 20px; padding: 15px; background: #f9f9f9; border-left: 4px solid #0073aa;">
+                            <h4><?php _e('คำอธิบายการนำเข้า', 'tpak-dq-system'); ?></h4>
+                            <ul style="margin: 10px 0;">
+                                <li><strong><?php _e('นำเข้าแบบเต็ม:', 'tpak-dq-system'); ?></strong> <?php _e('นำเข้าข้อมูลทั้งหมดจาก LimeSurvey พร้อมข้อมูลครบถ้วน เหมาะสำหรับข้อมูลขนาดเล็ก', 'tpak-dq-system'); ?></li>
+                                <li><strong><?php _e('นำเข้าข้อมูลดิบ:', 'tpak-dq-system'); ?></strong> <?php _e('นำเข้าข้อมูลดิบพร้อม mapping ระบบจะแสดงเฉพาะคำถาม คำถามย่อย และคำตอบ เหมาะสำหรับข้อมูลขนาดใหญ่', 'tpak-dq-system'); ?></li>
+                            </ul>
+                        </div>
                         <?php
                         $surveys = $api_handler->get_surveys();
                         if ($surveys && !empty($surveys)):
@@ -116,10 +124,18 @@ if (!defined('ABSPATH')) {
                                             <span class="tpak-status-<?php echo $status_class; ?>"><?php echo $status; ?></span>
                                         </td>
                                         <td>
-                                            <button type="button" class="button button-small tpak-import-survey" 
-                                                    data-survey-id="<?php echo esc_attr($survey['sid']); ?>">
-                                                <?php _e('นำเข้า', 'tpak-dq-system'); ?>
-                                            </button>
+                                            <div class="tpak-import-actions">
+                                                <button type="button" class="button button-small tpak-import-survey" 
+                                                        data-survey-id="<?php echo esc_attr($survey['sid']); ?>" 
+                                                        data-import-type="full">
+                                                    <?php _e('นำเข้าแบบเต็ม', 'tpak-dq-system'); ?>
+                                                </button>
+                                                <button type="button" class="button button-small tpak-import-survey" 
+                                                        data-survey-id="<?php echo esc_attr($survey['sid']); ?>" 
+                                                        data-import-type="raw" style="margin-left: 5px;">
+                                                    <?php _e('นำเข้าข้อมูลดิบ', 'tpak-dq-system'); ?>
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                     <?php endforeach; ?>
@@ -340,8 +356,17 @@ jQuery(document).ready(function($) {
     $('.tpak-import-survey').on('click', function() {
         var button = $(this);
         var surveyId = button.data('survey-id');
+        var importType = button.data('import-type') || 'full';
         
-        if (confirm('<?php _e('คุณต้องการนำเข้าแบบสอบถาม ID: ', 'tpak-dq-system'); ?>' + surveyId + '?\n\n<?php _e('หมายเหตุ: การนำเข้าข้อมูลขนาดใหญ่อาจใช้เวลานาน กรุณารอจนกว่าการดำเนินการจะเสร็จสิ้น', 'tpak-dq-system'); ?>')) {
+        var confirmMessage = '<?php _e('คุณต้องการนำเข้าแบบสอบถาม ID: ', 'tpak-dq-system'); ?>' + surveyId + '?';
+        if (importType === 'raw') {
+            confirmMessage += '\n\n<?php _e('ประเภท: นำเข้าข้อมูลดิบพร้อม mapping', 'tpak-dq-system'); ?>';
+        } else {
+            confirmMessage += '\n\n<?php _e('ประเภท: นำเข้าข้อมูลแบบเต็ม', 'tpak-dq-system'); ?>';
+        }
+        confirmMessage += '\n\n<?php _e('หมายเหตุ: การนำเข้าข้อมูลขนาดใหญ่อาจใช้เวลานาน กรุณารอจนกว่าการดำเนินการจะเสร็จสิ้น', 'tpak-dq-system'); ?>';
+        
+        if (confirm(confirmMessage)) {
             button.prop('disabled', true).text('<?php _e('กำลังนำเข้า...', 'tpak-dq-system'); ?>');
             
             // Show progress message
@@ -354,7 +379,8 @@ jQuery(document).ready(function($) {
                 data: {
                     action: 'tpak_import_survey',
                     nonce: '<?php echo wp_create_nonce('tpak_import_survey'); ?>',
-                    survey_id: surveyId
+                    survey_id: surveyId,
+                    import_type: importType
                 },
                 dataType: 'json',
                 success: function(response) {
@@ -377,7 +403,12 @@ jQuery(document).ready(function($) {
                     alert('<?php _e('นำเข้าข้อมูลล้มเหลว กรุณาลองใหม่อีกครั้ง', 'tpak-dq-system'); ?>');
                 },
                 complete: function() {
-                    button.prop('disabled', false).text('<?php _e('นำเข้า', 'tpak-dq-system'); ?>');
+                    button.prop('disabled', false);
+                    if (importType === 'raw') {
+                        button.text('<?php _e('นำเข้าข้อมูลดิบ', 'tpak-dq-system'); ?>');
+                    } else {
+                        button.text('<?php _e('นำเข้าแบบเต็ม', 'tpak-dq-system'); ?>');
+                    }
                     progressDiv.remove();
                 }
             });
