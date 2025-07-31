@@ -235,7 +235,12 @@ if (!defined('ABSPATH')) {
                 <?php
                 // Get total imported count
                 $total_imported = wp_count_posts('verification_batch');
-                $total_count = $total_imported->publish + $total_imported->private + $total_imported->draft;
+                $total_count = 0;
+                if (is_object($total_imported)) {
+                    $total_count = (isset($total_imported->publish) ? $total_imported->publish : 0) + 
+                                  (isset($total_imported->private) ? $total_imported->private : 0) + 
+                                  (isset($total_imported->draft) ? $total_imported->draft : 0);
+                }
                 
                 // Get today's imported count
                 $today_imported = get_posts(array(

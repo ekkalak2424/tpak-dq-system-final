@@ -43,6 +43,9 @@ class TPAK_DQ_API_Handler {
         $this->api_url = isset($options['limesurvey_url']) ? $options['limesurvey_url'] : '';
         $this->username = isset($options['limesurvey_username']) ? $options['limesurvey_username'] : '';
         $this->password = isset($options['limesurvey_password']) ? $options['limesurvey_password'] : '';
+        
+        // Debug: Log loaded settings
+        error_log('TPAK DQ System: Loaded API settings - URL: ' . ($this->api_url ? 'Set' : 'Not set') . ', Username: ' . ($this->username ? 'Set' : 'Not set') . ', Password: ' . ($this->password ? 'Set' : 'Not set'));
     }
     
     /**

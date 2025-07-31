@@ -386,6 +386,14 @@ class TPAK_DQ_Admin_Menu {
         // Get API handler
         $api_handler = new TPAK_DQ_API_Handler();
         
+        // Debug: Check what settings are missing
+        $options = get_option('tpak_dq_system_options', array());
+        $url = isset($options['limesurvey_url']) ? $options['limesurvey_url'] : '';
+        $username = isset($options['limesurvey_username']) ? $options['limesurvey_username'] : '';
+        $password = isset($options['limesurvey_password']) ? $options['limesurvey_password'] : '';
+        
+        error_log('TPAK DQ System: API Settings Debug - URL: ' . ($url ? 'Set' : 'Not set') . ', Username: ' . ($username ? 'Set' : 'Not set') . ', Password: ' . ($password ? 'Set' : 'Not set'));
+        
         // Test connection
         if ($api_handler->is_configured()) {
             error_log('TPAK DQ System: API is configured, testing connection');
@@ -395,20 +403,21 @@ class TPAK_DQ_Admin_Menu {
             } else {
                 error_log('TPAK DQ System: API connection failed');
                 // Get more detailed error information
-                $options = get_option('tpak_dq_system_options', array());
-                $url = isset($options['limesurvey_url']) ? $options['limesurvey_url'] : '';
-                $username = isset($options['limesurvey_username']) ? $options['limesurvey_username'] : '';
-                
                 $error_message = __('API connection failed. Please check:', 'tpak-dq-system') . '<br>';
                 $error_message .= '- ' . __('URL: ', 'tpak-dq-system') . ($url ? $url : __('Not set', 'tpak-dq-system')) . '<br>';
                 $error_message .= '- ' . __('Username: ', 'tpak-dq-system') . ($username ? $username : __('Not set', 'tpak-dq-system')) . '<br>';
-                $error_message .= '- ' . __('Password: ', 'tpak-dq-system') . (isset($options['limesurvey_password']) && $options['limesurvey_password'] ? __('Set', 'tpak-dq-system') : __('Not set', 'tpak-dq-system'));
+                $error_message .= '- ' . __('Password: ', 'tpak-dq-system') . ($password ? __('Set', 'tpak-dq-system') : __('Not set', 'tpak-dq-system'));
                 
                 wp_send_json_error(array('message' => $error_message));
             }
         } else {
             error_log('TPAK DQ System: API is not configured');
-            wp_send_json_error(array('message' => __('API is not configured. Please fill in all required fields.', 'tpak-dq-system')));
+            $error_message = __('API is not configured. Please fill in all required fields:', 'tpak-dq-system') . '<br>';
+            $error_message .= '- ' . __('URL: ', 'tpak-dq-system') . ($url ? $url : __('Not set', 'tpak-dq-system')) . '<br>';
+            $error_message .= '- ' . __('Username: ', 'tpak-dq-system') . ($username ? $username : __('Not set', 'tpak-dq-system')) . '<br>';
+            $error_message .= '- ' . __('Password: ', 'tpak-dq-system') . ($password ? __('Set', 'tpak-dq-system') : __('Not set', 'tpak-dq-system'));
+            
+            wp_send_json_error(array('message' => $error_message));
         }
     }
 } 
