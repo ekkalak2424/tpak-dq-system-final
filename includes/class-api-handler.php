@@ -299,18 +299,60 @@ class TPAK_DQ_API_Handler {
                     return false;
                 }
                 
-                // Check if result is a string (error message)
-                if (is_string($response['result'])) {
-                    error_log('TPAK DQ System: API returned string result (likely error): ' . $response['result']);
-                    
-                    // If it's a language error, return false to try next language
-                    if (strpos($response['result'], 'Language code not found') !== false) {
-                        return false;
-                    }
-                    
-                    // For other errors, return false
-                    return false;
-                }
+                                 // Check if result is a string (could be base64 encoded data or error)
+                 if (is_string($response['result'])) {
+                     error_log('TPAK DQ System: API returned string result, length: ' . strlen($response['result']));
+                     
+                     // Check if it's an error message
+                     if (strpos($response['result'], 'Language code not found') !== false) {
+                         error_log('TPAK DQ System: Language code not found error');
+                         return false;
+                     }
+                     
+                     if (strpos($response['result'], 'No Data') !== false) {
+                         error_log('TPAK DQ System: No data available');
+                         return false;
+                     }
+                     
+                     // Try to decode as base64 (this is the normal case for LimeSurvey)
+                     $decoded = base64_decode($response['result'], true);
+                     if ($decoded !== false) {
+                         error_log('TPAK DQ System: Base64 decode success, length: ' . strlen($decoded));
+                         
+                         // Try to decode as JSON
+                         $json_data = json_decode($decoded, true);
+                         if (json_last_error() === JSON_ERROR_NONE && is_array($json_data)) {
+                             error_log('TPAK DQ System: JSON decode success, keys: ' . implode(',', array_keys($json_data)));
+                             
+                             // Check if it has 'responses' key
+                             if (isset($json_data['responses']) && is_array($json_data['responses'])) {
+                                 $responses_chunk = $json_data['responses'];
+                                 error_log('TPAK DQ System: Found ' . count($responses_chunk) . ' responses in JSON');
+                                 
+                                 if (!empty($responses_chunk)) {
+                                     $all_responses = array_merge($all_responses, $responses_chunk);
+                                     $iStart += $iLimit;
+                                     
+                                     // If we got fewer responses than requested, we've reached the end
+                                     if (count($responses_chunk) < $iLimit) {
+                                         $has_more_data = false;
+                                     }
+                                 } else {
+                                     $has_more_data = false;
+                                 }
+                             } else {
+                                 error_log('TPAK DQ System: No responses key found, available keys: ' . implode(',', array_keys($json_data)));
+                                 return false;
+                             }
+                         } else {
+                             error_log('TPAK DQ System: JSON decode failed: ' . json_last_error_msg());
+                             return false;
+                         }
+                     } else {
+                         error_log('TPAK DQ System: Base64 decode failed, treating as error message');
+                         return false;
+                     }
+                 }
                 
                 // Check if result is an array of responses
                 if (is_array($response['result'])) {
@@ -330,49 +372,7 @@ class TPAK_DQ_API_Handler {
                     }
                 }
                 
-                // Check if result is a base64 encoded JSON string
-                if (is_string($response['result'])) {
-                    error_log('TPAK DQ System: Got base64 string response, length: ' . strlen($response['result']));
-                    
-                    // Try to decode base64
-                    $decoded = base64_decode($response['result'], true);
-                    if ($decoded !== false) {
-                        error_log('TPAK DQ System: Base64 decode success, length: ' . strlen($decoded));
-                        
-                        // Try to decode as JSON
-                        $json_data = json_decode($decoded, true);
-                        if (json_last_error() === JSON_ERROR_NONE && is_array($json_data)) {
-                            error_log('TPAK DQ System: JSON decode success, keys: ' . implode(',', array_keys($json_data)));
-                            
-                            // Check if it has 'responses' key
-                            if (isset($json_data['responses']) && is_array($json_data['responses'])) {
-                                $responses_chunk = $json_data['responses'];
-                                error_log('TPAK DQ System: Found ' . count($responses_chunk) . ' responses in JSON');
-                                
-                                if (!empty($responses_chunk)) {
-                                    $all_responses = array_merge($all_responses, $responses_chunk);
-                                    $iStart += $iLimit;
-                                    
-                                    // If we got fewer responses than requested, we've reached the end
-                                    if (count($responses_chunk) < $iLimit) {
-                                        $has_more_data = false;
-                                    }
-                                } else {
-                                    $has_more_data = false;
-                                }
-                            } else {
-                                error_log('TPAK DQ System: No responses key found, available keys: ' . implode(',', array_keys($json_data)));
-                                return false;
-                            }
-                        } else {
-                            error_log('TPAK DQ System: JSON decode failed: ' . json_last_error_msg());
-                            return false;
-                        }
-                    } else {
-                        error_log('TPAK DQ System: Base64 decode failed');
-                        return false;
-                    }
-                }
+                
             } else {
                 error_log('TPAK DQ System: No response or invalid response structure');
                 return false;
