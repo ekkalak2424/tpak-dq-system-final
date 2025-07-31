@@ -224,49 +224,74 @@ class TPAK_DQ_API_Handler {
             return false;
         }
         
-        $params = array(
-            'sSessionKey' => $session_key,
-            'iSurveyID' => $survey_id,
-            'sDocumentType' => 'json',
-            'sLanguageCode' => 'en'
-        );
+        // Try different language codes or no language code
+        $language_codes = array('en', 'th', ''); // Try English, Thai, then no language code
         
-        if ($start_date) {
-            $params['sDateFrom'] = $start_date;
-        }
-        
-        if ($end_date) {
-            $params['sDateTo'] = $end_date;
-        }
-        
-        error_log('TPAK DQ System: Export responses params: ' . print_r($params, true));
-        
-        $response = $this->make_api_request('export_responses', $params);
-        
-        if ($response && isset($response['result'])) {
-            // Check if the result is an error message
-            if (is_array($response['result']) && isset($response['result']['status'])) {
-                error_log('TPAK DQ System: API returned error status: ' . $response['result']['status']);
+        foreach ($language_codes as $lang_code) {
+            $params = array(
+                'sSessionKey' => $session_key,
+                'iSurveyID' => $survey_id,
+                'sDocumentType' => 'json'
+            );
+            
+            // Only add language code if it's not empty
+            if (!empty($lang_code)) {
+                $params['sLanguageCode'] = $lang_code;
+            }
+            
+            if ($start_date) {
+                $params['sDateFrom'] = $start_date;
+            }
+            
+            if ($end_date) {
+                $params['sDateTo'] = $end_date;
+            }
+            
+            error_log('TPAK DQ System: Trying export responses with language code: ' . ($lang_code ?: 'none') . ' - params: ' . print_r($params, true));
+            
+            $response = $this->make_api_request('export_responses', $params);
+            
+            if ($response && isset($response['result'])) {
+                // Check if the result is an error message
+                if (is_array($response['result']) && isset($response['result']['status'])) {
+                    error_log('TPAK DQ System: API returned error status with language ' . ($lang_code ?: 'none') . ': ' . $response['result']['status']);
+                    
+                    // If it's a language error, try the next language code
+                    if (strpos($response['result']['status'], 'Language code not found') !== false) {
+                        continue;
+                    }
+                    
+                    // For other errors, return false
+                    return false;
+                }
+                
+                // Check if result is a string (error message)
+                if (is_string($response['result'])) {
+                    error_log('TPAK DQ System: API returned string result (likely error) with language ' . ($lang_code ?: 'none') . ': ' . $response['result']);
+                    
+                    // If it's a language error, try the next language code
+                    if (strpos($response['result'], 'Language code not found') !== false) {
+                        continue;
+                    }
+                    
+                    // For other errors, return false
+                    return false;
+                }
+                
+                // Check if result is an array of responses
+                if (is_array($response['result'])) {
+                    error_log('TPAK DQ System: Successfully got survey responses with language ' . ($lang_code ?: 'none') . ' - count: ' . count($response['result']));
+                    return $response['result'];
+                }
+                
+                error_log('TPAK DQ System: Unexpected result type with language ' . ($lang_code ?: 'none') . ': ' . gettype($response['result']));
                 return false;
             }
             
-            // Check if result is a string (error message)
-            if (is_string($response['result'])) {
-                error_log('TPAK DQ System: API returned string result (likely error): ' . $response['result']);
-                return false;
-            }
-            
-            // Check if result is an array of responses
-            if (is_array($response['result'])) {
-                error_log('TPAK DQ System: Successfully got survey responses - count: ' . count($response['result']));
-                return $response['result'];
-            }
-            
-            error_log('TPAK DQ System: Unexpected result type: ' . gettype($response['result']));
-            return false;
+            error_log('TPAK DQ System: Failed to get survey responses with language ' . ($lang_code ?: 'none') . ' - response: ' . print_r($response, true));
         }
         
-        error_log('TPAK DQ System: Failed to get survey responses - response: ' . print_r($response, true));
+        error_log('TPAK DQ System: All language codes failed for survey ID: ' . $survey_id);
         return false;
     }
     
