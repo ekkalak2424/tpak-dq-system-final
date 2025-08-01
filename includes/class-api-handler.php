@@ -517,21 +517,21 @@ class TPAK_DQ_API_Handler {
          
          error_log('TPAK DQ System: Processing ' . count($batches) . ' batches of ' . $batch_size . ' responses each');
          
-         foreach ($batches as $batch_index => $batch) {
-             $batch_number = $batch_index + 1;
-             error_log('TPAK DQ System: Processing batch ' . $batch_number . ' of ' . count($batches) . ' (' . count($batch) . ' responses)');
-             
-             $batch_result = $this->process_import_batch($batch);
-             $total_imported += $batch_result['imported'];
-             $total_errors = array_merge($total_errors, $batch_result['errors']);
-             
-             error_log('TPAK DQ System: Batch ' . $batch_number . ' completed - Imported: ' . $batch_result['imported'] . ', Errors: ' . count($batch_result['errors']));
-             
-             // Small delay between batches to prevent overwhelming the database
-             if ($batch_number < count($batches)) {
-                 usleep(100000); // 0.1 second delay
-             }
-         }
+                 foreach ($batches as $batch_index => $batch) {
+            $batch_number = $batch_index + 1;
+            error_log('TPAK DQ System: Processing batch ' . $batch_number . ' of ' . count($batches) . ' (' . count($batch) . ' responses)');
+            
+            $batch_result = $this->process_import_batch($batch, $survey_id);
+            $total_imported += $batch_result['imported'];
+            $total_errors = array_merge($total_errors, $batch_result['errors']);
+            
+            error_log('TPAK DQ System: Batch ' . $batch_number . ' completed - Imported: ' . $batch_result['imported'] . ', Errors: ' . count($batch_result['errors']));
+            
+            // Small delay between batches to prevent overwhelming the database
+            if ($batch_number < count($batches)) {
+                usleep(100000); // 0.1 second delay
+            }
+        }
          
          error_log('TPAK DQ System: Improved batch import completed - Total Imported: ' . $total_imported . ', Total Errors: ' . count($total_errors));
          if (!empty($total_errors)) {
@@ -547,7 +547,7 @@ class TPAK_DQ_API_Handler {
     /**
      * Process a batch of responses for import
      */
-    private function process_import_batch($responses_batch) {
+    private function process_import_batch($responses_batch, $survey_id) {
         $imported_count = 0;
         $errors = array();
         
@@ -654,6 +654,73 @@ class TPAK_DQ_API_Handler {
         
         $audit_trail[] = $entry;
         update_post_meta($post_id, '_audit_trail', $audit_trail);
+    }
+
+    /**
+     * Fix existing data structure for LimeSurvey ID and Response ID
+     * This function migrates existing posts that have response IDs stored in _lime_survey_id
+     * to the new structure where _lime_survey_id contains the actual survey ID
+     * and _lime_response_id contains the response ID
+     */
+    public function fix_existing_data_structure($survey_id = null) {
+        error_log('TPAK DQ System: Starting data structure fix for existing posts');
+        
+        $args = array(
+            'post_type' => 'verification_batch',
+            'posts_per_page' => -1,
+            'post_status' => 'any',
+            'meta_query' => array(
+                array(
+                    'key' => '_lime_survey_id',
+                    'compare' => 'EXISTS'
+                ),
+                array(
+                    'key' => '_lime_response_id',
+                    'compare' => 'NOT EXISTS'
+                )
+            )
+        );
+        
+        $posts = get_posts($args);
+        $fixed_count = 0;
+        $errors = array();
+        
+        error_log('TPAK DQ System: Found ' . count($posts) . ' posts that need structure fix');
+        
+        foreach ($posts as $post) {
+            $current_lime_survey_id = get_post_meta($post->ID, '_lime_survey_id', true);
+            
+            // If the current _lime_survey_id looks like a response ID (numeric and not a survey ID)
+            // and we have a survey_id parameter, we can fix it
+            if (is_numeric($current_lime_survey_id) && $survey_id) {
+                // Store the current value as response ID
+                update_post_meta($post->ID, '_lime_response_id', $current_lime_survey_id);
+                
+                // Update with the actual survey ID
+                update_post_meta($post->ID, '_lime_survey_id', $survey_id);
+                
+                // Add audit trail entry
+                $this->add_audit_trail_entry($post->ID, array(
+                    'user_id' => 0,
+                    'user_name' => 'System',
+                    'action' => 'data_structure_fix',
+                    'comment' => sprintf(__('แก้ไขโครงสร้างข้อมูล: ย้าย Response ID %s ไปยัง _lime_response_id และตั้งค่า Survey ID เป็น %s', 'tpak-dq-system'), $current_lime_survey_id, $survey_id),
+                    'timestamp' => current_time('mysql')
+                ));
+                
+                $fixed_count++;
+                error_log('TPAK DQ System: Fixed post ID ' . $post->ID . ' - moved response ID ' . $current_lime_survey_id . ' to _lime_response_id');
+            } else {
+                $errors[] = sprintf(__('ไม่สามารถแก้ไขข้อมูลสำหรับ Post ID %s: ไม่มี Survey ID หรือข้อมูลไม่ถูกต้อง', 'tpak-dq-system'), $post->ID);
+            }
+        }
+        
+        error_log('TPAK DQ System: Data structure fix completed - Fixed: ' . $fixed_count . ', Errors: ' . count($errors));
+        
+        return array(
+            'fixed' => $fixed_count,
+            'errors' => $errors
+        );
     }
     
          /**

@@ -315,6 +315,49 @@ class TPAK_DQ_Admin_Menu {
             $result = $cron_handler->manual_import();
         }
         
+        if (isset($_POST['fix_data_structure'])) {
+            if (wp_verify_nonce($_POST['_wpnonce'], 'tpak_fix_data_structure')) {
+                $survey_id = sanitize_text_field($_POST['survey_id_fix']);
+                if (!empty($survey_id)) {
+                    $result = $api_handler->fix_existing_data_structure($survey_id);
+                    
+                    if ($result['fixed'] > 0) {
+                        add_settings_error(
+                            'tpak_dq_import',
+                            'data_structure_fixed',
+                            sprintf(__('แก้ไขโครงสร้างข้อมูลสำเร็จ: %d รายการ', 'tpak-dq-system'), $result['fixed']),
+                            'updated'
+                        );
+                    }
+                    
+                    if (!empty($result['errors'])) {
+                        foreach ($result['errors'] as $error) {
+                            add_settings_error(
+                                'tpak_dq_import',
+                                'data_structure_error',
+                                $error,
+                                'error'
+                            );
+                        }
+                    }
+                } else {
+                    add_settings_error(
+                        'tpak_dq_import',
+                        'survey_id_required',
+                        __('กรุณาระบุ Survey ID', 'tpak-dq-system'),
+                        'error'
+                    );
+                }
+            } else {
+                add_settings_error(
+                    'tpak_dq_import',
+                    'nonce_failed',
+                    __('การตรวจสอบความปลอดภัยล้มเหลว', 'tpak-dq-system'),
+                    'error'
+                );
+            }
+        }
+        
         include TPAK_DQ_SYSTEM_PLUGIN_DIR . 'admin/views/import.php';
     }
     

@@ -75,6 +75,36 @@ if (!defined('ABSPATH')) {
             </form>
         </div>
         
+        <!-- Data Structure Fix Section -->
+        <div class="tpak-import-section">
+            <h2><?php _e('แก้ไขโครงสร้างข้อมูล', 'tpak-dq-system'); ?></h2>
+            
+            <div class="tpak-import-info" style="margin-bottom: 20px; padding: 15px; background: #fff3cd; border-left: 4px solid #ffc107;">
+                <h4><?php _e('คำอธิบาย', 'tpak-dq-system'); ?></h4>
+                <p><?php _e('หากข้อมูล LimeSurvey ID แสดงผลไม่ถูกต้อง (แสดง Response ID แทน Survey ID) ให้ใช้เครื่องมือนี้เพื่อแก้ไขโครงสร้างข้อมูลที่มีอยู่', 'tpak-dq-system'); ?></p>
+            </div>
+            
+            <form method="post" action="">
+                <?php wp_nonce_field('tpak_fix_data_structure'); ?>
+                
+                <div class="tpak-form-row">
+                    <label for="survey_id_fix"><?php _e('Survey ID สำหรับแก้ไข', 'tpak-dq-system'); ?></label>
+                    <input type="text" id="survey_id_fix" name="survey_id_fix" 
+                           value="<?php echo esc_attr($options['survey_id'] ?? ''); ?>" 
+                           class="regular-text" />
+                    <p class="description">
+                        <?php _e('ระบุ Survey ID ที่ถูกต้องเพื่อแก้ไขข้อมูลที่มีอยู่', 'tpak-dq-system'); ?>
+                    </p>
+                </div>
+                
+                <div class="tpak-form-row">
+                    <button type="submit" name="fix_data_structure" class="button button-secondary" id="tpak-fix-data-structure">
+                        <?php _e('แก้ไขโครงสร้างข้อมูล', 'tpak-dq-system'); ?>
+                    </button>
+                </div>
+            </form>
+        </div>
+        
         <!-- API Status Section -->
         <div class="tpak-import-section">
             <h2><?php _e('สถานะการเชื่อมต่อ API', 'tpak-dq-system'); ?></h2>
