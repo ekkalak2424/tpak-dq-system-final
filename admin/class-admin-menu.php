@@ -759,11 +759,15 @@ class TPAK_DQ_Admin_Menu {
             wp_send_json_error(array('message' => __('กรุณาระบุ Survey ID ในฟอร์มหรือตั้งค่าในหน้า Settings', 'tpak-dq-system')));
         }
         
-        error_log('TPAK DQ System: Manual importing survey ID: ' . $survey_id);
+        // Get date range parameters
+        $start_date = isset($_POST['start_date']) ? sanitize_text_field($_POST['start_date']) : '';
+        $end_date = isset($_POST['end_date']) ? sanitize_text_field($_POST['end_date']) : '';
+        
+        error_log('TPAK DQ System: Manual importing survey ID: ' . $survey_id . ' with date range: ' . $start_date . ' to ' . $end_date);
         
         // Get cron handler and perform import
         $cron_handler = new TPAK_DQ_Cron();
-        $result = $cron_handler->manual_import($survey_id);
+        $result = $cron_handler->manual_import($survey_id, $start_date, $end_date);
         
         if ($result['success']) {
             wp_send_json_success(array(

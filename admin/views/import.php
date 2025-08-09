@@ -91,8 +91,15 @@ if (!defined('ABSPATH')) {
                 </div>
                 
                 <div class="tpak-form-row">
+                    <div style="margin-bottom: 10px; padding: 10px; background: #e7f3ff; border-left: 4px solid #2196F3;">
+                        <strong><?php _e('หมายเหตุ:', 'tpak-dq-system'); ?></strong> 
+                        <?php _e('หากไม่ระบุช่วงวันที่ ระบบจะนำเข้าข้อมูลทั้งหมด หากระบุช่วงวันที่ ระบบจะนำเข้าข้อมูลเฉพาะในช่วงวันที่ที่ระบุเท่านั้น', 'tpak-dq-system'); ?>
+                    </div>
+                </div>
+                
+                <div class="tpak-form-row">
                     <label for="start_date"><?php _e('วันที่เริ่มต้น (ไม่บังคับ)', 'tpak-dq-system'); ?></label>
-                    <input type="date" id="start_date" name="start_date" class="regular-text" />
+                    <input type="date" id="start_date" name="start_date" class="regular-text" value="2025-07-09" />
                     <p class="description">
                         <?php _e('นำเข้าข้อมูลตั้งแต่วันที่นี้ (รูปแบบ: YYYY-MM-DD)', 'tpak-dq-system'); ?>
                     </p>
@@ -100,7 +107,7 @@ if (!defined('ABSPATH')) {
                 
                 <div class="tpak-form-row">
                     <label for="end_date"><?php _e('วันที่สิ้นสุด (ไม่บังคับ)', 'tpak-dq-system'); ?></label>
-                    <input type="date" id="end_date" name="end_date" class="regular-text" />
+                    <input type="date" id="end_date" name="end_date" class="regular-text" value="2025-08-09" />
                     <p class="description">
                         <?php _e('นำเข้าข้อมูลจนถึงวันที่นี้ (รูปแบบ: YYYY-MM-DD)', 'tpak-dq-system'); ?>
                     </p>

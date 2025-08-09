@@ -26,6 +26,8 @@ jQuery(document).ready(function($) {
         var button = $(this);
         var originalText = button.text();
         var surveyId = $('#survey_id_manual').val();
+        var startDate = $('#start_date').val();
+        var endDate = $('#end_date').val();
         
         // Validate survey ID
         if (!surveyId || surveyId.trim() === '') {
@@ -42,6 +44,8 @@ jQuery(document).ready(function($) {
             data: {
                 action: 'tpak_manual_import',
                 survey_id: surveyId,
+                start_date: startDate,
+                end_date: endDate,
                 nonce: tpak_dq_ajax.nonce
             },
             success: function(response) {

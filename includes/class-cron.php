@@ -84,7 +84,7 @@ class TPAK_DQ_Cron {
     /**
      * Manual import trigger
      */
-    public function manual_import($survey_id = null) {
+    public function manual_import($survey_id = null, $start_date = null, $end_date = null) {
         $api_handler = new TPAK_DQ_API_Handler();
         
         if (!$api_handler->is_configured()) {
@@ -106,18 +106,35 @@ class TPAK_DQ_Cron {
             );
         }
         
-        $result = $api_handler->import_survey_data($survey_id);
+        error_log('TPAK DQ System: Manual import called with survey_id: ' . $survey_id . ', start_date: ' . ($start_date ?: 'null') . ', end_date: ' . ($end_date ?: 'null'));
         
-        if ($result) {
-            return array(
-                'success' => true,
-                'imported' => $result['imported'],
-                'errors' => $result['errors'],
-                'message' => sprintf(
-                    __('นำเข้าข้อมูลสำเร็จ %d รายการ', 'tpak-dq-system'),
-                    $result['imported']
-                )
-            );
+        $result = $api_handler->import_survey_data($survey_id, $start_date, $end_date);
+        
+        if ($result && isset($result['imported'])) {
+            if ($result['imported'] > 0) {
+                return array(
+                    'success' => true,
+                    'imported' => $result['imported'],
+                    'errors' => $result['errors'],
+                    'message' => sprintf(
+                        __('นำเข้าข้อมูลสำเร็จ %d รายการ', 'tpak-dq-system'),
+                        $result['imported']
+                    )
+                );
+            } else {
+                // No data imported, but no error either
+                $error_message = __('ไม่พบข้อมูลที่ตรงกับเงื่อนไขที่ระบุ', 'tpak-dq-system');
+                if (!empty($start_date) || !empty($end_date)) {
+                    $error_message .= ' (ช่วงวันที่: ' . ($start_date ?: 'ไม่ระบุ') . ' ถึง ' . ($end_date ?: 'ไม่ระบุ') . ')';
+                }
+                if (!empty($result['errors'])) {
+                    $error_message .= ' - ' . implode(', ', $result['errors']);
+                }
+                return array(
+                    'success' => false,
+                    'message' => $error_message
+                );
+            }
         } else {
             return array(
                 'success' => false,

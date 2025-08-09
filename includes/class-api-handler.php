@@ -216,7 +216,7 @@ class TPAK_DQ_API_Handler {
       * Get survey responses with improved pagination
       */
      public function get_survey_responses($survey_id, $start_date = null, $end_date = null) {
-         error_log('TPAK DQ System: Getting survey responses for survey ID: ' . $survey_id);
+         error_log('TPAK DQ System: Getting survey responses for survey ID: ' . $survey_id . ' with date range: ' . ($start_date ?: 'all') . ' to ' . ($end_date ?: 'all'));
          
          // Try different language codes or no language code
          $language_codes = array('', 'th', 'en'); // Try no language first, then Thai, then English
@@ -230,6 +230,8 @@ class TPAK_DQ_API_Handler {
              if ($all_responses && is_array($all_responses) && !empty($all_responses)) {
                  error_log('TPAK DQ System: Successfully got ' . count($all_responses) . ' responses with language ' . ($lang_code ?: 'none'));
                  return $all_responses;
+             } else {
+                 error_log('TPAK DQ System: Failed to get responses with language ' . ($lang_code ?: 'none') . ' - Response: ' . print_r($all_responses, true));
              }
          }
          
@@ -554,18 +556,21 @@ class TPAK_DQ_API_Handler {
          /**
       * Import survey data to WordPress using improved pagination and batch processing
       */
-     public function import_survey_data($survey_id) {
+     public function import_survey_data($survey_id, $start_date = null, $end_date = null) {
          // Increase memory and time limits for large imports
          @ini_set('memory_limit', '1G');
          @ini_set('max_execution_time', 600); // 10 minutes
          
-         error_log('TPAK DQ System: Starting improved batch import for survey ID: ' . $survey_id);
+         error_log('TPAK DQ System: Starting improved batch import for survey ID: ' . $survey_id . ' with date range: ' . ($start_date ?: 'all') . ' to ' . ($end_date ?: 'all'));
          
          // Get survey responses with improved pagination
-         $responses = $this->get_survey_responses($survey_id);
+         $responses = $this->get_survey_responses($survey_id, $start_date, $end_date);
          if (!$responses) {
              error_log('TPAK DQ System: Failed to get survey responses for survey ID: ' . $survey_id);
-             return false;
+             return array(
+                 'imported' => 0,
+                 'errors' => array('ไม่สามารถดึงข้อมูลจาก LimeSurvey ได้ กรุณาตรวจสอบ Survey ID และการเชื่อมต่อ API')
+             );
          }
          
          // Ensure responses is an array
