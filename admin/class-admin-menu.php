@@ -311,13 +311,18 @@ class TPAK_DQ_Admin_Menu {
         $api_handler = new TPAK_DQ_API_Handler();
         $cron_handler = new TPAK_DQ_Cron();
         
+        // Load options for the view
+        $options = get_option('tpak_dq_system_options', array());
+        
+        // Debug: Log the options being loaded
+        error_log('TPAK DQ System: Import page - Loaded options: ' . print_r($options, true));
+        
         if (isset($_POST['manual_import'])) {
             // Check if survey_id_manual is provided in the form
             $survey_id = isset($_POST['survey_id_manual']) ? sanitize_text_field($_POST['survey_id_manual']) : '';
             
             if (empty($survey_id)) {
                 // Try to get from settings
-                $options = get_option('tpak_dq_system_options', array());
                 $survey_id = isset($options['survey_id']) ? $options['survey_id'] : '';
             }
             
@@ -523,12 +528,14 @@ class TPAK_DQ_Admin_Menu {
         error_log('TPAK DQ System: limesurvey_url in POST: ' . (isset($_POST['limesurvey_url']) ? $_POST['limesurvey_url'] : 'NOT SET'));
         error_log('TPAK DQ System: limesurvey_username in POST: ' . (isset($_POST['limesurvey_username']) ? $_POST['limesurvey_username'] : 'NOT SET'));
         error_log('TPAK DQ System: limesurvey_password in POST: ' . (isset($_POST['limesurvey_password']) ? 'SET' : 'NOT SET'));
+        error_log('TPAK DQ System: survey_id in POST: ' . (isset($_POST['survey_id']) ? $_POST['survey_id'] : 'NOT SET'));
         
         $options['limesurvey_url'] = sanitize_url($_POST['limesurvey_url']);
         $options['limesurvey_username'] = sanitize_text_field($_POST['limesurvey_username']);
         $options['limesurvey_password'] = sanitize_text_field($_POST['limesurvey_password']);
         $options['cron_interval'] = sanitize_text_field($_POST['cron_interval']);
         $options['survey_id'] = sanitize_text_field($_POST['survey_id']);
+        error_log('TPAK DQ System: survey_id saved as: ' . $options['survey_id']);
         $options['email_notifications'] = isset($_POST['email_notifications']) ? true : false;
         $options['sampling_percentage'] = intval($_POST['sampling_percentage']);
         
