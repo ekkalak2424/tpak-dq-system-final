@@ -16,6 +16,40 @@ if (!defined('ABSPATH')) {
         <div class="tpak-import-section">
             <h2><?php _e('นำเข้าข้อมูลด้วยตนเอง', 'tpak-dq-system'); ?></h2>
             
+            <!-- Configuration Status -->
+            <div class="tpak-config-status" style="margin-bottom: 20px; padding: 15px; background: #e2e3e5; border-left: 4px solid #6c757d;">
+                <h4><?php _e('สถานะการตั้งค่า', 'tpak-dq-system'); ?></h4>
+                <ul>
+                    <li><strong><?php _e('LimeSurvey URL:', 'tpak-dq-system'); ?></strong> 
+                        <?php echo !empty($options['limesurvey_url']) ? '✓ ' . esc_html($options['limesurvey_url']) : '✗ ' . __('ไม่ระบุ', 'tpak-dq-system'); ?>
+                    </li>
+                    <li><strong><?php _e('Username:', 'tpak-dq-system'); ?></strong> 
+                        <?php echo !empty($options['limesurvey_username']) ? '✓ ' . esc_html($options['limesurvey_username']) : '✗ ' . __('ไม่ระบุ', 'tpak-dq-system'); ?>
+                    </li>
+                    <li><strong><?php _e('Password:', 'tpak-dq-system'); ?></strong> 
+                        <?php echo !empty($options['limesurvey_password']) ? '✓ ' . __('ตั้งค่าแล้ว', 'tpak-dq-system') : '✗ ' . __('ไม่ระบุ', 'tpak-dq-system'); ?>
+                    </li>
+                    <li><strong><?php _e('Survey ID:', 'tpak-dq-system'); ?></strong> 
+                        <?php if (!empty($options['survey_id'])): ?>
+                            ✓ <?php echo esc_html($options['survey_id']); ?>
+                        <?php else: ?>
+                            <span style="color: #dc3545;">✗ <?php _e('ไม่ระบุ - กรุณาตั้งค่าในหน้า Settings', 'tpak-dq-system'); ?></span>
+                        <?php endif; ?>
+                    </li>
+                </ul>
+                <?php if (empty($options['survey_id'])): ?>
+                    <p style="margin-top: 10px; color: #dc3545;">
+                        <strong><?php _e('หมายเหตุ:', 'tpak-dq-system'); ?></strong> 
+                        <?php _e('กรุณาไปที่หน้า Settings เพื่อตั้งค่า Survey ID ก่อนการนำเข้าข้อมูล', 'tpak-dq-system'); ?>
+                    </p>
+                    <p style="margin-top: 10px;">
+                        <a href="<?php echo admin_url('admin.php?page=tpak-dq-settings'); ?>" class="button button-secondary">
+                            <?php _e('ไปที่หน้า Settings', 'tpak-dq-system'); ?>
+                        </a>
+                    </p>
+                <?php endif; ?>
+            </div>
+            
             <?php if (isset($result)): ?>
                 <?php if ($result['success']): ?>
                     <div class="tpak-import-status success">
@@ -42,12 +76,12 @@ if (!defined('ABSPATH')) {
                 <?php wp_nonce_field('tpak_manual_import'); ?>
                 
                 <div class="tpak-form-row">
-                    <label for="survey_id_manual"><?php _e('Survey ID', 'tpak-dq-system'); ?></label>
+                    <label for="survey_id_manual"><?php _e('Survey ID', 'tpak-dq-system'); ?> <span style="color: #dc3545;">*</span></label>
                     <input type="text" id="survey_id_manual" name="survey_id_manual" 
                            value="<?php echo esc_attr($options['survey_id'] ?? ''); ?>" 
-                           class="regular-text" />
+                           class="regular-text" required />
                     <p class="description">
-                        <?php _e('ID ของแบบสอบถามที่ต้องการนำเข้า', 'tpak-dq-system'); ?>
+                        <?php _e('ID ของแบบสอบถามที่ต้องการนำเข้า (จำเป็น)', 'tpak-dq-system'); ?>
                     </p>
                 </div>
                 

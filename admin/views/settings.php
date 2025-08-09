@@ -15,7 +15,7 @@ if (!defined('ABSPATH')) {
     
     <div class="tpak-settings-page">
         <form method="post" action="">
-            <?php wp_nonce_field('tpak_dq_settings'); ?>
+            <?php wp_nonce_field('tpak_dq_settings', '_wpnonce'); ?>
             
             <!-- API Settings -->
             <div class="tpak-settings-section">

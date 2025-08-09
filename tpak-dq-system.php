@@ -86,6 +86,9 @@ class TPAK_DQ_System {
         // Initialize post types and taxonomies
         new TPAK_DQ_Post_Types();
         
+        // Ensure options are up to date
+        $this->ensure_options_complete();
+        
         // Initialize user roles
         new TPAK_DQ_Roles();
         
@@ -169,11 +172,40 @@ class TPAK_DQ_System {
             'limesurvey_username' => '',
             'limesurvey_password' => '',
             'cron_interval' => 'hourly',
+            'survey_id' => '',
             'sampling_percentage' => 70,
             'email_notifications' => true
         );
         
         add_option('tpak_dq_system_options', $default_options);
+    }
+    
+    /**
+     * Ensure all required options exist
+     */
+    private function ensure_options_complete() {
+        $options = get_option('tpak_dq_system_options', array());
+        $default_options = array(
+            'limesurvey_url' => '',
+            'limesurvey_username' => '',
+            'limesurvey_password' => '',
+            'cron_interval' => 'hourly',
+            'survey_id' => '',
+            'sampling_percentage' => 70,
+            'email_notifications' => true
+        );
+        
+        $updated = false;
+        foreach ($default_options as $key => $default_value) {
+            if (!isset($options[$key])) {
+                $options[$key] = $default_value;
+                $updated = true;
+            }
+        }
+        
+        if ($updated) {
+            update_option('tpak_dq_system_options', $options);
+        }
     }
 }
 

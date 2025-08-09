@@ -312,7 +312,23 @@ class TPAK_DQ_Admin_Menu {
         $cron_handler = new TPAK_DQ_Cron();
         
         if (isset($_POST['manual_import'])) {
-            $result = $cron_handler->manual_import();
+            // Check if survey_id_manual is provided in the form
+            $survey_id = isset($_POST['survey_id_manual']) ? sanitize_text_field($_POST['survey_id_manual']) : '';
+            
+            if (empty($survey_id)) {
+                // Try to get from settings
+                $options = get_option('tpak_dq_system_options', array());
+                $survey_id = isset($options['survey_id']) ? $options['survey_id'] : '';
+            }
+            
+            if (empty($survey_id)) {
+                $result = array(
+                    'success' => false,
+                    'message' => __('กรุณาระบุ Survey ID ในฟอร์มหรือตั้งค่าในหน้า Settings', 'tpak-dq-system')
+                );
+            } else {
+                $result = $cron_handler->manual_import($survey_id);
+            }
         }
         
         if (isset($_POST['fix_data_structure'])) {
