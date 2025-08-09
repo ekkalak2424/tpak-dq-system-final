@@ -215,11 +215,26 @@ class TPAK_DQ_API_Handler {
          /**
       * Get survey responses with improved pagination
       */
-     public function get_survey_responses($survey_id, $start_date = null, $end_date = null) {
-         error_log('TPAK DQ System: Getting survey responses for survey ID: ' . $survey_id . ' with date range: ' . ($start_date ?: 'all') . ' to ' . ($end_date ?: 'all'));
-         
-         // Try different language codes or no language code
-         $language_codes = array('', 'th', 'en'); // Try no language first, then Thai, then English
+         public function get_survey_responses($survey_id, $start_date = null, $end_date = null) {
+        error_log('TPAK DQ System: Getting survey responses for survey ID: ' . $survey_id . ' with date range: ' . ($start_date ?: 'all') . ' to ' . ($end_date ?: 'all'));
+        
+        // Validate survey ID
+        if (empty($survey_id) || !is_numeric($survey_id)) {
+            error_log('TPAK DQ System: Invalid survey ID provided: ' . $survey_id);
+            return false;
+        }
+        
+        // First, try to validate that the survey exists by getting its structure
+        $survey_structure = $this->get_survey_structure($survey_id);
+        if (!$survey_structure) {
+            error_log('TPAK DQ System: Survey ID ' . $survey_id . ' does not exist or is not accessible');
+            return false;
+        }
+        
+        error_log('TPAK DQ System: Survey structure validation passed for survey ID: ' . $survey_id);
+        
+        // Try different language codes or no language code
+        $language_codes = array('', 'th', 'en'); // Try no language first, then Thai, then English
          
          foreach ($language_codes as $lang_code) {
              error_log('TPAK DQ System: Trying language code: ' . ($lang_code ?: 'none'));
@@ -287,10 +302,12 @@ class TPAK_DQ_API_Handler {
              
              if ($start_date) {
                  $params['sDateFrom'] = $start_date;
+                 error_log('TPAK DQ System: Added date filter - From: ' . $start_date);
              }
              
              if ($end_date) {
                  $params['sDateTo'] = $end_date;
+                 error_log('TPAK DQ System: Added date filter - To: ' . $end_date);
              }
              
              error_log('TPAK DQ System: Page ' . $page_count . ' - Requesting responses ' . $iStart . ' to ' . ($iStart + $iLimit) . ' with language: ' . ($lang_code ?: 'none'));
@@ -330,7 +347,14 @@ class TPAK_DQ_API_Handler {
                      }
                      
                      if (strpos($response['result'], 'No Data') !== false) {
-                         error_log('TPAK DQ System: No data available');
+                         error_log('TPAK DQ System: No data available - API returned: ' . $response['result']);
+                         
+                         // Check if it's the specific "survey table does not exist" error
+                         if (strpos($response['result'], 'survey table does not exist') !== false) {
+                             error_log('TPAK DQ System: Survey table does not exist for survey ID: ' . $survey_id . ' - This may indicate an invalid survey ID or the survey has been deleted');
+                             return false; // Return false to try next language or fail completely
+                         }
+                         
                          $has_more_data = false;
                          break;
                      }
@@ -500,6 +524,96 @@ class TPAK_DQ_API_Handler {
             error_log('TPAK DQ System API Test Error: ' . $e->getMessage());
             return false;
         }
+    }
+    
+    /**
+     * Validate if a survey ID exists and is accessible
+     */
+    public function validate_survey_id($survey_id) {
+        if (empty($survey_id) || !is_numeric($survey_id)) {
+            return array(
+                'valid' => false,
+                'message' => 'Invalid survey ID format'
+            );
+        }
+        
+        $session_key = $this->get_session_key();
+        if (!$session_key) {
+            return array(
+                'valid' => false,
+                'message' => 'Cannot authenticate with LimeSurvey API'
+            );
+        }
+        
+        // Try to get survey properties to validate it exists
+        $response = $this->make_api_request('get_survey_properties', array(
+            'sSessionKey' => $session_key,
+            'iSurveyID' => $survey_id,
+            'aSurveySettings' => array('active', 'title')
+        ));
+        
+        if ($response && isset($response['result'])) {
+            if (is_array($response['result']) && isset($response['result']['status'])) {
+                return array(
+                    'valid' => false,
+                    'message' => 'Survey not found: ' . $response['result']['status']
+                );
+            }
+            
+            if (is_array($response['result'])) {
+                return array(
+                    'valid' => true,
+                    'message' => 'Survey found and accessible',
+                    'data' => $response['result']
+                );
+            }
+        }
+        
+        return array(
+            'valid' => false,
+            'message' => 'Unable to validate survey ID'
+        );
+    }
+    
+    /**
+     * Get response date range for a survey
+     */
+    public function get_response_date_range($survey_id) {
+        error_log('TPAK DQ System: Getting response date range for survey ID: ' . $survey_id);
+        
+        $responses = $this->get_survey_responses($survey_id);
+        if (!$responses || !is_array($responses) || empty($responses)) {
+            return array(
+                'success' => false,
+                'message' => 'No responses found for this survey'
+            );
+        }
+        
+        $dates = array();
+        foreach ($responses as $response) {
+            if (isset($response['submitdate']) && !empty($response['submitdate'])) {
+                $dates[] = $response['submitdate'];
+            }
+        }
+        
+        if (empty($dates)) {
+            return array(
+                'success' => false,
+                'message' => 'No response dates found'
+            );
+        }
+        
+        sort($dates);
+        $earliest = $dates[0];
+        $latest = end($dates);
+        
+        return array(
+            'success' => true,
+            'total_responses' => count($responses),
+            'earliest_date' => $earliest,
+            'latest_date' => $latest,
+            'date_range' => $earliest . ' to ' . $latest
+        );
     }
     
     /**

@@ -334,7 +334,32 @@ class TPAK_DQ_Admin_Menu {
                     'message' => __('กรุณาระบุ Survey ID ในฟอร์มหรือตั้งค่าในหน้า Settings', 'tpak-dq-system')
                 );
             } else {
-                $result = $cron_handler->manual_import($survey_id);
+                // Get date range from form
+                $start_date = isset($_POST['start_date']) ? sanitize_text_field($_POST['start_date']) : '';
+                $end_date = isset($_POST['end_date']) ? sanitize_text_field($_POST['end_date']) : '';
+                
+                error_log('TPAK DQ System: Manual import with date range - Survey ID: ' . $survey_id . ', Start: ' . $start_date . ', End: ' . $end_date);
+                $result = $cron_handler->manual_import($survey_id, $start_date, $end_date);
+            }
+        }
+        
+        if (isset($_POST['manual_import_no_date'])) {
+            // Check if survey_id_manual is provided in the form
+            $survey_id = isset($_POST['survey_id_manual']) ? sanitize_text_field($_POST['survey_id_manual']) : '';
+            
+            if (empty($survey_id)) {
+                // Try to get from settings
+                $survey_id = isset($options['survey_id']) ? $options['survey_id'] : '';
+            }
+            
+            if (empty($survey_id)) {
+                $result = array(
+                    'success' => false,
+                    'message' => __('กรุณาระบุ Survey ID ในฟอร์มหรือตั้งค่าในหน้า Settings', 'tpak-dq-system')
+                );
+            } else {
+                error_log('TPAK DQ System: Manual import without date range - Survey ID: ' . $survey_id);
+                $result = $cron_handler->manual_import($survey_id, null, null);
             }
         }
         
@@ -764,6 +789,12 @@ class TPAK_DQ_Admin_Menu {
         $end_date = isset($_POST['end_date']) ? sanitize_text_field($_POST['end_date']) : '';
         
         error_log('TPAK DQ System: Manual importing survey ID: ' . $survey_id . ' with date range: ' . $start_date . ' to ' . $end_date);
+        
+        // Validate survey ID first
+        $validation = $api_handler->validate_survey_id($survey_id);
+        if (!$validation['valid']) {
+            wp_send_json_error(array('message' => 'Survey ID validation failed: ' . $validation['message']));
+        }
         
         // Get cron handler and perform import
         $cron_handler = new TPAK_DQ_Cron();

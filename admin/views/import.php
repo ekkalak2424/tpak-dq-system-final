@@ -76,6 +76,28 @@ if (!defined('ABSPATH')) {
             // Debug: Log options in the view
             error_log('TPAK DQ System: Import view - Options: ' . print_r($options, true));
             error_log('TPAK DQ System: Import view - Survey ID: ' . (isset($options['survey_id']) ? $options['survey_id'] : 'NOT SET'));
+            
+            // Show survey information if survey ID is set
+            if (!empty($options['survey_id'])) {
+                $survey_id = $options['survey_id'];
+                $date_range = $api_handler->get_response_date_range($survey_id);
+                if ($date_range['success']) {
+                    echo '<div class="tpak-import-info" style="margin-bottom: 20px; padding: 15px; background: #d4edda; border-left: 4px solid #28a745;">';
+                    echo '<h4>' . __('ข้อมูลแบบสอบถาม', 'tpak-dq-system') . '</h4>';
+                    echo '<p><strong>' . __('Survey ID:', 'tpak-dq-system') . '</strong> ' . esc_html($survey_id) . '</p>';
+                    echo '<p><strong>' . __('จำนวนการตอบกลับทั้งหมด:', 'tpak-dq-system') . '</strong> ' . esc_html($date_range['total_responses']) . '</p>';
+                    echo '<p><strong>' . __('ช่วงวันที่ที่มีข้อมูล:', 'tpak-dq-system') . '</strong> ' . esc_html($date_range['date_range']) . '</p>';
+                    echo '<p><strong>' . __('วันที่เริ่มต้น:', 'tpak-dq-system') . '</strong> ' . esc_html($date_range['earliest_date']) . '</p>';
+                    echo '<p><strong>' . __('วันที่สิ้นสุด:', 'tpak-dq-system') . '</strong> ' . esc_html($date_range['latest_date']) . '</p>';
+                    echo '</div>';
+                } else {
+                    echo '<div class="tpak-import-info" style="margin-bottom: 20px; padding: 15px; background: #f8d7da; border-left: 4px solid #dc3545;">';
+                    echo '<h4>' . __('ข้อมูลแบบสอบถาม', 'tpak-dq-system') . '</h4>';
+                    echo '<p><strong>' . __('Survey ID:', 'tpak-dq-system') . '</strong> ' . esc_html($survey_id) . '</p>';
+                    echo '<p style="color: #721c24;">' . esc_html($date_range['message']) . '</p>';
+                    echo '</div>';
+                }
+            }
             ?>
             <form method="post" action="">
                 <?php wp_nonce_field('tpak_manual_import'); ?>
@@ -116,6 +138,9 @@ if (!defined('ABSPATH')) {
                 <div class="tpak-form-row">
                     <button type="submit" name="manual_import" class="button button-primary" id="tpak-manual-import">
                         <?php _e('นำเข้าข้อมูล', 'tpak-dq-system'); ?>
+                    </button>
+                    <button type="submit" name="manual_import_no_date" class="button button-secondary" style="margin-left: 10px;">
+                        <?php _e('นำเข้าข้อมูลทั้งหมด (ไม่ใช้ช่วงวันที่)', 'tpak-dq-system'); ?>
                     </button>
                 </div>
             </form>
