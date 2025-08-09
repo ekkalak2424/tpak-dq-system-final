@@ -22,10 +22,11 @@ if (!$post || $post->post_type !== 'verification_batch') {
 }
 
 // Get response data and metadata
-$response_data = get_post_meta($response_id, '_response_data', true);
-$response_meta_id = get_post_meta($response_id, '_response_id', true);
-$survey_info = get_post_meta($response_id, '_survey_info', true);
-$survey_structure = get_post_meta($response_id, '_survey_structure', true);
+$survey_data_json = get_post_meta($response_id, '_survey_data', true);
+$response_data = json_decode($survey_data_json, true);
+$lime_response_id = get_post_meta($response_id, '_lime_response_id', true);
+$lime_survey_id = get_post_meta($response_id, '_lime_survey_id', true);
+$import_date = get_post_meta($response_id, '_import_date', true);
 
 // Get workflow data
 $workflow = new TPAK_DQ_Workflow();
@@ -38,10 +39,21 @@ $other_data = array();
 
 if ($response_data && is_array($response_data)) {
     foreach ($response_data as $field_key => $field_value) {
-        // Group questions by prefix (e.g., Q1, Q2, etc.)
-        if (preg_match('/^(Q\d+)(.*)/', $field_key, $matches)) {
+        // Skip empty values
+        if ($field_value === null || $field_value === '' || $field_value === ' ') {
+            continue;
+        }
+        
+        // Identify metadata fields
+        if (in_array($field_key, ['id', 'submitdate', 'lastpage', 'startlanguage', 'seed', 'startdate', 'datestamp', 'ipaddr', 'refurl'])) {
+            $other_data[$field_key] = $field_value;
+            continue;
+        }
+        
+        // Group questions by prefix (e.g., Q1, Q2, etc.) or numeric patterns
+        if (preg_match('/^(Q?\d+)([A-Z]*\d*)(.*)/', $field_key, $matches)) {
             $question_group = $matches[1];
-            $sub_question = $matches[2];
+            $sub_part = $matches[2] . $matches[3];
             
             if (!isset($organized_data[$question_group])) {
                 $organized_data[$question_group] = array(
@@ -50,27 +62,28 @@ if ($response_data && is_array($response_data)) {
                 );
             }
             
-            if (empty($sub_question)) {
+            if (empty($sub_part) || $sub_part === '') {
                 $organized_data[$question_group]['main'] = $field_value;
             } else {
                 $organized_data[$question_group]['sub_questions'][$field_key] = $field_value;
             }
         } else {
-            // Non-question data (metadata, timestamps, etc.)
-            $other_data[$field_key] = $field_value;
+            // Try to catch other question patterns or treat as individual questions
+            if (!in_array($field_key, ['token', 'lastpage', 'startlanguage', 'seed'])) {
+                $organized_data[$field_key] = array(
+                    'main' => $field_value,
+                    'sub_questions' => array()
+                );
+            } else {
+                $other_data[$field_key] = $field_value;
+            }
         }
     }
 }
 
-// Get question labels from survey structure if available
+// For now, we'll use field keys as labels since we don't have survey structure
+// In the future, this could be enhanced to fetch question labels from LimeSurvey API
 $question_labels = array();
-if ($survey_structure && isset($survey_structure['questions'])) {
-    foreach ($survey_structure['questions'] as $q) {
-        if (isset($q['title']) && isset($q['question'])) {
-            $question_labels[$q['title']] = $q['question'];
-        }
-    }
-}
 ?>
 
 <div class="wrap tpak-response-detail">
@@ -79,7 +92,7 @@ if ($survey_structure && isset($survey_structure['questions'])) {
         <div class="header-left">
             <h1>
                 <?php _e('รายละเอียดแบบสอบถาม', 'tpak-dq-system'); ?>
-                <span class="response-id">#<?php echo esc_html($response_meta_id ?: $response_id); ?></span>
+                <span class="response-id">#<?php echo esc_html($lime_response_id ?: $response_id); ?></span>
             </h1>
             
             <?php if ($status): ?>
@@ -148,10 +161,17 @@ if ($survey_structure && isset($survey_structure['questions'])) {
                         </div>
                     <?php endif; ?>
                     
-                    <?php if ($survey_info && isset($survey_info['surveyls_title'])): ?>
-                        <div class="info-item full-width">
-                            <label><?php _e('ชื่อแบบสอบถาม:', 'tpak-dq-system'); ?></label>
-                            <span><?php echo esc_html($survey_info['surveyls_title']); ?></span>
+                    <?php if ($lime_survey_id): ?>
+                        <div class="info-item">
+                            <label><?php _e('Survey ID:', 'tpak-dq-system'); ?></label>
+                            <span><?php echo esc_html($lime_survey_id); ?></span>
+                        </div>
+                    <?php endif; ?>
+                    
+                    <?php if ($import_date): ?>
+                        <div class="info-item">
+                            <label><?php _e('วันที่ Import:', 'tpak-dq-system'); ?></label>
+                            <span><?php echo esc_html($import_date); ?></span>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -182,6 +202,19 @@ if ($survey_structure && isset($survey_structure['questions'])) {
                         (<?php echo count($organized_data); ?> <?php _e('คำถามหลัก', 'tpak-dq-system'); ?>)
                     </span>
                 </h2>
+                
+                <?php if (current_user_can('manage_options')): ?>
+                    <!-- Debug Info for Admins -->
+                    <details style="margin-bottom: 20px; padding: 10px; background: #f0f0f1; border-radius: 4px;">
+                        <summary style="cursor: pointer; font-weight: bold;">🔧 Debug Information (Admin Only)</summary>
+                        <div style="margin-top: 10px; font-size: 12px;">
+                            <p><strong>Raw Response Data Keys:</strong> <?php echo $response_data ? implode(', ', array_keys($response_data)) : 'None'; ?></p>
+                            <p><strong>Organized Data Keys:</strong> <?php echo implode(', ', array_keys($organized_data)); ?></p>
+                            <p><strong>Other Data Keys:</strong> <?php echo implode(', ', array_keys($other_data)); ?></p>
+                            <p><strong>Total Response Fields:</strong> <?php echo $response_data ? count($response_data) : 0; ?></p>
+                        </div>
+                    </details>
+                <?php endif; ?>
                 
                 <?php if (!empty($organized_data)): ?>
                     <?php 

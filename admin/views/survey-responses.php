@@ -104,16 +104,18 @@ $query = new WP_Query($args);
         <div class="tpak-responses-grid view-content" id="grid-view">
             <?php while ($query->have_posts()): $query->the_post(); ?>
                 <?php
-                $response_data = get_post_meta(get_the_ID(), '_response_data', true);
-                $response_id = get_post_meta(get_the_ID(), '_response_id', true);
-                $survey_info = get_post_meta(get_the_ID(), '_survey_info', true);
+                // Get the actual survey data that was imported
+                $survey_data_json = get_post_meta(get_the_ID(), '_survey_data', true);
+                $response_data = json_decode($survey_data_json, true);
+                $lime_response_id = get_post_meta(get_the_ID(), '_lime_response_id', true);
+                $lime_survey_id = get_post_meta(get_the_ID(), '_lime_survey_id', true);
                 $workflow = new TPAK_DQ_Workflow();
                 $status = $workflow->get_batch_status(get_the_ID());
                 ?>
                 
                 <div class="response-card status-<?php echo esc_attr($status); ?>">
                     <div class="card-header">
-                        <span class="response-id">#<?php echo esc_html($response_id ?: get_the_ID()); ?></span>
+                        <span class="response-id">#<?php echo esc_html($lime_response_id ?: get_the_ID()); ?></span>
                         <?php if ($status): ?>
                             <?php
                             $status_term = get_term_by('slug', $status, 'verification_status');
@@ -152,13 +154,30 @@ $query = new WP_Query($args);
                                 $preview_count = 0;
                                 foreach ($response_data as $field_key => $field_value) {
                                     if ($preview_count >= 3) break;
-                                    if (strpos($field_key, 'Q') === 0) {
+                                    // Skip metadata fields and show only actual question responses
+                                    if (in_array($field_key, ['id', 'submitdate', 'lastpage', 'startlanguage', 'seed', 'startdate', 'datestamp'])) {
+                                        continue;
+                                    }
+                                    if (!empty($field_value) && $field_value !== '' && $field_value !== null) {
                                         echo '<div class="preview-item">';
                                         echo '<strong>' . esc_html($field_key) . ':</strong> ';
-                                        echo '<span>' . esc_html(mb_substr($field_value, 0, 50)) . '...</span>';
+                                        echo '<span>' . esc_html(mb_substr(strip_tags($field_value), 0, 50)) . (strlen($field_value) > 50 ? '...' : '') . '</span>';
                                         echo '</div>';
                                         $preview_count++;
                                     }
+                                }
+                                
+                                // Debug info for admins when no preview items found
+                                if ($preview_count === 0 && current_user_can('manage_options')) {
+                                    echo '<div class="preview-item" style="color: #999; font-style: italic;">';
+                                    echo '<small>Debug: ';
+                                    if ($response_data && is_array($response_data)) {
+                                        echo 'Fields: ' . implode(', ', array_keys($response_data));
+                                    } else {
+                                        echo 'No response data found';
+                                    }
+                                    echo '</small>';
+                                    echo '</div>';
                                 }
                                 ?>
                             </div>
@@ -199,13 +218,15 @@ $query = new WP_Query($args);
                     while ($query->have_posts()): $query->the_post(); 
                     ?>
                         <?php
-                        $response_data = get_post_meta(get_the_ID(), '_response_data', true);
-                        $response_id = get_post_meta(get_the_ID(), '_response_id', true);
+                        // Get the actual survey data that was imported
+                        $survey_data_json = get_post_meta(get_the_ID(), '_survey_data', true);
+                        $response_data = json_decode($survey_data_json, true);
+                        $lime_response_id = get_post_meta(get_the_ID(), '_lime_response_id', true);
                         $workflow = new TPAK_DQ_Workflow();
                         $status = $workflow->get_batch_status(get_the_ID());
                         ?>
                         <tr>
-                            <td>#<?php echo esc_html($response_id ?: get_the_ID()); ?></td>
+                            <td>#<?php echo esc_html($lime_response_id ?: get_the_ID()); ?></td>
                             <td>
                                 <strong>
                                     <a href="<?php echo admin_url('admin.php?page=tpak-dq-response-view&id=' . get_the_ID()); ?>">
