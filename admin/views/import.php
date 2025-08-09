@@ -72,13 +72,18 @@ if (!defined('ABSPATH')) {
                 <?php endif; ?>
             <?php endif; ?>
             
+            <?php
+            // Debug: Log options in the view
+            error_log('TPAK DQ System: Import view - Options: ' . print_r($options, true));
+            error_log('TPAK DQ System: Import view - Survey ID: ' . (isset($options['survey_id']) ? $options['survey_id'] : 'NOT SET'));
+            ?>
             <form method="post" action="">
                 <?php wp_nonce_field('tpak_manual_import'); ?>
                 
                 <div class="tpak-form-row">
                     <label for="survey_id_manual"><?php _e('Survey ID', 'tpak-dq-system'); ?> <span style="color: #dc3545;">*</span></label>
                     <input type="text" id="survey_id_manual" name="survey_id_manual" 
-                           value="<?php echo esc_attr($options['survey_id'] ?? ''); ?>" 
+                           value="<?php echo esc_attr(isset($options['survey_id']) ? $options['survey_id'] : ''); ?>" 
                            class="regular-text" required />
                     <p class="description">
                         <?php _e('ID ของแบบสอบถามที่ต้องการนำเข้า (จำเป็น)', 'tpak-dq-system'); ?>

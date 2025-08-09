@@ -25,10 +25,12 @@ class TPAK_DQ_Admin_Menu {
         // AJAX actions
         add_action('wp_ajax_tpak_test_api', array($this, 'test_api_connection'));
         add_action('wp_ajax_tpak_import_survey', array($this, 'import_survey_ajax'));
+        add_action('wp_ajax_tpak_manual_import', array($this, 'manual_import_ajax'));
         
         // Debug: Log AJAX action registration
         error_log('TPAK DQ System: AJAX action tpak_test_api registered');
         error_log('TPAK DQ System: AJAX action tpak_import_survey registered');
+        error_log('TPAK DQ System: AJAX action tpak_manual_import registered');
     }
     
     /**
@@ -721,6 +723,55 @@ class TPAK_DQ_Admin_Menu {
             $error_message .= '- ' . __('Password: ', 'tpak-dq-system') . ($password ? __('Set', 'tpak-dq-system') : __('Not set', 'tpak-dq-system'));
             
             wp_send_json_error(array('message' => $error_message));
+        }
+    }
+    
+    /**
+     * Manual import via AJAX
+     */
+    public function manual_import_ajax() {
+        // Debug: Log the request
+        error_log('TPAK DQ System: AJAX manual_import_ajax called');
+        error_log('TPAK DQ System: POST data: ' . print_r($_POST, true));
+        
+        // Check nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'tpak_workflow_nonce')) {
+            error_log('TPAK DQ System: Manual import nonce verification failed');
+            wp_send_json_error(array('message' => __('Security check failed', 'tpak-dq-system')));
+        }
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            error_log('TPAK DQ System: Manual import permission check failed');
+            wp_send_json_error(array('message' => __('You do not have permission to perform this action', 'tpak-dq-system')));
+        }
+        
+        // Get survey ID from form or settings
+        $survey_id = isset($_POST['survey_id']) ? sanitize_text_field($_POST['survey_id']) : '';
+        
+        if (empty($survey_id)) {
+            // Try to get from settings
+            $options = get_option('tpak_dq_system_options', array());
+            $survey_id = isset($options['survey_id']) ? $options['survey_id'] : '';
+        }
+        
+        if (empty($survey_id)) {
+            wp_send_json_error(array('message' => __('กรุณาระบุ Survey ID ในฟอร์มหรือตั้งค่าในหน้า Settings', 'tpak-dq-system')));
+        }
+        
+        error_log('TPAK DQ System: Manual importing survey ID: ' . $survey_id);
+        
+        // Get cron handler and perform import
+        $cron_handler = new TPAK_DQ_Cron();
+        $result = $cron_handler->manual_import($survey_id);
+        
+        if ($result['success']) {
+            wp_send_json_success(array(
+                'message' => $result['message'],
+                'imported' => $result['imported'] ?? 0
+            ));
+        } else {
+            wp_send_json_error(array('message' => $result['message']));
         }
     }
 } 

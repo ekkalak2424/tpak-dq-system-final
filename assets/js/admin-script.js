@@ -19,32 +19,45 @@ jQuery(document).ready(function($) {
         }
     });
     
-    // Manual import handler
+    // Manual import handler - Use AJAX for better user experience
     $('#tpak-manual-import').on('click', function(e) {
         e.preventDefault();
         
         var button = $(this);
         var originalText = button.text();
+        var surveyId = $('#survey_id_manual').val();
         
-        button.text('Importing...').prop('disabled', true);
+        // Validate survey ID
+        if (!surveyId || surveyId.trim() === '') {
+            showNotification('กรุณาระบุ Survey ID', 'error');
+            return;
+        }
+        
+        // Show loading state
+        button.text('กำลังนำเข้า...').prop('disabled', true);
         
         $.ajax({
             url: tpak_dq_ajax.ajax_url,
             type: 'POST',
             data: {
                 action: 'tpak_manual_import',
+                survey_id: surveyId,
                 nonce: tpak_dq_ajax.nonce
             },
             success: function(response) {
+                console.log('Manual import response:', response);
                 if (response.success) {
-                    showNotification('Import completed successfully!', 'success');
-                    location.reload();
+                    showNotification('นำเข้าข้อมูลสำเร็จ: ' + response.data.message, 'success');
+                    setTimeout(function() {
+                        location.reload();
+                    }, 2000);
                 } else {
-                    showNotification('Import failed: ' + response.data.message, 'error');
+                    showNotification('นำเข้าข้อมูลล้มเหลว: ' + response.data.message, 'error');
                 }
             },
-            error: function() {
-                showNotification('Import failed. Please try again.', 'error');
+            error: function(xhr, status, error) {
+                console.log('Manual import error:', {xhr: xhr, status: status, error: error});
+                showNotification('นำเข้าข้อมูลล้มเหลว กรุณาลองใหม่อีกครั้ง', 'error');
             },
             complete: function() {
                 button.text(originalText).prop('disabled', false);
