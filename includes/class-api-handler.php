@@ -1139,35 +1139,378 @@ class TPAK_DQ_API_Handler {
          );
      }
      
-     /**
-      * Generate content from mapped data
-      */
-     private function generate_mapped_content($mapped_response) {
-         $content = '<h3>ข้อมูลการตอบแบบสอบถาม</h3>';
-         $content .= '<p><strong>รหัสการตอบ:</strong> ' . $mapped_response['response_id'] . '</p>';
-         $content .= '<p><strong>วันที่ตอบ:</strong> ' . $mapped_response['submit_date'] . '</p>';
-         
-         $content .= '<h4>คำถามและคำตอบ:</h4>';
-         $content .= '<table class="mapped-questions">';
-         $content .= '<tr><th>รหัสคำถาม</th><th>คำถาม</th><th>คำตอบ</th></tr>';
-         
-         foreach ($mapped_response['questions'] as $question) {
-             $question_text = isset($question['question_text']) ? $question['question_text'] : $question['question_code'];
-             $answer = isset($question['mapped_answer']) ? $question['mapped_answer'] : $question['raw_answer'];
-             
-             $content .= '<tr>';
-             $content .= '<td>' . $question['question_code'];
-             if (isset($question['sub_question'])) {
-                 $content .= '[' . $question['sub_question'] . ']';
-             }
-             $content .= '</td>';
-             $content .= '<td>' . $question_text . '</td>';
-             $content .= '<td>' . $answer . '</td>';
-             $content .= '</tr>';
-         }
-         
-         $content .= '</table>';
-         
-         return $content;
-     }
+         /**
+     * Generate content from mapped data
+     */
+    private function generate_mapped_content($mapped_response) {
+        $content = '<h3>ข้อมูลการตอบแบบสอบถาม</h3>';
+        $content .= '<p><strong>รหัสการตอบ:</strong> ' . $mapped_response['response_id'] . '</p>';
+        $content .= '<p><strong>วันที่ตอบ:</strong> ' . $mapped_response['submit_date'] . '</p>';
+        
+        $content .= '<h4>คำถามและคำตอบ:</h4>';
+        $content .= '<table class="mapped-questions">';
+        $content .= '<tr><th>รหัสคำถาม</th><th>คำถาม</th><th>คำตอบ</th></tr>';
+        
+        foreach ($mapped_response['questions'] as $question) {
+            $question_text = isset($question['question_text']) ? $question['question_text'] : $question['question_code'];
+            $answer = isset($question['mapped_answer']) ? $question['mapped_answer'] : $question['raw_answer'];
+            
+            $content .= '<tr>';
+            $content .= '<td>' . $question['question_code'];
+            if (isset($question['sub_question'])) {
+                $content .= '[' . $question['sub_question'] . ']';
+            }
+            $content .= '</td>';
+            $content .= '<td>' . $question_text . '</td>';
+            $content .= '<td>' . $answer . '</td>';
+            $content .= '</tr>';
+        }
+        
+        $content .= '</table>';
+        
+        return $content;
+    }
+    
+    /**
+     * Clear verification batch data based on criteria
+     */
+    public function clear_verification_data($clear_type, $params = array()) {
+        error_log('TPAK DQ System: Starting data clear operation - Type: ' . $clear_type);
+        
+        // Increase memory and time limits for large operations
+        @ini_set('memory_limit', '1G');
+        @ini_set('max_execution_time', 600);
+        
+        $deleted_count = 0;
+        $errors = array();
+        
+        try {
+            // Create backup before clearing data
+            $backup_result = $this->create_backup_before_clear($clear_type, $params);
+            if (!$backup_result['success']) {
+                error_log('TPAK DQ System: Backup failed - ' . implode(', ', $backup_result['errors']));
+                // Continue with clear operation even if backup fails
+            } else {
+                error_log('TPAK DQ System: Backup created successfully - ' . $backup_result['backup_file']);
+            }
+            
+            switch ($clear_type) {
+                case 'all':
+                    $deleted_count = $this->clear_all_data();
+                    break;
+                    
+                case 'by_survey':
+                    $survey_id = isset($params['survey_id']) ? sanitize_text_field($params['survey_id']) : '';
+                    if (empty($survey_id)) {
+                        throw new Exception(__('กรุณาระบุ Survey ID', 'tpak-dq-system'));
+                    }
+                    $deleted_count = $this->clear_data_by_survey($survey_id);
+                    break;
+                    
+                case 'by_status':
+                    $status = isset($params['status']) ? sanitize_text_field($params['status']) : '';
+                    if (empty($status)) {
+                        throw new Exception(__('กรุณาระบุสถานะ', 'tpak-dq-system'));
+                    }
+                    $deleted_count = $this->clear_data_by_status($status);
+                    break;
+                    
+                case 'by_date':
+                    $start_date = isset($params['start_date']) ? sanitize_text_field($params['start_date']) : '';
+                    $end_date = isset($params['end_date']) ? sanitize_text_field($params['end_date']) : '';
+                    if (empty($start_date) || empty($end_date)) {
+                        throw new Exception(__('กรุณาระบุช่วงวันที่ให้ครบถ้วน', 'tpak-dq-system'));
+                    }
+                    $deleted_count = $this->clear_data_by_date($start_date, $end_date);
+                    break;
+                    
+                default:
+                    throw new Exception(__('ประเภทการเคลียร์ข้อมูลไม่ถูกต้อง', 'tpak-dq-system'));
+            }
+            
+            error_log('TPAK DQ System: Data clear operation completed - Deleted: ' . $deleted_count . ' posts');
+            
+            return array(
+                'success' => true,
+                'deleted' => $deleted_count,
+                'errors' => $errors,
+                'backup_file' => isset($backup_result['backup_file']) ? $backup_result['backup_file'] : null
+            );
+            
+        } catch (Exception $e) {
+            error_log('TPAK DQ System: Data clear operation failed - ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'deleted' => $deleted_count,
+                'errors' => array($e->getMessage())
+            );
+        }
+    }
+    
+    /**
+     * Create backup before clearing data
+     */
+    private function create_backup_before_clear($clear_type, $params) {
+        error_log('TPAK DQ System: Creating backup before clear operation');
+        
+        try {
+            $backup_data = array(
+                'timestamp' => current_time('mysql'),
+                'clear_type' => $clear_type,
+                'params' => $params,
+                'user_id' => get_current_user_id(),
+                'user_name' => wp_get_current_user()->display_name,
+                'posts' => array()
+            );
+            
+            // Get posts to be deleted based on criteria
+            $args = array(
+                'post_type' => 'verification_batch',
+                'posts_per_page' => -1,
+                'post_status' => 'any'
+            );
+            
+            switch ($clear_type) {
+                case 'all':
+                    // Get all posts
+                    break;
+                    
+                case 'by_survey':
+                    $args['meta_query'] = array(
+                        array(
+                            'key' => '_lime_survey_id',
+                            'value' => $params['survey_id'],
+                            'compare' => '='
+                        )
+                    );
+                    break;
+                    
+                case 'by_status':
+                    $args['tax_query'] = array(
+                        array(
+                            'taxonomy' => 'verification_status',
+                            'field' => 'slug',
+                            'terms' => $params['status']
+                        )
+                    );
+                    break;
+                    
+                case 'by_date':
+                    $args['date_query'] = array(
+                        array(
+                            'after' => $params['start_date'],
+                            'before' => $params['end_date'] . ' 23:59:59',
+                            'inclusive' => true
+                        )
+                    );
+                    break;
+            }
+            
+            $posts = get_posts($args);
+            
+            foreach ($posts as $post) {
+                $post_data = array(
+                    'ID' => $post->ID,
+                    'post_title' => $post->post_title,
+                    'post_content' => $post->post_content,
+                    'post_status' => $post->post_status,
+                    'post_date' => $post->post_date,
+                    'meta_data' => array()
+                );
+                
+                // Get all meta data
+                $meta_keys = array('_lime_survey_id', '_lime_response_id', '_survey_data', '_audit_trail', '_import_date');
+                foreach ($meta_keys as $meta_key) {
+                    $meta_value = get_post_meta($post->ID, $meta_key, true);
+                    if ($meta_value !== '') {
+                        $post_data['meta_data'][$meta_key] = $meta_value;
+                    }
+                }
+                
+                // Get terms
+                $terms = wp_get_object_terms($post->ID, 'verification_status');
+                if (!is_wp_error($terms)) {
+                    $post_data['terms'] = array();
+                    foreach ($terms as $term) {
+                        $post_data['terms'][] = array(
+                            'taxonomy' => $term->taxonomy,
+                            'term_id' => $term->term_id,
+                            'slug' => $term->slug,
+                            'name' => $term->name
+                        );
+                    }
+                }
+                
+                $backup_data['posts'][] = $post_data;
+            }
+            
+            // Create backup directory if it doesn't exist
+            $backup_dir = WP_CONTENT_DIR . '/tpak-dq-backups';
+            if (!file_exists($backup_dir)) {
+                wp_mkdir_p($backup_dir);
+            }
+            
+            // Create backup file
+            $timestamp = current_time('Y-m-d_H-i-s');
+            $backup_filename = 'tpak-dq-backup-' . $clear_type . '-' . $timestamp . '.json';
+            $backup_file = $backup_dir . '/' . $backup_filename;
+            
+            $json_data = json_encode($backup_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            if (file_put_contents($backup_file, $json_data) === false) {
+                throw new Exception(__('ไม่สามารถสร้างไฟล์ backup ได้', 'tpak-dq-system'));
+            }
+            
+            error_log('TPAK DQ System: Backup created successfully - ' . $backup_file . ' (' . count($backup_data['posts']) . ' posts)');
+            
+            return array(
+                'success' => true,
+                'backup_file' => $backup_file,
+                'post_count' => count($backup_data['posts'])
+            );
+            
+        } catch (Exception $e) {
+            error_log('TPAK DQ System: Backup creation failed - ' . $e->getMessage());
+            return array(
+                'success' => false,
+                'errors' => array($e->getMessage())
+            );
+        }
+    }
+    
+    /**
+     * Clear all verification batch data
+     */
+    private function clear_all_data() {
+        error_log('TPAK DQ System: Clearing all verification batch data');
+        
+        $args = array(
+            'post_type' => 'verification_batch',
+            'posts_per_page' => -1,
+            'post_status' => 'any',
+            'fields' => 'ids'
+        );
+        
+        $post_ids = get_posts($args);
+        $deleted_count = 0;
+        
+        error_log('TPAK DQ System: Found ' . count($post_ids) . ' posts to delete');
+        
+        foreach ($post_ids as $post_id) {
+            $result = wp_delete_post($post_id, true); // true = force delete
+            if ($result) {
+                $deleted_count++;
+            }
+        }
+        
+        error_log('TPAK DQ System: Successfully deleted ' . $deleted_count . ' posts');
+        return $deleted_count;
+    }
+    
+    /**
+     * Clear data by survey ID
+     */
+    private function clear_data_by_survey($survey_id) {
+        error_log('TPAK DQ System: Clearing data for survey ID: ' . $survey_id);
+        
+        $args = array(
+            'post_type' => 'verification_batch',
+            'posts_per_page' => -1,
+            'post_status' => 'any',
+            'fields' => 'ids',
+            'meta_query' => array(
+                array(
+                    'key' => '_lime_survey_id',
+                    'value' => $survey_id,
+                    'compare' => '='
+                )
+            )
+        );
+        
+        $post_ids = get_posts($args);
+        $deleted_count = 0;
+        
+        error_log('TPAK DQ System: Found ' . count($post_ids) . ' posts for survey ID ' . $survey_id . ' to delete');
+        
+        foreach ($post_ids as $post_id) {
+            $result = wp_delete_post($post_id, true);
+            if ($result) {
+                $deleted_count++;
+            }
+        }
+        
+        error_log('TPAK DQ System: Successfully deleted ' . $deleted_count . ' posts for survey ID ' . $survey_id);
+        return $deleted_count;
+    }
+    
+    /**
+     * Clear data by status
+     */
+    private function clear_data_by_status($status) {
+        error_log('TPAK DQ System: Clearing data for status: ' . $status);
+        
+        $args = array(
+            'post_type' => 'verification_batch',
+            'posts_per_page' => -1,
+            'post_status' => 'any',
+            'fields' => 'ids',
+            'tax_query' => array(
+                array(
+                    'taxonomy' => 'verification_status',
+                    'field' => 'slug',
+                    'terms' => $status
+                )
+            )
+        );
+        
+        $post_ids = get_posts($args);
+        $deleted_count = 0;
+        
+        error_log('TPAK DQ System: Found ' . count($post_ids) . ' posts with status ' . $status . ' to delete');
+        
+        foreach ($post_ids as $post_id) {
+            $result = wp_delete_post($post_id, true);
+            if ($result) {
+                $deleted_count++;
+            }
+        }
+        
+        error_log('TPAK DQ System: Successfully deleted ' . $deleted_count . ' posts with status ' . $status);
+        return $deleted_count;
+    }
+    
+    /**
+     * Clear data by date range
+     */
+    private function clear_data_by_date($start_date, $end_date) {
+        error_log('TPAK DQ System: Clearing data from ' . $start_date . ' to ' . $end_date);
+        
+        $args = array(
+            'post_type' => 'verification_batch',
+            'posts_per_page' => -1,
+            'post_status' => 'any',
+            'fields' => 'ids',
+            'date_query' => array(
+                array(
+                    'after' => $start_date,
+                    'before' => $end_date . ' 23:59:59',
+                    'inclusive' => true
+                )
+            )
+        );
+        
+        $post_ids = get_posts($args);
+        $deleted_count = 0;
+        
+        error_log('TPAK DQ System: Found ' . count($post_ids) . ' posts in date range to delete');
+        
+        foreach ($post_ids as $post_id) {
+            $result = wp_delete_post($post_id, true);
+            if ($result) {
+                $deleted_count++;
+            }
+        }
+        
+        error_log('TPAK DQ System: Successfully deleted ' . $deleted_count . ' posts in date range');
+        return $deleted_count;
+    }
 } 

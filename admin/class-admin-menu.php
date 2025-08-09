@@ -358,6 +358,116 @@ class TPAK_DQ_Admin_Menu {
             }
         }
         
+        if (isset($_POST['clear_data'])) {
+            if (wp_verify_nonce($_POST['_wpnonce'], 'tpak_clear_data')) {
+                $clear_type = sanitize_text_field($_POST['clear_type']);
+                $confirmation = isset($_POST['clear_confirmation']) ? true : false;
+                
+                if (!$confirmation) {
+                    add_settings_error(
+                        'tpak_dq_import',
+                        'confirmation_required',
+                        __('กรุณายืนยันการดำเนินการก่อน', 'tpak-dq-system'),
+                        'error'
+                    );
+                } else {
+                    $params = array();
+                    
+                    switch ($clear_type) {
+                        case 'by_survey':
+                            $survey_id = sanitize_text_field($_POST['clear_survey_id']);
+                            if (empty($survey_id)) {
+                                add_settings_error(
+                                    'tpak_dq_import',
+                                    'survey_id_required',
+                                    __('กรุณาระบุ Survey ID', 'tpak-dq-system'),
+                                    'error'
+                                );
+                                break;
+                            }
+                            $params['survey_id'] = $survey_id;
+                            break;
+                            
+                        case 'by_status':
+                            $status = sanitize_text_field($_POST['clear_status']);
+                            if (empty($status)) {
+                                add_settings_error(
+                                    'tpak_dq_import',
+                                    'status_required',
+                                    __('กรุณาเลือกสถานะ', 'tpak-dq-system'),
+                                    'error'
+                                );
+                                break;
+                            }
+                            $params['status'] = $status;
+                            break;
+                            
+                        case 'by_date':
+                            $start_date = sanitize_text_field($_POST['clear_start_date']);
+                            $end_date = sanitize_text_field($_POST['clear_end_date']);
+                            if (empty($start_date) || empty($end_date)) {
+                                add_settings_error(
+                                    'tpak_dq_import',
+                                    'date_range_required',
+                                    __('กรุณาระบุช่วงวันที่ให้ครบถ้วน', 'tpak-dq-system'),
+                                    'error'
+                                );
+                                break;
+                            }
+                            if ($start_date > $end_date) {
+                                add_settings_error(
+                                    'tpak_dq_import',
+                                    'invalid_date_range',
+                                    __('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด', 'tpak-dq-system'),
+                                    'error'
+                                );
+                                break;
+                            }
+                            $params['start_date'] = $start_date;
+                            $params['end_date'] = $end_date;
+                            break;
+                    }
+                    
+                    if (empty(get_settings_errors('tpak_dq_import'))) {
+                        $result = $api_handler->clear_verification_data($clear_type, $params);
+                        
+                        if ($result['success']) {
+                            $message = sprintf(__('เคลียร์ข้อมูลสำเร็จ: ลบ %d รายการ', 'tpak-dq-system'), $result['deleted']);
+                            
+                            // Add backup information if available
+                            if (isset($result['backup_file']) && $result['backup_file']) {
+                                $backup_filename = basename($result['backup_file']);
+                                $message .= sprintf(__(' (Backup: %s)', 'tpak-dq-system'), $backup_filename);
+                            }
+                            
+                            add_settings_error(
+                                'tpak_dq_import',
+                                'data_cleared',
+                                $message,
+                                'updated'
+                            );
+                        } else {
+                            foreach ($result['errors'] as $error) {
+                                add_settings_error(
+                                    'tpak_dq_import',
+                                    'clear_data_error',
+                                    $error,
+                                    'error'
+                                );
+                            }
+                        }
+                    }
+                }
+            } else {
+                add_settings_error(
+                    'tpak_dq_import',
+                    'nonce_failed',
+                    __('การตรวจสอบความปลอดภัยล้มเหลว', 'tpak-dq-system'),
+                    'error'
+                );
+            }
+        }
+        
         include TPAK_DQ_SYSTEM_PLUGIN_DIR . 'admin/views/import.php';
     }
     

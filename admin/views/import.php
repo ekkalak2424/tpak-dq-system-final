@@ -105,6 +105,109 @@ if (!defined('ABSPATH')) {
             </form>
         </div>
         
+        <!-- Data Clear Section -->
+        <div class="tpak-import-section">
+            <h2><?php _e('เคลียร์ข้อมูล', 'tpak-dq-system'); ?></h2>
+            
+            <div class="tpak-import-info" style="margin-bottom: 20px; padding: 15px; background: #f8d7da; border-left: 4px solid #dc3545;">
+                <h4><?php _e('คำเตือน', 'tpak-dq-system'); ?></h4>
+                <p><strong><?php _e('การดำเนินการนี้จะลบข้อมูลทั้งหมดอย่างถาวรและไม่สามารถกู้คืนได้', 'tpak-dq-system'); ?></strong></p>
+                <p><?php _e('กรุณาตรวจสอบและยืนยันการดำเนินการอย่างรอบคอบ', 'tpak-dq-system'); ?></p>
+            </div>
+            
+            <?php
+            // Get current data statistics
+            $total_posts = wp_count_posts('verification_batch');
+            $total_published = $total_posts->publish;
+            $total_draft = $total_posts->draft;
+            $total_trash = $total_posts->trash;
+            $total_all = $total_published + $total_draft + $total_trash;
+            ?>
+            
+            <div class="tpak-data-stats" style="margin-bottom: 20px; padding: 15px; background: #e2e3e5; border-left: 4px solid #6c757d;">
+                <h4><?php _e('สถิติข้อมูลปัจจุบัน', 'tpak-dq-system'); ?></h4>
+                <ul>
+                    <li><strong><?php _e('ชุดข้อมูลทั้งหมด:', 'tpak-dq-system'); ?></strong> <?php echo number_format($total_all); ?> <?php _e('รายการ', 'tpak-dq-system'); ?></li>
+                    <li><strong><?php _e('ชุดข้อมูลที่เผยแพร่:', 'tpak-dq-system'); ?></strong> <?php echo number_format($total_published); ?> <?php _e('รายการ', 'tpak-dq-system'); ?></li>
+                    <li><strong><?php _e('ชุดข้อมูลแบบร่าง:', 'tpak-dq-system'); ?></strong> <?php echo number_format($total_draft); ?> <?php _e('รายการ', 'tpak-dq-system'); ?></li>
+                    <li><strong><?php _e('ชุดข้อมูลในถังขยะ:', 'tpak-dq-system'); ?></strong> <?php echo number_format($total_trash); ?> <?php _e('รายการ', 'tpak-dq-system'); ?></li>
+                </ul>
+            </div>
+            
+            <form method="post" action="" id="tpak-clear-data-form">
+                <?php wp_nonce_field('tpak_clear_data'); ?>
+                
+                <div class="tpak-form-row">
+                    <label for="clear_type"><?php _e('ประเภทการเคลียร์', 'tpak-dq-system'); ?></label>
+                    <select id="clear_type" name="clear_type" class="regular-text">
+                        <option value="all"><?php _e('เคลียร์ข้อมูลทั้งหมด', 'tpak-dq-system'); ?></option>
+                        <option value="by_survey"><?php _e('เคลียร์ข้อมูลตาม Survey ID', 'tpak-dq-system'); ?></option>
+                        <option value="by_status"><?php _e('เคลียร์ข้อมูลตามสถานะ', 'tpak-dq-system'); ?></option>
+                        <option value="by_date"><?php _e('เคลียร์ข้อมูลตามวันที่', 'tpak-dq-system'); ?></option>
+                    </select>
+                    <p class="description">
+                        <?php _e('เลือกประเภทการเคลียร์ข้อมูลที่ต้องการ', 'tpak-dq-system'); ?>
+                    </p>
+                </div>
+                
+                <!-- Survey ID Option -->
+                <div class="tpak-form-row clear-option" id="clear-by-survey" style="display: none;">
+                    <label for="clear_survey_id"><?php _e('Survey ID', 'tpak-dq-system'); ?></label>
+                    <input type="text" id="clear_survey_id" name="clear_survey_id" 
+                           value="<?php echo esc_attr($options['survey_id'] ?? ''); ?>" 
+                           class="regular-text" />
+                    <p class="description">
+                        <?php _e('ระบุ Survey ID ที่ต้องการเคลียร์ข้อมูล', 'tpak-dq-system'); ?>
+                    </p>
+                </div>
+                
+                <!-- Status Option -->
+                <div class="tpak-form-row clear-option" id="clear-by-status" style="display: none;">
+                    <label for="clear_status"><?php _e('สถานะ', 'tpak-dq-system'); ?></label>
+                    <select id="clear_status" name="clear_status" class="regular-text">
+                        <option value="pending_a"><?php _e('รอตรวจสอบขั้นที่ 1', 'tpak-dq-system'); ?></option>
+                        <option value="pending_b"><?php _e('รอตรวจสอบขั้นที่ 2', 'tpak-dq-system'); ?></option>
+                        <option value="pending_c"><?php _e('รอตรวจสอบขั้นที่ 3', 'tpak-dq-system'); ?></option>
+                        <option value="rejected_by_b"><?php _e('ถูกปฏิเสธโดยขั้นที่ 2', 'tpak-dq-system'); ?></option>
+                        <option value="rejected_by_c"><?php _e('ถูกปฏิเสธโดยขั้นที่ 3', 'tpak-dq-system'); ?></option>
+                        <option value="finalized"><?php _e('เสร็จสมบูรณ์', 'tpak-dq-system'); ?></option>
+                        <option value="finalized_by_sampling"><?php _e('เสร็จสมบูรณ์โดยการสุ่มตัวอย่าง', 'tpak-dq-system'); ?></option>
+                    </select>
+                    <p class="description">
+                        <?php _e('เลือกสถานะที่ต้องการเคลียร์ข้อมูล', 'tpak-dq-system'); ?>
+                    </p>
+                </div>
+                
+                <!-- Date Range Option -->
+                <div class="tpak-form-row clear-option" id="clear-by-date" style="display: none;">
+                    <label for="clear_start_date"><?php _e('วันที่เริ่มต้น', 'tpak-dq-system'); ?></label>
+                    <input type="date" id="clear_start_date" name="clear_start_date" class="regular-text" />
+                    <p class="description">
+                        <?php _e('เคลียร์ข้อมูลตั้งแต่วันที่นี้', 'tpak-dq-system'); ?>
+                    </p>
+                    
+                    <label for="clear_end_date" style="margin-top: 10px; display: block;"><?php _e('วันที่สิ้นสุด', 'tpak-dq-system'); ?></label>
+                    <input type="date" id="clear_end_date" name="clear_end_date" class="regular-text" />
+                    <p class="description">
+                        <?php _e('เคลียร์ข้อมูลจนถึงวันที่นี้', 'tpak-dq-system'); ?>
+                    </p>
+                </div>
+                
+                <div class="tpak-form-row">
+                    <label for="clear_confirmation">
+                        <input type="checkbox" id="clear_confirmation" name="clear_confirmation" value="1" />
+                        <?php _e('ฉันเข้าใจว่าการดำเนินการนี้จะลบข้อมูลอย่างถาวรและไม่สามารถกู้คืนได้', 'tpak-dq-system'); ?>
+                    </label>
+                </div>
+                
+                <div class="tpak-form-row">
+                    <button type="submit" name="clear_data" class="button button-danger" id="tpak-clear-data" disabled>
+                        <?php _e('เคลียร์ข้อมูล', 'tpak-dq-system'); ?>
+                    </button>
+                </div>
+            </form>
+        </div>
+        
         <!-- API Status Section -->
         <div class="tpak-import-section">
             <h2><?php _e('สถานะการเชื่อมต่อ API', 'tpak-dq-system'); ?></h2>
@@ -461,6 +564,95 @@ jQuery(document).ready(function($) {
             $(this).val('');
         }
     });
+    
+    // Clear data form handling
+    $('#clear_type').on('change', function() {
+        var clearType = $(this).val();
+        
+        // Hide all clear options
+        $('.clear-option').hide();
+        
+        // Show relevant option
+        if (clearType === 'by_survey') {
+            $('#clear-by-survey').show();
+        } else if (clearType === 'by_status') {
+            $('#clear-by-status').show();
+        } else if (clearType === 'by_date') {
+            $('#clear-by-date').show();
+        }
+    });
+    
+    // Clear confirmation checkbox
+    $('#clear_confirmation').on('change', function() {
+        var isChecked = $(this).is(':checked');
+        $('#tpak-clear-data').prop('disabled', !isChecked);
+    });
+    
+    // Clear data form submission
+    $('#tpak-clear-data-form').on('submit', function(e) {
+        var clearType = $('#clear_type').val();
+        var confirmation = $('#clear_confirmation').is(':checked');
+        
+        if (!confirmation) {
+            e.preventDefault();
+            alert('<?php _e('กรุณายืนยันการดำเนินการก่อน', 'tpak-dq-system'); ?>');
+            return false;
+        }
+        
+        // Validate specific options
+        if (clearType === 'by_survey') {
+            var surveyId = $('#clear_survey_id').val().trim();
+            if (!surveyId) {
+                e.preventDefault();
+                alert('<?php _e('กรุณาระบุ Survey ID', 'tpak-dq-system'); ?>');
+                return false;
+            }
+        } else if (clearType === 'by_date') {
+            var startDate = $('#clear_start_date').val();
+            var endDate = $('#clear_end_date').val();
+            if (!startDate || !endDate) {
+                e.preventDefault();
+                alert('<?php _e('กรุณาระบุช่วงวันที่ให้ครบถ้วน', 'tpak-dq-system'); ?>');
+                return false;
+            }
+            if (startDate > endDate) {
+                e.preventDefault();
+                alert('<?php _e('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด', 'tpak-dq-system'); ?>');
+                return false;
+            }
+        }
+        
+        // Final confirmation
+        var confirmMessage = '<?php _e('คุณแน่ใจหรือไม่ที่จะเคลียร์ข้อมูล?', 'tpak-dq-system'); ?>\n\n';
+        
+        if (clearType === 'all') {
+            confirmMessage += '<?php _e('ประเภท: เคลียร์ข้อมูลทั้งหมด', 'tpak-dq-system'); ?>';
+        } else if (clearType === 'by_survey') {
+            confirmMessage += '<?php _e('ประเภท: เคลียร์ข้อมูลตาม Survey ID', 'tpak-dq-system'); ?>: ' + $('#clear_survey_id').val();
+        } else if (clearType === 'by_status') {
+            confirmMessage += '<?php _e('ประเภท: เคลียร์ข้อมูลตามสถานะ', 'tpak-dq-system'); ?>: ' + $('#clear_status option:selected').text();
+        } else if (clearType === 'by_date') {
+            confirmMessage += '<?php _e('ประเภท: เคลียร์ข้อมูลตามวันที่', 'tpak-dq-system'); ?>: ' + $('#clear_start_date').val() + ' ถึง ' + $('#clear_end_date').val();
+        }
+        
+        confirmMessage += '\n\n<?php _e('การดำเนินการนี้ไม่สามารถยกเลิกได้', 'tpak-dq-system'); ?>';
+        
+        if (!confirm(confirmMessage)) {
+            e.preventDefault();
+            return false;
+        }
+    });
+    
+    // Date validation for clear form
+    $('#clear_start_date, #clear_end_date').on('change', function() {
+        var startDate = $('#clear_start_date').val();
+        var endDate = $('#clear_end_date').val();
+        
+        if (startDate && endDate && startDate > endDate) {
+            alert('<?php _e('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด', 'tpak-dq-system'); ?>');
+            $(this).val('');
+        }
+    });
 });
 </script>
 
@@ -482,5 +674,22 @@ jQuery(document).ready(function($) {
 .tpak-status-error {
     color: #dc3545;
     font-weight: 600;
+}
+
+.button-danger {
+    background-color: #dc3545 !important;
+    border-color: #dc3545 !important;
+    color: #fff !important;
+}
+
+.button-danger:hover {
+    background-color: #c82333 !important;
+    border-color: #bd2130 !important;
+}
+
+.button-danger:disabled {
+    background-color: #6c757d !important;
+    border-color: #6c757d !important;
+    cursor: not-allowed !important;
 }
 </style> 
