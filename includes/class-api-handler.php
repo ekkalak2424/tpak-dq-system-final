@@ -255,7 +255,7 @@ class TPAK_DQ_API_Handler {
          $page_count = 0;
          $max_pages = 200; // Safety limit for number of pages
          
-         error_log('TPAK DQ System: Starting improved paginated data retrieval for survey ID: ' . $survey_id . ' with language: ' . ($lang_code ?: 'none'));
+         error_log('TPAK DQ System: Starting improved paginated data retrieval for survey ID: ' . $survey_id . ' with language: ' . ($lang_code ?: 'none') . ' (iLimit: ' . $iLimit . ')');
          
          while ($has_more_data && $page_count < $max_pages) {
              $page_count++;
@@ -350,13 +350,21 @@ class TPAK_DQ_API_Handler {
                                  
                                  if (!empty($responses_chunk)) {
                                      $all_responses = array_merge($all_responses, $responses_chunk);
-                                     $iStart += $iLimit;
                                      $consecutive_errors = 0; // Reset error counter on success
                                      
-                                     // If we got fewer responses than requested, we've reached the end
+                                     // Check if we've received all data
                                      if (count($responses_chunk) < $iLimit) {
+                                         // Got fewer responses than requested - we've reached the end
                                          $has_more_data = false;
-                                         error_log('TPAK DQ System: Page ' . $page_count . ' - Got fewer responses than requested, ending pagination');
+                                         error_log('TPAK DQ System: Page ' . $page_count . ' - Got fewer responses than requested (' . count($responses_chunk) . ' < ' . $iLimit . '), ending pagination');
+                                     } elseif (count($responses_chunk) > $iLimit) {
+                                         // Got more responses than requested - LimeSurvey ignored iLimit and returned all data
+                                         $has_more_data = false;
+                                         error_log('TPAK DQ System: Page ' . $page_count . ' - Got more responses than requested (' . count($responses_chunk) . ' > ' . $iLimit . '), LimeSurvey returned all data, ending pagination');
+                                     } else {
+                                         // Got exactly iLimit responses - might be more data
+                                         $iStart += $iLimit;
+                                         error_log('TPAK DQ System: Page ' . $page_count . ' - Got exactly ' . $iLimit . ' responses, continuing to next page');
                                      }
                                  } else {
                                      $has_more_data = false;
@@ -383,13 +391,21 @@ class TPAK_DQ_API_Handler {
                      
                      if (!empty($responses_chunk)) {
                          $all_responses = array_merge($all_responses, $responses_chunk);
-                         $iStart += $iLimit;
                          $consecutive_errors = 0; // Reset error counter on success
                          
-                         // If we got fewer responses than requested, we've reached the end
+                         // Check if we've received all data
                          if (count($responses_chunk) < $iLimit) {
+                             // Got fewer responses than requested - we've reached the end
                              $has_more_data = false;
-                             error_log('TPAK DQ System: Page ' . $page_count . ' - Got fewer responses than requested, ending pagination');
+                             error_log('TPAK DQ System: Page ' . $page_count . ' - Got fewer responses than requested (' . count($responses_chunk) . ' < ' . $iLimit . '), ending pagination');
+                         } elseif (count($responses_chunk) > $iLimit) {
+                             // Got more responses than requested - LimeSurvey ignored iLimit and returned all data
+                             $has_more_data = false;
+                             error_log('TPAK DQ System: Page ' . $page_count . ' - Got more responses than requested (' . count($responses_chunk) . ' > ' . $iLimit . '), LimeSurvey returned all data, ending pagination');
+                         } else {
+                             // Got exactly iLimit responses - might be more data
+                             $iStart += $iLimit;
+                             error_log('TPAK DQ System: Page ' . $page_count . ' - Got exactly ' . $iLimit . ' responses, continuing to next page');
                          }
                      } else {
                          $has_more_data = false;
@@ -422,7 +438,7 @@ class TPAK_DQ_API_Handler {
              }
          }
          
-         error_log('TPAK DQ System: Pagination completed after ' . $page_count . ' pages, total responses: ' . count($all_responses));
+         error_log('TPAK DQ System: Pagination completed after ' . $page_count . ' pages, total responses: ' . count($all_responses) . ' (expected iLimit per page: ' . $iLimit . ')');
          return $all_responses;
      }
     
@@ -482,6 +498,57 @@ class TPAK_DQ_API_Handler {
             error_log('TPAK DQ System API Test Error: ' . $e->getMessage());
             return false;
         }
+    }
+    
+    /**
+     * Test pagination logic with a small sample
+     */
+    public function test_pagination($survey_id, $limit = 10) {
+        error_log('TPAK DQ System: Testing pagination for survey ID: ' . $survey_id . ' with limit: ' . $limit);
+        
+        $session_key = $this->get_session_key();
+        if (!$session_key) {
+            error_log('TPAK DQ System: Failed to get session key for pagination test');
+            return false;
+        }
+        
+        // Test with a small limit to see pagination behavior
+        $params = array(
+            'sSessionKey' => $session_key,
+            'iSurveyID' => $survey_id,
+            'sDocumentType' => 'json',
+            'iStart' => 0,
+            'iLimit' => $limit
+        );
+        
+        error_log('TPAK DQ System: Testing pagination with params: ' . print_r($params, true));
+        
+        $response = $this->make_api_request('export_responses', $params);
+        
+        if ($response && isset($response['result'])) {
+            if (is_string($response['result'])) {
+                $decoded = base64_decode($response['result'], true);
+                if ($decoded !== false) {
+                    $json_data = json_decode($decoded, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($json_data)) {
+                        if (isset($json_data['responses'])) {
+                            $response_count = count($json_data['responses']);
+                            error_log('TPAK DQ System: Pagination test - Requested: ' . $limit . ', Received: ' . $response_count);
+                            
+                            return array(
+                                'requested' => $limit,
+                                'received' => $response_count,
+                                'has_more' => $response_count >= $limit,
+                                'all_data_returned' => $response_count > $limit
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        
+        error_log('TPAK DQ System: Pagination test failed');
+        return false;
     }
     
          /**
