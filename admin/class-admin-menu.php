@@ -83,6 +83,26 @@ class TPAK_DQ_Admin_Menu {
             array($this, 'import_page')
         );
         
+        // Survey Responses submenu
+        add_submenu_page(
+            'tpak-dq-system',
+            __('ข้อมูลแบบสอบถาม', 'tpak-dq-system'),
+            __('ข้อมูลแบบสอบถาม', 'tpak-dq-system'),
+            'manage_options',
+            'tpak-dq-responses',
+            array($this, 'responses_page')
+        );
+        
+        // Single Response View (hidden from menu)
+        add_submenu_page(
+            null, // Parent slug set to null to hide from menu
+            __('รายละเอียดแบบสอบถาม', 'tpak-dq-system'),
+            __('รายละเอียดแบบสอบถาม', 'tpak-dq-system'),
+            'manage_options',
+            'tpak-dq-response-view',
+            array($this, 'response_detail_page')
+        );
+        
         // Users submenu
         add_submenu_page(
             'tpak-dq-system',
@@ -530,6 +550,26 @@ class TPAK_DQ_Admin_Menu {
         $users = $roles->get_all_verification_users();
         
         include TPAK_DQ_SYSTEM_PLUGIN_DIR . 'admin/views/users.php';
+    }
+    
+    /**
+     * Survey Responses page
+     */
+    public function responses_page() {
+        // Ensure post types are registered before accessing
+        $this->ensure_post_types_registered();
+        
+        include TPAK_DQ_SYSTEM_PLUGIN_DIR . 'admin/views/survey-responses.php';
+    }
+    
+    /**
+     * Single Response Detail page
+     */
+    public function response_detail_page() {
+        // Ensure post types are registered before accessing
+        $this->ensure_post_types_registered();
+        
+        include TPAK_DQ_SYSTEM_PLUGIN_DIR . 'admin/views/response-detail.php';
     }
     
     /**
