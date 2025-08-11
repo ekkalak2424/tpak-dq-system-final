@@ -921,6 +921,9 @@ class TPAK_DQ_Admin_Menu {
         
         error_log('TPAK DQ System: Manual importing survey ID: ' . $survey_id . ' with date range: ' . $start_date . ' to ' . $end_date);
         
+        // Get API handler
+        $api_handler = new TPAK_DQ_API_Handler();
+        
         // Validate survey ID first
         $validation = $api_handler->validate_survey_id($survey_id);
         if (!$validation['valid']) {
@@ -940,4 +943,4 @@ class TPAK_DQ_Admin_Menu {
             wp_send_json_error(array('message' => $result['message']));
         }
     }
-} 
+}

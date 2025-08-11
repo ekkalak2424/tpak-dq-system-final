@@ -349,13 +349,6 @@ class TPAK_DQ_API_Handler {
     }
     
     /**
-     * Clear session key to force re-authentication
-     */
-    private function clear_session_key() {
-        $this->session_key = null;
-    }
-    
-    /**
      * Get list of surveys
      */
     public function get_surveys() {
