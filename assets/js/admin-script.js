@@ -370,4 +370,119 @@ jQuery(document).ready(function($) {
             $(this).toggle(text.indexOf(searchTerm) > -1);
         });
     });
-}); 
+});   
+  
+    // Function to perform workflow actions
+    function performWorkflowAction(action, postId, button, comment) {
+        comment = comment || '';
+        
+        var originalText = button.html();
+        button.html('<span class="dashicons dashicons-update spin"></span> กำลังดำเนินการ...').prop('disabled', true);
+        
+        var ajaxAction = '';
+        switch(action) {
+            case 'approve_a':
+                ajaxAction = 'tpak_approve_batch';
+                break;
+            case 'approve_batch_supervisor':
+                ajaxAction = 'tpak_approve_batch_supervisor';
+                break;
+            case 'reject_b':
+            case 'reject_c':
+                ajaxAction = 'tpak_reject_batch';
+                break;
+            case 'finalize':
+                ajaxAction = 'tpak_finalize_batch';
+                break;
+        }
+        
+        $.ajax({
+            url: tpak_dq_ajax.ajax_url,
+            type: 'POST',
+            data: {
+                action: ajaxAction,
+                post_id: postId,
+                comment: comment,
+                nonce: tpak_dq_ajax.nonce
+            },
+            success: function(response) {
+                if (response.success) {
+                    showNotification(response.data.message, 'success');
+                    // Reload page to show updated status
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showNotification(response.data.message, 'error');
+                    button.html(originalText).prop('disabled', false);
+                }
+            },
+            error: function() {
+                showNotification('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
+                button.html(originalText).prop('disabled', false);
+            }
+        });
+    }
+    
+    // Function to show reject dialog
+    function showRejectDialog(postId, button) {
+        var comment = prompt('กรุณากรอกเหตุผลในการส่งกลับ:');
+        
+        if (comment && comment.trim() !== '') {
+            var action = button.data('action');
+            performWorkflowAction(action, postId, button, comment.trim());
+        }
+    }
+    
+    // Status change functionality for response detail page
+    $(document).on('click', '.admin-change-status', function() {
+        var button = $(this);
+        var postId = button.data('id');
+        var newStatus = $('#status-select').val();
+        var comment = $('#admin-comment').val();
+        
+        if (!newStatus) {
+            showNotification('กรุณาเลือกสถานะใหม่', 'error');
+            return;
+        }
+        
+        if (confirm('คุณแน่ใจหรือไม่ที่จะเปลี่ยนสถานะ?')) {
+            changeStatus(postId, newStatus, comment);
+        }
+    });
+    
+    // Function to change status (admin)
+    function changeStatus(postId, newStatus, comment) {
+        var button = $('.admin-change-status');
+        var originalText = button.html();
+        
+        button.prop('disabled', true).html('<span class="dashicons dashicons-update spin"></span> กำลังเปลี่ยน...');
+        
+        $.ajax({
+            url: tpak_dq_ajax.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'tpak_admin_change_status',
+                post_id: postId,
+                new_status: newStatus,
+                comment: comment,
+                nonce: tpak_dq_ajax.nonce
+            },
+            success: function(response) {
+                if (response.success) {
+                    showNotification(response.data.message, 'success');
+                    // Reload page to show updated status
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showNotification(response.data.message, 'error');
+                    button.prop('disabled', false).html(originalText);
+                }
+            },
+            error: function() {
+                showNotification('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
+                button.prop('disabled', false).html(originalText);
+            }
+        });
+    }

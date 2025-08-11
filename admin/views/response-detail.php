@@ -340,39 +340,105 @@ $question_labels = array();
                         <p><?php _e('ยังไม่มีสถานะ', 'tpak-dq-system'); ?></p>
                     <?php endif; ?>
                     
-                    <!-- Action Buttons based on user role and status -->
+                    <!-- Status Change Section -->
                     <?php
-                    $current_user = wp_get_current_user();
-                    $can_verify = false;
-                    $next_action = '';
+                    $current_user_id = get_current_user_id();
+                    $user_role = '';
+                    $user = wp_get_current_user();
                     
-                    if ($status == 'pending_a' && current_user_can('verify_level_a')) {
-                        $can_verify = true;
-                        $next_action = 'approve_a';
-                    } elseif ($status == 'pending_b' && current_user_can('verify_level_b')) {
-                        $can_verify = true;
-                        $next_action = 'approve_b';
-                    } elseif ($status == 'pending_c' && current_user_can('verify_level_c')) {
-                        $can_verify = true;
-                        $next_action = 'approve_c';
+                    // Determine user role
+                    if (in_array('administrator', $user->roles)) {
+                        $user_role = 'administrator';
+                    } elseif (in_array('interviewer', $user->roles)) {
+                        $user_role = 'interviewer';
+                    } elseif (in_array('supervisor', $user->roles)) {
+                        $user_role = 'supervisor';
+                    } elseif (in_array('examiner', $user->roles)) {
+                        $user_role = 'examiner';
                     }
+                    
+                    // Get available actions
+                    $available_actions = $workflow->get_available_actions($response_id, $current_user_id);
                     ?>
                     
-                    <?php if ($can_verify): ?>
-                        <div class="verification-actions">
-                            <button class="button button-primary approve-btn" 
-                                    data-id="<?php echo $response_id; ?>" 
-                                    data-action="<?php echo $next_action; ?>">
-                                <span class="dashicons dashicons-yes"></span>
-                                <?php _e('อนุมัติ', 'tpak-dq-system'); ?>
-                            </button>
+                    <?php if (!empty($available_actions) || current_user_can('manage_options')): ?>
+                        <div class="status-change-section">
+                            <h4><?php _e('เปลี่ยนสถานะ', 'tpak-dq-system'); ?></h4>
                             
-                            <button class="button button-secondary reject-btn" 
-                                    data-id="<?php echo $response_id; ?>" 
-                                    data-action="reject">
-                                <span class="dashicons dashicons-no"></span>
-                                <?php _e('ส่งกลับ', 'tpak-dq-system'); ?>
-                            </button>
+                            <?php if (current_user_can('manage_options')): ?>
+                                <!-- Admin can change to any status -->
+                                <div class="admin-status-change">
+                                    <label for="status-select"><?php _e('เลือกสถานะใหม่:', 'tpak-dq-system'); ?></label>
+                                    <select id="status-select" class="status-select">
+                                        <option value=""><?php _e('-- เลือกสถานะ --', 'tpak-dq-system'); ?></option>
+                                        <?php
+                                        $all_statuses = get_terms(array(
+                                            'taxonomy' => 'verification_status',
+                                            'hide_empty' => false
+                                        ));
+                                        
+                                        foreach ($all_statuses as $status_option):
+                                            $selected = ($status_option->slug === $status) ? 'selected' : '';
+                                        ?>
+                                            <option value="<?php echo esc_attr($status_option->slug); ?>" <?php echo $selected; ?>>
+                                                <?php echo esc_html($status_option->name); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                    
+                                    <div class="admin-comment-section" style="margin-top: 10px;">
+                                        <label for="admin-comment"><?php _e('หมายเหตุ (ไม่บังคับ):', 'tpak-dq-system'); ?></label>
+                                        <textarea id="admin-comment" class="admin-comment" rows="3" 
+                                                  placeholder="<?php _e('เพิ่มหมายเหตุสำหรับการเปลี่ยนสถานะ...', 'tpak-dq-system'); ?>"></textarea>
+                                    </div>
+                                    
+                                    <button class="button button-primary admin-change-status" 
+                                            data-id="<?php echo $response_id; ?>" 
+                                            style="margin-top: 10px; width: 100%;">
+                                        <span class="dashicons dashicons-update"></span>
+                                        <?php _e('เปลี่ยนสถานะ', 'tpak-dq-system'); ?>
+                                    </button>
+                                </div>
+                            <?php endif; ?>
+                            
+                            <?php if (!empty($available_actions)): ?>
+                                <!-- Role-based actions -->
+                                <div class="role-based-actions" <?php echo current_user_can('manage_options') ? 'style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e9ecef;"' : ''; ?>>
+                                    <?php if (current_user_can('manage_options')): ?>
+                                        <h5><?php _e('หรือใช้การดำเนินการตามบทบาท:', 'tpak-dq-system'); ?></h5>
+                                    <?php endif; ?>
+                                    
+                                    <?php foreach ($available_actions as $action): ?>
+                                        <?php
+                                        $action_name = $workflow->get_action_display_name($action);
+                                        $button_class = 'button';
+                                        $icon = 'dashicons-yes';
+                                        
+                                        if (strpos($action, 'reject') !== false) {
+                                            $button_class .= ' button-secondary';
+                                            $icon = 'dashicons-no';
+                                        } else {
+                                            $button_class .= ' button-primary';
+                                        }
+                                        ?>
+                                        
+                                        <button class="<?php echo $button_class; ?> workflow-action-btn" 
+                                                data-id="<?php echo $response_id; ?>" 
+                                                data-action="<?php echo esc_attr($action); ?>"
+                                                style="width: 100%; margin-bottom: 10px;">
+                                            <span class="dashicons <?php echo $icon; ?>"></span>
+                                            <?php echo esc_html($action_name); ?>
+                                        </button>
+                                    <?php endforeach; ?>
+                                    
+                                    <!-- Comment section for reject actions -->
+                                    <div class="comment-section" style="display: none; margin-top: 10px;">
+                                        <label for="action-comment"><?php _e('ความคิดเห็น (บังคับสำหรับการส่งกลับ):', 'tpak-dq-system'); ?></label>
+                                        <textarea id="action-comment" class="action-comment" rows="3" 
+                                                  placeholder="<?php _e('กรุณาระบุเหตุผลในการส่งกลับ...', 'tpak-dq-system'); ?>"></textarea>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
                 </div>
@@ -927,6 +993,199 @@ $question_labels = array();
     padding: 2px 4px;
     border-radius: 2px;
 }
+
+/* Status Change Section */
+.status-change-section {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #e9ecef;
+}
+
+.status-change-section h4,
+.status-change-section h5 {
+    margin: 0 0 10px 0;
+    font-size: 14px;
+    color: #23282d;
+    font-weight: 600;
+}
+
+.status-change-section h5 {
+    font-size: 13px;
+    color: #666;
+    margin-top: 15px;
+}
+
+.admin-status-change {
+    margin-bottom: 15px;
+}
+
+.admin-status-change label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #666;
+    font-size: 13px;
+}
+
+.status-select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.admin-comment-section label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #666;
+    font-size: 13px;
+}
+
+.admin-comment,
+.action-comment {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 13px;
+    resize: vertical;
+    min-height: 60px;
+}
+
+.admin-change-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.role-based-actions {
+    margin-top: 15px;
+}
+
+.workflow-action-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    margin-bottom: 8px;
+}
+
+.comment-section {
+    background: #f8f9fa;
+    padding: 15px;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+}
+
+.comment-section label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: 600;
+    color: #666;
+    font-size: 13px;
+}
+
+/* Status badges */
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #fff;
+}
+
+.status-badge.large {
+    padding: 8px 16px;
+    font-size: 12px;
+    border-radius: 16px;
+}
+
+.status-badge.pending_a {
+    background-color: #f39c12;
+}
+
+.status-badge.pending_b {
+    background-color: #3498db;
+}
+
+.status-badge.pending_c {
+    background-color: #9b59b6;
+}
+
+.status-badge.rejected_by_b,
+.status-badge.rejected_by_c {
+    background-color: #e74c3c;
+}
+
+.status-badge.finalized,
+.status-badge.finalized_by_sampling {
+    background-color: #27ae60;
+}
+
+/* Loading animation */
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Notifications */
+.notice {
+    position: relative;
+    margin: 5px 0 15px;
+    padding: 1px 12px;
+    border-left: 4px solid #fff;
+    background: #fff;
+    box-shadow: 0 1px 1px 0 rgba(0,0,0,.1);
+}
+
+.notice-success {
+    border-left-color: #46b450;
+}
+
+.notice-error {
+    border-left-color: #dc3232;
+}
+
+.notice p {
+    margin: 0.5em 0;
+    padding: 2px;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .verification-actions,
+    .role-based-actions {
+        flex-direction: column;
+    }
+    
+    .verification-actions .button,
+    .workflow-action-btn {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+    
+    .info-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .sub-question-item {
+        grid-template-columns: 1fr;
+        gap: 5px;
+    }
+    
+    .other-data-grid {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 
 <script>
@@ -956,6 +1215,227 @@ jQuery(document).ready(function($) {
     // Search functionality
     $('#question-search').on('keyup', function() {
         var searchTerm = $(this).val().toLowerCase();
+        
+        $('.question-section').each(function() {
+            var section = $(this);
+            var questionText = section.find('.question-title').text().toLowerCase();
+            var answerText = section.find('.question-content').text().toLowerCase();
+            
+            if (questionText.indexOf(searchTerm) !== -1 || answerText.indexOf(searchTerm) !== -1) {
+                section.removeClass('filtered-out');
+                // Highlight search terms
+                if (searchTerm.length > 0) {
+                    highlightText(section, searchTerm);
+                } else {
+                    removeHighlight(section);
+                }
+            } else {
+                section.addClass('filtered-out');
+            }
+        });
+    });
+    
+    // Quick navigation
+    $('.nav-item').on('click', function(e) {
+        e.preventDefault();
+        var target = $(this).data('target');
+        var targetSection = $('.question-section[data-question="' + target + '"]');
+        
+        if (targetSection.length) {
+            // Remove active class from all nav items
+            $('.nav-item').removeClass('active');
+            $(this).addClass('active');
+            
+            // Scroll to target section
+            $('html, body').animate({
+                scrollTop: targetSection.offset().top - 100
+            }, 500);
+            
+            // Expand the target section if collapsed
+            targetSection.removeClass('collapsed');
+            targetSection.find('.toggle-section').attr('aria-expanded', 'true');
+        }
+    });
+    
+    // Admin status change
+    $('.admin-change-status').on('click', function() {
+        var button = $(this);
+        var postId = button.data('id');
+        var newStatus = $('#status-select').val();
+        var comment = $('#admin-comment').val();
+        
+        if (!newStatus) {
+            alert('<?php _e('กรุณาเลือกสถานะใหม่', 'tpak-dq-system'); ?>');
+            return;
+        }
+        
+        if (confirm('<?php _e('คุณแน่ใจหรือไม่ที่จะเปลี่ยนสถานะ?', 'tpak-dq-system'); ?>')) {
+            changeStatus(postId, newStatus, comment, 'admin_change');
+        }
+    });
+    
+    // Workflow action buttons
+    $('.workflow-action-btn').on('click', function() {
+        var button = $(this);
+        var postId = button.data('id');
+        var action = button.data('action');
+        
+        // Show comment section for reject actions
+        if (action.indexOf('reject') !== -1) {
+            $('.comment-section').show();
+            $('#action-comment').focus();
+            
+            // Change button text to confirm
+            button.text('<?php _e('ยืนยันการส่งกลับ', 'tpak-dq-system'); ?>');
+            button.off('click').on('click', function() {
+                var comment = $('#action-comment').val().trim();
+                if (!comment) {
+                    alert('<?php _e('กรุณากรอกความคิดเห็นสำหรับการส่งกลับ', 'tpak-dq-system'); ?>');
+                    return;
+                }
+                
+                if (confirm('<?php _e('คุณแน่ใจหรือไม่ที่จะส่งกลับ?', 'tpak-dq-system'); ?>')) {
+                    performWorkflowAction(postId, action, comment);
+                }
+            });
+        } else {
+            // For approve actions
+            if (confirm('<?php _e('คุณแน่ใจหรือไม่ที่จะดำเนินการนี้?', 'tpak-dq-system'); ?>')) {
+                performWorkflowAction(postId, action, '');
+            }
+        }
+    });
+    
+    // Function to change status (admin)
+    function changeStatus(postId, newStatus, comment, actionType) {
+        var button = $('.admin-change-status');
+        var originalText = button.html();
+        
+        button.prop('disabled', true).html('<span class="dashicons dashicons-update spin"></span> <?php _e('กำลังเปลี่ยน...', 'tpak-dq-system'); ?>');
+        
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'tpak_admin_change_status',
+                post_id: postId,
+                new_status: newStatus,
+                comment: comment,
+                nonce: '<?php echo wp_create_nonce('tpak_workflow_nonce'); ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    // Show success message
+                    showNotification('success', response.data.message);
+                    
+                    // Reload page to show updated status
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showNotification('error', response.data.message);
+                    button.prop('disabled', false).html(originalText);
+                }
+            },
+            error: function() {
+                showNotification('error', '<?php _e('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'tpak-dq-system'); ?>');
+                button.prop('disabled', false).html(originalText);
+            }
+        });
+    }
+    
+    // Function to perform workflow action
+    function performWorkflowAction(postId, action, comment) {
+        var button = $('.workflow-action-btn[data-action="' + action + '"]');
+        var originalText = button.html();
+        
+        button.prop('disabled', true).html('<span class="dashicons dashicons-update spin"></span> <?php _e('กำลังดำเนินการ...', 'tpak-dq-system'); ?>');
+        
+        var ajaxAction = '';
+        switch(action) {
+            case 'approve_a':
+                ajaxAction = 'tpak_approve_batch';
+                break;
+            case 'approve_batch_supervisor':
+                ajaxAction = 'tpak_approve_batch_supervisor';
+                break;
+            case 'reject_b':
+            case 'reject_c':
+                ajaxAction = 'tpak_reject_batch';
+                break;
+            case 'finalize':
+                ajaxAction = 'tpak_finalize_batch';
+                break;
+        }
+        
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: ajaxAction,
+                post_id: postId,
+                comment: comment,
+                nonce: '<?php echo wp_create_nonce('tpak_workflow_nonce'); ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    showNotification('success', response.data.message);
+                    
+                    // Reload page to show updated status
+                    setTimeout(function() {
+                        location.reload();
+                    }, 1500);
+                } else {
+                    showNotification('error', response.data.message);
+                    button.prop('disabled', false).html(originalText);
+                }
+            },
+            error: function() {
+                showNotification('error', '<?php _e('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'tpak-dq-system'); ?>');
+                button.prop('disabled', false).html(originalText);
+            }
+        });
+    }
+    
+    // Function to show notifications
+    function showNotification(type, message) {
+        var notificationClass = type === 'success' ? 'notice-success' : 'notice-error';
+        var notification = $('<div class="notice ' + notificationClass + ' is-dismissible"><p>' + message + '</p></div>');
+        
+        $('.wrap').prepend(notification);
+        
+        // Auto dismiss after 5 seconds
+        setTimeout(function() {
+            notification.fadeOut();
+        }, 5000);
+    }
+    
+    // Helper functions for search highlighting
+    function highlightText(container, searchTerm) {
+        removeHighlight(container);
+        
+        container.find('*').contents().filter(function() {
+            return this.nodeType === 3; // Text nodes only
+        }).each(function() {
+            var text = $(this).text();
+            var regex = new RegExp('(' + escapeRegExp(searchTerm) + ')', 'gi');
+            if (regex.test(text)) {
+                var highlightedText = text.replace(regex, '<span class="highlight">$1</span>');
+                $(this).replaceWith(highlightedText);
+            }
+        });
+    }
+    
+    function removeHighlight(container) {
+        container.find('.highlight').each(function() {
+            $(this).replaceWith($(this).text());
+        });
+    }
+    
+    function escapeRegExp(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+});(this).val().toLowerCase();
         
         if (searchTerm === '') {
             $('.question-section').removeClass('filtered-out');

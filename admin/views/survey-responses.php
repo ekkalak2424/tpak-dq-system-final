@@ -298,6 +298,316 @@ $query = new WP_Query($args);
 </div>
 
 <style>
+/* Status badges */
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #fff;
+    white-space: nowrap;
+}
+
+.status-badge.pending_a {
+    background-color: #f39c12;
+}
+
+.status-badge.pending_b {
+    background-color: #3498db;
+}
+
+.status-badge.pending_c {
+    background-color: #9b59b6;
+}
+
+.status-badge.rejected_by_b,
+.status-badge.rejected_by_c {
+    background-color: #e74c3c;
+}
+
+.status-badge.finalized,
+.status-badge.finalized_by_sampling {
+    background-color: #27ae60;
+}
+
+/* Filters */
+.tpak-filters {
+    background: #fff;
+    padding: 15px;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    margin: 20px 0;
+}
+
+.tpak-filters form {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.tpak-filters select,
+.tpak-filters input[type="search"] {
+    padding: 6px 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.tpak-filters input[type="search"] {
+    min-width: 200px;
+}
+
+/* View Toggle */
+.tpak-view-toggle {
+    margin: 20px 0;
+    display: flex;
+    gap: 10px;
+}
+
+.tpak-view-toggle .button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.tpak-view-toggle .button.active {
+    background: #0073aa;
+    color: #fff;
+}
+
+/* Grid View */
+.tpak-responses-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+    margin: 20px 0;
+}
+
+.response-card {
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    overflow: hidden;
+    transition: box-shadow 0.2s;
+}
+
+.response-card:hover {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.card-header {
+    background: #f8f9fa;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #e9ecef;
+}
+
+.response-id {
+    font-weight: 600;
+    color: #0073aa;
+    font-size: 14px;
+}
+
+.card-body {
+    padding: 15px;
+}
+
+.card-body h3 {
+    margin: 0 0 10px 0;
+    font-size: 16px;
+    color: #23282d;
+}
+
+.card-meta {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 15px;
+    color: #666;
+    font-size: 13px;
+}
+
+.meta-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.meta-item .dashicons {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+}
+
+.response-preview {
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.preview-item {
+    margin-bottom: 5px;
+}
+
+.preview-item:last-child {
+    margin-bottom: 0;
+}
+
+.preview-item strong {
+    color: #666;
+}
+
+.card-footer {
+    padding: 15px;
+    background: #f8f9fa;
+    border-top: 1px solid #e9ecef;
+    display: flex;
+    gap: 10px;
+}
+
+.card-footer .button {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 13px;
+}
+
+/* Table View */
+.tpak-responses-table {
+    margin: 20px 0;
+}
+
+.tpak-responses-table table {
+    background: #fff;
+}
+
+.tpak-responses-table .column-id {
+    width: 100px;
+}
+
+.tpak-responses-table .column-status {
+    width: 120px;
+}
+
+.tpak-responses-table .column-date {
+    width: 120px;
+}
+
+.tpak-responses-table .column-questions {
+    width: 100px;
+    text-align: center;
+}
+
+.tpak-responses-table .column-actions {
+    width: 150px;
+}
+
+/* Pagination */
+.tpak-pagination {
+    margin: 30px 0;
+    text-align: center;
+}
+
+.tpak-pagination .page-numbers {
+    display: inline-block;
+    padding: 8px 12px;
+    margin: 0 2px;
+    background: #fff;
+    border: 1px solid #ddd;
+    color: #0073aa;
+    text-decoration: none;
+    border-radius: 4px;
+}
+
+.tpak-pagination .page-numbers:hover,
+.tpak-pagination .page-numbers.current {
+    background: #0073aa;
+    color: #fff;
+    border-color: #0073aa;
+}
+
+/* No Items */
+.tpak-no-items {
+    text-align: center;
+    padding: 60px 20px;
+    background: #fff;
+    border: 1px solid #ccd0d4;
+    border-radius: 4px;
+    margin: 20px 0;
+}
+
+.tpak-no-items p {
+    font-size: 16px;
+    color: #666;
+    margin-bottom: 20px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .tpak-responses-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .tpak-filters form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .tpak-filters select,
+    .tpak-filters input[type="search"] {
+        width: 100%;
+    }
+    
+    .card-footer {
+        flex-direction: column;
+    }
+    
+    .card-meta {
+        flex-direction: column;
+        gap: 5px;
+    }
+}
+</style>
+
+<script>
+jQuery(document).ready(function($) {
+    // View toggle functionality
+    $('.view-grid, .view-table').on('click', function() {
+        var viewType = $(this).data('view');
+        
+        // Update active button
+        $('.tpak-view-toggle .button').removeClass('active');
+        $(this).addClass('active');
+        
+        // Show/hide views
+        if (viewType === 'grid') {
+            $('#grid-view').show();
+            $('#table-view').hide();
+        } else {
+            $('#grid-view').hide();
+            $('#table-view').show();
+        }
+        
+        // Save preference
+        localStorage.setItem('tpak_responses_view', viewType);
+    });
+    
+    // Load saved view preference
+    var savedView = localStorage.getItem('tpak_responses_view');
+    if (savedView === 'table') {
+        $('.view-table').click();
+    }
+    
+    // Auto-submit filter form when status changes
+    $('#filter-status').on('change', function() {
+        $(this).closest('form').submit();
+    });
+});
+</script>
 /* Filter Styles */
 .tpak-filters {
     margin: 20px 0;

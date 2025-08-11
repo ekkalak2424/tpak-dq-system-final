@@ -54,6 +54,123 @@
     border-left: 4px solid #4caf50;
 }
 
+/* Status badges */
+.status-badge {
+    display: inline-block;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: #fff;
+    white-space: nowrap;
+}
+
+.status-badge.large {
+    padding: 8px 16px;
+    font-size: 12px;
+    border-radius: 16px;
+}
+
+.status-badge.pending_a {
+    background-color: #f39c12;
+}
+
+.status-badge.pending_b {
+    background-color: #3498db;
+}
+
+.status-badge.pending_c {
+    background-color: #9b59b6;
+}
+
+.status-badge.rejected_by_b,
+.status-badge.rejected_by_c {
+    background-color: #e74c3c;
+}
+
+.status-badge.finalized,
+.status-badge.finalized_by_sampling {
+    background-color: #27ae60;
+}
+
+/* Workflow action buttons */
+.workflow-actions {
+    margin: 15px 0;
+}
+
+.workflow-actions .button {
+    margin-right: 10px;
+    margin-bottom: 5px;
+}
+
+.workflow-actions .button.approve {
+    background: #27ae60;
+    border-color: #27ae60;
+    color: #fff;
+}
+
+.workflow-actions .button.reject {
+    background: #e74c3c;
+    border-color: #e74c3c;
+    color: #fff;
+}
+
+.workflow-actions .button:hover.approve {
+    background: #219a52;
+    border-color: #219a52;
+}
+
+.workflow-actions .button:hover.reject {
+    background: #c0392b;
+    border-color: #c0392b;
+}
+
+/* Loading animation */
+.spin {
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Notifications */
+.tpak-notification {
+    position: fixed;
+    top: 32px;
+    right: 20px;
+    z-index: 999999;
+    max-width: 400px;
+    padding: 15px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    color: #fff;
+    font-weight: 600;
+}
+
+.tpak-notification.success {
+    background: #27ae60;
+}
+
+.tpak-notification.error {
+    background: #e74c3c;
+}
+
+.tpak-notification.warning {
+    background: #f39c12;
+}
+
+.tpak-notification.info {
+    background: #3498db;
+}
+}
+
+.tpak-stat-card.finalized {
+    border-left: 4px solid #4caf50;
+}
+
 /* Settings Page Styles */
 .tpak-settings-page {
     max-width: 800px;

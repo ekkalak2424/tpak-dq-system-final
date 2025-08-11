@@ -19,6 +19,7 @@ class TPAK_DQ_Workflow {
         add_action('wp_ajax_tpak_approve_batch_supervisor', array($this, 'approve_batch_supervisor'));
         add_action('wp_ajax_tpak_reject_batch', array($this, 'reject_batch'));
         add_action('wp_ajax_tpak_finalize_batch', array($this, 'finalize_batch'));
+        add_action('wp_ajax_tpak_admin_change_status', array($this, 'admin_change_status'));
     }
     
     /**
@@ -477,5 +478,101 @@ class TPAK_DQ_Workflow {
         );
         
         return isset($action_names[$action]) ? $action_names[$action] : $action;
+    }
+    
+    /**
+     * Admin change status (for administrators only)
+     */
+    public function admin_change_status() {
+        if (!wp_verify_nonce($_POST['nonce'], 'tpak_workflow_nonce')) {
+            wp_die(__('Security check failed', 'tpak-dq-system'));
+        }
+        
+        // Check if user is administrator
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => __('You do not have permission to perform this action', 'tpak-dq-system')));
+            return;
+        }
+        
+        $post_id = intval($_POST['post_id']);
+        $new_status = sanitize_text_field($_POST['new_status']);
+        $comment = sanitize_textarea_field($_POST['comment']);
+        $user_id = get_current_user_id();
+        
+        // Validate post ID
+        if (!$post_id || get_post_type($post_id) !== 'verification_batch') {
+            wp_send_json_error(array('message' => __('Invalid post ID', 'tpak-dq-system')));
+            return;
+        }
+        
+        // Validate new status
+        $valid_statuses = get_terms(array(
+            'taxonomy' => 'verification_status',
+            'hide_empty' => false,
+            'fields' => 'slugs'
+        ));
+        
+        if (!in_array($new_status, $valid_statuses)) {
+            wp_send_json_error(array('message' => __('Invalid status', 'tpak-dq-system')));
+            return;
+        }
+        
+        // Get current status
+        $current_status = $this->get_batch_status($post_id);
+        
+        // Don't update if status is the same
+        if ($current_status === $new_status) {
+            wp_send_json_error(array('message' => __('Status is already set to this value', 'tpak-dq-system')));
+            return;
+        }
+        
+        // Update status
+        $result = $this->update_batch_status($post_id, $new_status);
+        
+        if ($result) {
+            // Add audit trail entry
+            $user = get_user_by('id', $user_id);
+            $status_term = get_term_by('slug', $new_status, 'verification_status');
+            $status_name = $status_term ? $status_term->name : $new_status;
+            
+            $audit_comment = sprintf(__('Administrator changed status to: %s', 'tpak-dq-system'), $status_name);
+            if (!empty($comment)) {
+                $audit_comment .= ' - ' . $comment;
+            }
+            
+            $this->add_audit_trail_entry($post_id, array(
+                'user_id' => $user_id,
+                'user_name' => $user->display_name,
+                'action' => 'admin_status_change',
+                'comment' => $audit_comment
+            ));
+            
+            // Send notification if needed
+            $this->send_notification_to_role_for_status($new_status, $post_id);
+            
+            wp_send_json_success(array(
+                'message' => sprintf(__('Status changed to: %s', 'tpak-dq-system'), $status_name),
+                'new_status' => $new_status
+            ));
+        } else {
+            wp_send_json_error(array('message' => __('Failed to update status', 'tpak-dq-system')));
+        }
+    }
+    
+    /**
+     * Send notification to appropriate role based on status
+     */
+    private function send_notification_to_role_for_status($status, $post_id) {
+        $notification_roles = array(
+            'pending_a' => 'interviewer',
+            'pending_b' => 'supervisor', 
+            'pending_c' => 'examiner',
+            'rejected_by_b' => 'interviewer',
+            'rejected_by_c' => 'supervisor'
+        );
+        
+        if (isset($notification_roles[$status])) {
+            $this->send_notification_to_role($notification_roles[$status], $post_id, $status);
+        }
     }
 } 
