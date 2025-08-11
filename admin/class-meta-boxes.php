@@ -206,6 +206,64 @@ class TPAK_DQ_Meta_Boxes {
     }
     
     /**
+     * Validate survey data input
+     */
+    private function validate_survey_data($survey_data) {
+        if (empty($survey_data)) {
+            return array('valid' => false, 'message' => __('Survey data cannot be empty', 'tpak-dq-system'));
+        }
+        
+        // Check data size (limit to 50KB)
+        if (strlen($survey_data) > 50000) {
+            return array('valid' => false, 'message' => __('Survey data is too large (maximum 50KB)', 'tpak-dq-system'));
+        }
+        
+        // Try to decode JSON
+        $decoded = json_decode($survey_data, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            return array('valid' => false, 'message' => __('Invalid JSON format: ', 'tpak-dq-system') . json_last_error_msg());
+        }
+        
+        // Check if decoded data is an array
+        if (!is_array($decoded)) {
+            return array('valid' => false, 'message' => __('Survey data must be a JSON object', 'tpak-dq-system'));
+        }
+        
+        // Check for required fields
+        $required_fields = array('id', 'submitdate');
+        foreach ($required_fields as $field) {
+            if (!isset($decoded[$field])) {
+                return array('valid' => false, 'message' => sprintf(__('Missing required field: %s', 'tpak-dq-system'), $field));
+            }
+        }
+        
+        return array('valid' => true, 'data' => $decoded);
+    }
+    
+    /**
+     * Validate lime survey ID
+     */
+    private function validate_lime_survey_id($survey_id) {
+        if (empty($survey_id)) {
+            return array('valid' => false, 'message' => __('LimeSurvey ID cannot be empty', 'tpak-dq-system'));
+        }
+        
+        if (!is_numeric($survey_id)) {
+            return array('valid' => false, 'message' => __('LimeSurvey ID must be numeric', 'tpak-dq-system'));
+        }
+        
+        if (intval($survey_id) <= 0) {
+            return array('valid' => false, 'message' => __('LimeSurvey ID must be positive', 'tpak-dq-system'));
+        }
+        
+        if (intval($survey_id) > 999999999) {
+            return array('valid' => false, 'message' => __('LimeSurvey ID is too large', 'tpak-dq-system'));
+        }
+        
+        return array('valid' => true, 'id' => intval($survey_id));
+    }
+    
+    /**
      * Save meta boxes
      */
     public function save_meta_boxes($post_id) {
@@ -224,13 +282,34 @@ class TPAK_DQ_Meta_Boxes {
             return;
         }
         
-        // Save custom fields
+        // Validate and save survey data
         if (isset($_POST['_survey_data'])) {
-            update_post_meta($post_id, '_survey_data', sanitize_textarea_field($_POST['_survey_data']));
+            $survey_data = sanitize_textarea_field($_POST['_survey_data']);
+            $validation = $this->validate_survey_data($survey_data);
+            
+            if ($validation['valid']) {
+                update_post_meta($post_id, '_survey_data', $survey_data);
+            } else {
+                // Store validation error for display
+                add_action('admin_notices', function() use ($validation) {
+                    echo '<div class="notice notice-error"><p>' . esc_html($validation['message']) . '</p></div>';
+                });
+            }
         }
         
+        // Validate and save lime survey ID
         if (isset($_POST['_lime_survey_id'])) {
-            update_post_meta($post_id, '_lime_survey_id', sanitize_text_field($_POST['_lime_survey_id']));
+            $lime_survey_id = sanitize_text_field($_POST['_lime_survey_id']);
+            $validation = $this->validate_lime_survey_id($lime_survey_id);
+            
+            if ($validation['valid']) {
+                update_post_meta($post_id, '_lime_survey_id', $validation['id']);
+            } else {
+                // Store validation error for display
+                add_action('admin_notices', function() use ($validation) {
+                    echo '<div class="notice notice-error"><p>' . esc_html($validation['message']) . '</p></div>';
+                });
+            }
         }
     }
     

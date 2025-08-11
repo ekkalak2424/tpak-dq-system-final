@@ -169,6 +169,193 @@ class TPAK_DQ_API_Handler {
     }
     
     /**
+     * Validate survey response data structure
+     */
+    private function validate_survey_response($response) {
+        // Check if response is an array
+        if (!is_array($response)) {
+            return array('valid' => false, 'error' => 'Response is not an array');
+        }
+        
+        // Required fields for a valid response
+        $required_fields = array('id', 'submitdate', 'lastpage');
+        
+        foreach ($required_fields as $field) {
+            if (!isset($response[$field])) {
+                return array('valid' => false, 'error' => "Missing required field: {$field}");
+            }
+        }
+        
+        // Validate ID is numeric
+        if (!is_numeric($response['id']) || intval($response['id']) <= 0) {
+            return array('valid' => false, 'error' => 'Invalid response ID');
+        }
+        
+        // Validate submit date format
+        if (!empty($response['submitdate']) && $response['submitdate'] !== '1900-01-01 00:00:00') {
+            $timestamp = strtotime($response['submitdate']);
+            if ($timestamp === false) {
+                return array('valid' => false, 'error' => 'Invalid submitdate format');
+            }
+            
+            // Check if date is reasonable (not too old or in future)
+            $current_time = time();
+            $ten_years_ago = $current_time - (10 * 365 * 24 * 60 * 60);
+            $one_day_future = $current_time + (24 * 60 * 60);
+            
+            if ($timestamp < $ten_years_ago || $timestamp > $one_day_future) {
+                return array('valid' => false, 'error' => 'Submitdate is out of reasonable range');
+            }
+        }
+        
+        // Validate lastpage is numeric
+        if (!is_numeric($response['lastpage'])) {
+            return array('valid' => false, 'error' => 'Invalid lastpage value');
+        }
+        
+        // Check for suspicious data patterns
+        if (isset($response['token']) && strlen($response['token']) > 100) {
+            return array('valid' => false, 'error' => 'Token too long');
+        }
+        
+        return array('valid' => true);
+    }
+    
+    /**
+     * Validate and clean survey responses batch
+     */
+    private function validate_survey_responses_batch($responses) {
+        if (!is_array($responses)) {
+            return array(
+                'valid_responses' => array(),
+                'errors' => array('Responses data is not an array'),
+                'total_processed' => 0,
+                'total_valid' => 0
+            );
+        }
+        
+        $validated_responses = array();
+        $errors = array();
+        $total_processed = count($responses);
+        
+        foreach ($responses as $index => $response) {
+            $validation = $this->validate_survey_response($response);
+            
+            if (!$validation['valid']) {
+                $errors[] = "Response #{$index} (ID: " . (isset($response['id']) ? $response['id'] : 'unknown') . "): " . $validation['error'];
+                continue;
+            }
+            
+            // Check for duplicate response ID
+            if ($this->response_exists($response['id'])) {
+                $errors[] = "Response #{$index}: Duplicate response ID {$response['id']} already exists";
+                continue;
+            }
+            
+            // Additional data cleaning
+            $cleaned_response = $this->clean_survey_response($response);
+            $validated_responses[] = $cleaned_response;
+        }
+        
+        return array(
+            'valid_responses' => $validated_responses,
+            'errors' => $errors,
+            'total_processed' => $total_processed,
+            'total_valid' => count($validated_responses)
+        );
+    }
+    
+    /**
+     * Clean survey response data
+     */
+    private function clean_survey_response($response) {
+        // Remove potentially harmful data
+        $cleaned = array();
+        
+        foreach ($response as $key => $value) {
+            // Skip empty or null values for optional fields
+            if ($value === null || $value === '') {
+                continue;
+            }
+            
+            // Sanitize key name
+            $clean_key = sanitize_key($key);
+            if (empty($clean_key)) {
+                continue;
+            }
+            
+            // Clean value based on type
+            if (is_string($value)) {
+                // Remove potential XSS and limit length
+                $clean_value = wp_strip_all_tags($value);
+                $clean_value = substr($clean_value, 0, 10000); // Limit to 10KB per field
+                $cleaned[$clean_key] = $clean_value;
+            } elseif (is_numeric($value)) {
+                $cleaned[$clean_key] = $value;
+            } elseif (is_array($value)) {
+                // Recursively clean arrays (but limit depth)
+                $cleaned[$clean_key] = $this->clean_array_recursive($value, 3);
+            }
+        }
+        
+        return $cleaned;
+    }
+    
+    /**
+     * Recursively clean array data with depth limit
+     */
+    private function clean_array_recursive($array, $max_depth) {
+        if ($max_depth <= 0 || !is_array($array)) {
+            return null;
+        }
+        
+        $cleaned = array();
+        foreach ($array as $key => $value) {
+            $clean_key = sanitize_key($key);
+            if (empty($clean_key)) {
+                continue;
+            }
+            
+            if (is_string($value)) {
+                $cleaned[$clean_key] = wp_strip_all_tags(substr($value, 0, 1000));
+            } elseif (is_numeric($value)) {
+                $cleaned[$clean_key] = $value;
+            } elseif (is_array($value)) {
+                $cleaned[$clean_key] = $this->clean_array_recursive($value, $max_depth - 1);
+            }
+        }
+        
+        return $cleaned;
+    }
+    
+    /**
+     * Check if response already exists
+     */
+    private function response_exists($response_id) {
+        $existing_posts = get_posts(array(
+            'post_type' => 'verification_batch',
+            'meta_query' => array(
+                array(
+                    'key' => '_lime_response_id',
+                    'value' => $response_id,
+                    'compare' => '='
+                )
+            ),
+            'posts_per_page' => 1,
+            'post_status' => 'any'
+        ));
+        
+        return !empty($existing_posts);
+    }
+    
+    /**
+     * Clear session key to force re-authentication
+     */
+    private function clear_session_key() {
+        $this->session_key = null;
+    }
+    
+    /**
      * Get list of surveys
      */
     public function get_surveys() {

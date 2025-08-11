@@ -589,6 +589,20 @@ class TPAK_DQ_Admin_Menu {
         // Debug: Log POST data
         error_log('TPAK DQ System: POST data in save_settings: ' . print_r($_POST, true));
         
+        // Validate input data before saving
+        $validation_result = $this->validate_settings_input($_POST);
+        if (!$validation_result['valid']) {
+            foreach ($validation_result['errors'] as $error) {
+                add_settings_error(
+                    'tpak_dq_settings',
+                    'validation_error',
+                    $error,
+                    'error'
+                );
+            }
+            return;
+        }
+        
         $options = get_option('tpak_dq_system_options', array());
         
         // Debug: Check if form fields exist
@@ -623,6 +637,83 @@ class TPAK_DQ_Admin_Menu {
             'settings_updated',
             __('Settings saved successfully', 'tpak-dq-system'),
             'updated'
+        );
+    }
+    
+    /**
+     * Validate settings input data using centralized validator
+     */
+    private function validate_settings_input($input) {
+        $errors = array();
+        
+        // Validate LimeSurvey URL
+        if (!empty($input['limesurvey_url'])) {
+            $url_validation = TPAK_DQ_Validator::validate_url(
+                $input['limesurvey_url'], 
+                array('/admin/remotecontrol', '/index.php/admin/remotecontrol')
+            );
+            if (!$url_validation['valid']) {
+                $errors[] = $url_validation['message'];
+            }
+        }
+        
+        // Validate username
+        if (!empty($input['limesurvey_username'])) {
+            $username_validation = TPAK_DQ_Validator::validate_username($input['limesurvey_username']);
+            if (!$username_validation['valid']) {
+                $errors[] = $username_validation['message'];
+            }
+        }
+        
+        // Validate password
+        if (!empty($input['limesurvey_password'])) {
+            $password_validation = TPAK_DQ_Validator::validate_password($input['limesurvey_password']);
+            if (!$password_validation['valid']) {
+                $errors[] = $password_validation['message'];
+            }
+        }
+        
+        // Validate survey ID
+        if (!empty($input['survey_id'])) {
+            $survey_id_validation = TPAK_DQ_Validator::validate_numeric_id($input['survey_id'], 1, 999999999, 'Survey ID');
+            if (!$survey_id_validation['valid']) {
+                $errors[] = $survey_id_validation['message'];
+            }
+        }
+        
+        // Validate cron interval
+        if (!empty($input['cron_interval'])) {
+            $valid_intervals = array('hourly', 'twicedaily', 'daily', 'weekly');
+            $interval_validation = TPAK_DQ_Validator::validate_array(array($input['cron_interval']), $valid_intervals, 'Cron interval');
+            if (!$interval_validation['valid']) {
+                $errors[] = $interval_validation['message'];
+            }
+        }
+        
+        // Validate sampling percentage
+        if (isset($input['sampling_percentage'])) {
+            $percentage_validation = TPAK_DQ_Validator::validate_percentage($input['sampling_percentage'], 'Sampling percentage');
+            if (!$percentage_validation['valid']) {
+                $errors[] = $percentage_validation['message'];
+            }
+        }
+        
+        // Check if all required fields are provided when any API field is filled
+        if (!empty($input['limesurvey_url']) || !empty($input['limesurvey_username']) || !empty($input['limesurvey_password'])) {
+            if (empty($input['limesurvey_url'])) {
+                $errors[] = __('LimeSurvey URL is required when configuring API', 'tpak-dq-system');
+            }
+            if (empty($input['limesurvey_username'])) {
+                $errors[] = __('Username is required when configuring API', 'tpak-dq-system');
+            }
+            if (empty($input['limesurvey_password'])) {
+                $errors[] = __('Password is required when configuring API', 'tpak-dq-system');
+            }
+        }
+        
+        return array(
+            'valid' => empty($errors),
+            'errors' => $errors
         );
     }
     

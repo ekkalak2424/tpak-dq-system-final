@@ -156,19 +156,75 @@ class TPAK_DQ_Cron {
     }
     
     /**
+     * Validate cron settings
+     */
+    private function validate_cron_settings($settings) {
+        $errors = array();
+        
+        // Validate cron interval
+        $valid_intervals = array('hourly', 'twicedaily', 'daily', 'weekly');
+        if (!isset($settings['cron_interval']) || !in_array($settings['cron_interval'], $valid_intervals)) {
+            $errors[] = __('Invalid cron interval. Must be one of: hourly, twicedaily, daily, weekly', 'tpak-dq-system');
+        }
+        
+        // Validate survey ID
+        if (isset($settings['survey_id']) && !empty($settings['survey_id'])) {
+            if (!is_numeric($settings['survey_id'])) {
+                $errors[] = __('Survey ID must be numeric', 'tpak-dq-system');
+            } elseif (intval($settings['survey_id']) <= 0) {
+                $errors[] = __('Survey ID must be positive', 'tpak-dq-system');
+            } elseif (intval($settings['survey_id']) > 999999999) {
+                $errors[] = __('Survey ID is too large', 'tpak-dq-system');
+            }
+        }
+        
+        // Validate sampling percentage if provided
+        if (isset($settings['sampling_percentage'])) {
+            $sampling = intval($settings['sampling_percentage']);
+            if ($sampling < 1 || $sampling > 100) {
+                $errors[] = __('Sampling percentage must be between 1 and 100', 'tpak-dq-system');
+            }
+        }
+        
+        return array(
+            'valid' => empty($errors),
+            'errors' => $errors
+        );
+    }
+    
+    /**
      * Update cron settings
      */
     public function update_cron_settings($settings) {
+        // Validate settings first
+        $validation = $this->validate_cron_settings($settings);
+        if (!$validation['valid']) {
+            error_log('TPAK DQ System: Cron settings validation failed: ' . implode(', ', $validation['errors']));
+            return false;
+        }
+        
         $options = get_option('tpak_dq_system_options', array());
         
         $options['cron_interval'] = sanitize_text_field($settings['cron_interval']);
         $options['survey_id'] = sanitize_text_field($settings['survey_id']);
         
-        update_option('tpak_dq_system_options', $options);
+        // Update sampling percentage if provided
+        if (isset($settings['sampling_percentage'])) {
+            $options['sampling_percentage'] = intval($settings['sampling_percentage']);
+        }
         
-        // Reschedule cron job
-        wp_clear_scheduled_hook('tpak_dq_cron_import_data');
-        wp_schedule_event(time(), $options['cron_interval'], 'tpak_dq_cron_import_data');
+        $result = update_option('tpak_dq_system_options', $options);
+        
+        if ($result) {
+            // Reschedule cron job only if update was successful
+            wp_clear_scheduled_hook('tpak_dq_cron_import_data');
+            wp_schedule_event(time(), $options['cron_interval'], 'tpak_dq_cron_import_data');
+            error_log('TPAK DQ System: Cron settings updated successfully');
+        } else {
+            error_log('TPAK DQ System: Failed to update cron settings');
+        }
+        
+        return $result;
     }
     
     /**

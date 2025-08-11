@@ -121,6 +121,66 @@ class TPAK_DQ_Workflow {
     }
     
     /**
+     * Validate user action before processing
+     */
+    private function validate_user_action($post_id, $action, $user_id) {
+        // Validate post ID
+        if (!$post_id || !is_numeric($post_id) || $post_id <= 0) {
+            return array('valid' => false, 'message' => __('Invalid post ID', 'tpak-dq-system'));
+        }
+        
+        // Check if post exists and is verification_batch
+        $post = get_post($post_id);
+        if (!$post || $post->post_type !== 'verification_batch') {
+            return array('valid' => false, 'message' => __('Invalid post type', 'tpak-dq-system'));
+        }
+        
+        // Validate user
+        $user = get_user_by('id', $user_id);
+        if (!$user) {
+            return array('valid' => false, 'message' => __('User not found', 'tpak-dq-system'));
+        }
+        
+        // Check current status
+        $current_status = $this->get_batch_status($post_id);
+        if (!$current_status) {
+            return array('valid' => false, 'message' => __('Invalid post status', 'tpak-dq-system'));
+        }
+        
+        // Check if action is allowed
+        if (!$this->can_perform_action($post_id, $action, $user_id)) {
+            return array('valid' => false, 'message' => __('Action not allowed for current user and status', 'tpak-dq-system'));
+        }
+        
+        return array('valid' => true);
+    }
+    
+    /**
+     * Validate comment input
+     */
+    private function validate_comment($comment) {
+        if (empty($comment)) {
+            return array('valid' => false, 'message' => __('Comment is required', 'tpak-dq-system'));
+        }
+        
+        $comment = trim($comment);
+        if (strlen($comment) < 10) {
+            return array('valid' => false, 'message' => __('Comment must be at least 10 characters long', 'tpak-dq-system'));
+        }
+        
+        if (strlen($comment) > 1000) {
+            return array('valid' => false, 'message' => __('Comment is too long (maximum 1000 characters)', 'tpak-dq-system'));
+        }
+        
+        // Check for suspicious patterns
+        if (preg_match('/<script|javascript:|data:|vbscript:/i', $comment)) {
+            return array('valid' => false, 'message' => __('Comment contains invalid content', 'tpak-dq-system'));
+        }
+        
+        return array('valid' => true, 'comment' => $comment);
+    }
+    
+    /**
      * Approve batch (Interviewer action)
      */
     public function approve_batch() {
@@ -131,8 +191,11 @@ class TPAK_DQ_Workflow {
         $post_id = intval($_POST['post_id']);
         $user_id = get_current_user_id();
         
-        if (!$this->can_perform_action($post_id, 'approve_a', $user_id)) {
-            wp_die(__('You do not have permission to perform this action', 'tpak-dq-system'));
+        // Validate action
+        $validation = $this->validate_user_action($post_id, 'approve_a', $user_id);
+        if (!$validation['valid']) {
+            wp_send_json_error(array('message' => $validation['message']));
+            return;
         }
         
         // Update status to pending_b
@@ -165,20 +228,24 @@ class TPAK_DQ_Workflow {
         }
         
         $post_id = intval($_POST['post_id']);
-        $comment = sanitize_textarea_field($_POST['comment']);
         $user_id = get_current_user_id();
         
-        if (empty($comment)) {
-            wp_send_json_error(array(
-                'message' => __('กรุณากรอกความคิดเห็น', 'tpak-dq-system')
-            ));
+        // Validate comment
+        $comment_validation = $this->validate_comment($_POST['comment']);
+        if (!$comment_validation['valid']) {
+            wp_send_json_error(array('message' => $comment_validation['message']));
+            return;
         }
+        $comment = sanitize_textarea_field($comment_validation['comment']);
         
         $current_status = $this->get_batch_status($post_id);
         $action = $current_status === 'pending_b' ? 'reject_b' : 'reject_c';
         
-        if (!$this->can_perform_action($post_id, $action, $user_id)) {
-            wp_die(__('You do not have permission to perform this action', 'tpak-dq-system'));
+        // Validate action
+        $validation = $this->validate_user_action($post_id, $action, $user_id);
+        if (!$validation['valid']) {
+            wp_send_json_error(array('message' => $validation['message']));
+            return;
         }
         
         // Determine new status based on current status
@@ -217,8 +284,11 @@ class TPAK_DQ_Workflow {
         $post_id = intval($_POST['post_id']);
         $user_id = get_current_user_id();
         
-        if (!$this->can_perform_action($post_id, 'approve_b', $user_id)) {
-            wp_die(__('You do not have permission to perform this action', 'tpak-dq-system'));
+        // Validate action
+        $validation = $this->validate_user_action($post_id, 'approve_b', $user_id);
+        if (!$validation['valid']) {
+            wp_send_json_error(array('message' => $validation['message']));
+            return;
         }
         
         // Run sampling gate logic
@@ -266,8 +336,11 @@ class TPAK_DQ_Workflow {
         $post_id = intval($_POST['post_id']);
         $user_id = get_current_user_id();
         
-        if (!$this->can_perform_action($post_id, 'finalize', $user_id)) {
-            wp_die(__('You do not have permission to perform this action', 'tpak-dq-system'));
+        // Validate action
+        $validation = $this->validate_user_action($post_id, 'finalize', $user_id);
+        if (!$validation['valid']) {
+            wp_send_json_error(array('message' => $validation['message']));
+            return;
         }
         
         // Update status to finalized

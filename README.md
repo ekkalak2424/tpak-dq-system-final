@@ -123,6 +123,27 @@ tpak-dq-system/
 2. ลงทะเบียนคลาสใน `tpak-dq-system.php`
 3. เพิ่มเมนูใหม่ใน `admin/class-admin-menu.php`
 
+## ระบบตรวจสอบข้อมูล (Data Validation)
+
+### คุณสมบัติการตรวจสอบข้อมูล
+- **API Settings Validation**: ตรวจสอบ URL, Username, Password, Survey ID
+- **Survey Data Validation**: ตรวจสอบโครงสร้างข้อมูลจาก LimeSurvey
+- **Workflow Actions Validation**: ตรวจสอบสิทธิ์และข้อมูลในการดำเนินการ
+- **Meta Box Data Validation**: ตรวจสอบ JSON format และขนาดข้อมูล
+- **User Input Validation**: ตรวจสอบความยาว, รูปแบบ, และเนื้อหาที่ปลอดภัย
+
+### ฟังก์ชันตรวจสอบหลัก
+- `validate_email()`: ตรวจสอบรูปแบบอีเมล
+- `validate_url()`: ตรวจสอบ URL และ endpoint ที่กำหนด
+- `validate_numeric_id()`: ตรวจสอบ ID ตัวเลข
+- `validate_percentage()`: ตรวจสอบเปอร์เซ็นต์ (1-100)
+- `validate_text()`: ตรวจสอบข้อความและความยาว
+- `validate_json()`: ตรวจสอบรูปแบบ JSON
+- `validate_date()`: ตรวจสอบรูปแบบวันที่
+
+### การทดสอบ Validation
+เรียกใช้ไฟล์ `test_validation.php` เพื่อทดสอบฟังก์ชันตรวจสอบข้อมูลทั้งหมด
+
 ## การแก้ไขปัญหา
 
 ### ปัญหาที่พบบ่อย
@@ -141,6 +162,11 @@ tpak-dq-system/
 - ตรวจสอบการตั้งค่า WP-Cron
 - ตรวจสอบ Server Cron Jobs
 - ตรวจสอบ Log Files
+
+**4. ข้อผิดพลาดในการตรวจสอบข้อมูล**
+- ตรวจสอบรูปแบบข้อมูลที่ป้อนเข้า
+- ดู Error Messages ในหน้า Admin
+- เรียกใช้ `test_validation.php` เพื่อทดสอบระบบ
 
 ## การสนับสนุน
 

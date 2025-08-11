@@ -64,6 +64,7 @@ class TPAK_DQ_System {
      */
     private function load_dependencies() {
         // Include required files
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-validator.php';
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-post-types.php';
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-roles.php';
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-api-handler.php';
