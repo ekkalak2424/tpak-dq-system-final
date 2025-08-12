@@ -67,15 +67,81 @@ $workflow = new TPAK_DQ_Workflow();
 $status = $workflow->get_batch_status($response_id);
 $audit_trail = $workflow->get_audit_trail($response_id);
 
-// Organize questions by groups/sections
+// Enhanced Question Organization with Smart Display Names
+function generateDisplayName($field_key) {
+    // Thai-friendly patterns for common survey fields
+    $patterns = [
+        '/^Q(\d+)$/' => 'คำถามที่ $1',
+        '/^Q(\d+)([A-Z])(\d*)$/' => 'คำถามที่ $1 ข้อย่อย $2$3',
+        '/^(\d+)([a-z]+)?$/' => 'คำถามที่ $1$2',
+        '/name/i' => 'ชื่อ',
+        '/firstname/i' => 'ชื่อจริง',
+        '/lastname/i' => 'นามสกุล',
+        '/age/i' => 'อายุ',
+        '/birth/i' => 'วันเกิด',
+        '/address/i' => 'ที่อยู่',
+        '/phone/i' => 'เบอร์โทรศัพท์',
+        '/email/i' => 'อีเมล',
+        '/gender/i' => 'เพศ',
+        '/education/i' => 'การศึกษา',
+        '/occupation/i' => 'อาชีพ',
+        '/income/i' => 'รายได้',
+        '/province/i' => 'จังหวัด',
+        '/district/i' => 'อำเภอ',
+        '/subdistrict/i' => 'ตำบล',
+        '/postal/i' => 'รหัสไปรษณีย์'
+    ];
+    
+    foreach ($patterns as $pattern => $replacement) {
+        if (preg_match($pattern, $field_key)) {
+            return preg_replace($pattern, $replacement, $field_key);
+        }
+    }
+    
+    // Fallback: clean up field key
+    $clean = str_replace(['_', '-'], ' ', $field_key);
+    return ucfirst(trim($clean));
+}
+
+function guessCategory($field_key) {
+    $field_lower = strtolower($field_key);
+    
+    $categories = [
+        'personal' => ['name', 'age', 'birth', 'gender', 'id', 'firstname', 'lastname'],
+        'contact' => ['phone', 'email', 'address', 'province', 'district', 'postal'],
+        'education' => ['school', 'university', 'degree', 'grade', 'education'],
+        'work' => ['job', 'occupation', 'work', 'income', 'salary', 'company'],
+        'survey' => ['Q', 'question', 'answer']
+    ];
+    
+    foreach ($categories as $category => $keywords) {
+        foreach ($keywords as $keyword) {
+            if (strpos($field_lower, $keyword) !== false) {
+                return $category;
+            }
+        }
+    }
+    
+    return 'other';
+}
+
+// Organize questions by groups/sections with enhanced logic
 $organized_data = array();
 $other_data = array();
+$question_stats = array('total' => 0, 'answered' => 0, 'categories' => array());
 
 if ($response_data && is_array($response_data)) {
     foreach ($response_data as $field_key => $field_value) {
-        // Skip empty values
-        if ($field_value === null || $field_value === '' || $field_value === ' ') {
-            continue;
+        // Skip empty values but count them
+        $question_stats['total']++;
+        $is_answered = !($field_value === null || $field_value === '' || $field_value === ' ');
+        
+        if ($is_answered) {
+            $question_stats['answered']++;
+        }
+        
+        if (!$is_answered) {
+            continue; // Skip empty for display but counted above
         }
         
         // Identify metadata fields
@@ -84,7 +150,7 @@ if ($response_data && is_array($response_data)) {
             continue;
         }
         
-        // Group questions by prefix (e.g., Q1, Q2, etc.) or numeric patterns
+        // Enhanced pattern matching with better grouping
         if (preg_match('/^(Q?\d+)([A-Z]*\d*)(.*)/', $field_key, $matches)) {
             $question_group = $matches[1];
             $sub_part = $matches[2] . $matches[3];
@@ -92,22 +158,46 @@ if ($response_data && is_array($response_data)) {
             if (!isset($organized_data[$question_group])) {
                 $organized_data[$question_group] = array(
                     'main' => null,
-                    'sub_questions' => array()
+                    'sub_questions' => array(),
+                    'display_name' => generateDisplayName($question_group),
+                    'category' => guessCategory($field_key),
+                    'field_count' => 0,
+                    'answered_count' => 0
                 );
+            }
+            
+            $organized_data[$question_group]['field_count']++;
+            if ($is_answered) {
+                $organized_data[$question_group]['answered_count']++;
             }
             
             if (empty($sub_part) || $sub_part === '') {
                 $organized_data[$question_group]['main'] = $field_value;
             } else {
-                $organized_data[$question_group]['sub_questions'][$field_key] = $field_value;
+                $organized_data[$question_group]['sub_questions'][$field_key] = array(
+                    'value' => $field_value,
+                    'display_name' => generateDisplayName($field_key),
+                    'category' => guessCategory($field_key)
+                );
             }
         } else {
-            // Try to catch other question patterns or treat as individual questions
+            // Handle other patterns
             if (!in_array($field_key, ['token', 'lastpage', 'startlanguage', 'seed'])) {
+                $category = guessCategory($field_key);
                 $organized_data[$field_key] = array(
                     'main' => $field_value,
-                    'sub_questions' => array()
+                    'sub_questions' => array(),
+                    'display_name' => generateDisplayName($field_key),
+                    'category' => $category,
+                    'field_count' => 1,
+                    'answered_count' => $is_answered ? 1 : 0
                 );
+                
+                // Count categories
+                if (!isset($question_stats['categories'][$category])) {
+                    $question_stats['categories'][$category] = 0;
+                }
+                $question_stats['categories'][$category]++;
             } else {
                 $other_data[$field_key] = $field_value;
             }
@@ -115,9 +205,19 @@ if ($response_data && is_array($response_data)) {
     }
 }
 
-// For now, we'll use field keys as labels since we don't have survey structure
-// In the future, this could be enhanced to fetch question labels from LimeSurvey API
-$question_labels = array();
+// Sort organized data by question number for better display
+uksort($organized_data, function($a, $b) {
+    // Extract numbers for proper sorting
+    preg_match('/\d+/', $a, $matches_a);
+    preg_match('/\d+/', $b, $matches_b);
+    
+    $num_a = isset($matches_a[0]) ? intval($matches_a[0]) : 0;
+    $num_b = isset($matches_b[0]) ? intval($matches_b[0]) : 0;
+    
+    return $num_a - $num_b;
+});
+
+$question_labels = array(); // Keep for backward compatibility
 ?>
 
 <div class="wrap tpak-response-detail">
@@ -211,20 +311,75 @@ $question_labels = array();
                 </div>
             </div>
             
-            <!-- Search/Filter Bar -->
-            <div class="question-filter">
-                <input type="text" id="question-search" 
-                       placeholder="<?php _e('ค้นหาคำถามหรือคำตอบ...', 'tpak-dq-system'); ?>">
+            <!-- Enhanced Search/Filter Bar with Display Modes -->
+            <div class="question-filter enhanced">
+                <div class="filter-row-1">
+                    <input type="text" id="question-search" 
+                           placeholder="<?php _e('ค้นหาคำถามหรือคำตอบ...', 'tpak-dq-system'); ?>">
+                    
+                    <div class="display-mode-selector">
+                        <label><?php _e('รูปแบบการแสดงผล:', 'tpak-dq-system'); ?></label>
+                        <select id="display-mode" class="display-mode-select">
+                            <option value="enhanced"><?php _e('แบบปรับปรุง (แนะนำ)', 'tpak-dq-system'); ?></option>
+                            <option value="grouped"><?php _e('จัดกลุ่มตามหมวด', 'tpak-dq-system'); ?></option>
+                            <option value="flat"><?php _e('แสดงแบบเรียบ', 'tpak-dq-system'); ?></option>
+                            <option value="table"><?php _e('แสดงแบบตาราง', 'tpak-dq-system'); ?></option>
+                        </select>
+                    </div>
+                </div>
                 
-                <div class="filter-actions">
-                    <button class="button expand-all">
-                        <span class="dashicons dashicons-editor-expand"></span>
-                        <?php _e('ขยายทั้งหมด', 'tpak-dq-system'); ?>
-                    </button>
-                    <button class="button collapse-all">
-                        <span class="dashicons dashicons-editor-contract"></span>
-                        <?php _e('ย่อทั้งหมด', 'tpak-dq-system'); ?>
-                    </button>
+                <div class="filter-row-2">
+                    <div class="filter-stats">
+                        <span class="stat-item">
+                            <strong><?php echo $question_stats['answered']; ?></strong> / <?php echo $question_stats['total']; ?> 
+                            <?php _e('ตอบแล้ว', 'tpak-dq-system'); ?>
+                        </span>
+                        <span class="stat-item completion-rate">
+                            <?php 
+                            $completion_rate = $question_stats['total'] > 0 ? 
+                                round(($question_stats['answered'] / $question_stats['total']) * 100) : 0;
+                            echo $completion_rate . '%';
+                            ?>
+                        </span>
+                        <?php if (!empty($question_stats['categories'])): ?>
+                            <span class="stat-item">
+                                <?php echo count($question_stats['categories']); ?> <?php _e('หมวดหมู่', 'tpak-dq-system'); ?>
+                            </span>
+                        <?php endif; ?>
+                    </div>
+                    
+                    <div class="filter-actions">
+                        <div class="category-filter">
+                            <select id="category-filter">
+                                <option value=""><?php _e('ทุกหมวดหมู่', 'tpak-dq-system'); ?></option>
+                                <?php foreach ($question_stats['categories'] as $category => $count): ?>
+                                    <option value="<?php echo esc_attr($category); ?>">
+                                        <?php 
+                                        $category_names = [
+                                            'personal' => 'ข้อมูลส่วนตัว',
+                                            'contact' => 'ข้อมูลติดต่อ', 
+                                            'education' => 'การศึกษา',
+                                            'work' => 'การทำงาน',
+                                            'survey' => 'คำถามสำรวจ',
+                                            'other' => 'อื่นๆ'
+                                        ];
+                                        echo isset($category_names[$category]) ? $category_names[$category] : ucfirst($category);
+                                        echo ' (' . $count . ')';
+                                        ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        
+                        <button class="button expand-all">
+                            <span class="dashicons dashicons-editor-expand"></span>
+                            <?php _e('ขยายทั้งหมด', 'tpak-dq-system'); ?>
+                        </button>
+                        <button class="button collapse-all">
+                            <span class="dashicons dashicons-editor-contract"></span>
+                            <?php _e('ย่อทั้งหมด', 'tpak-dq-system'); ?>
+                        </button>
+                    </div>
                 </div>
             </div>
             
@@ -254,20 +409,65 @@ $question_labels = array();
                     <?php 
                     $section_num = 1;
                     foreach ($organized_data as $question_key => $question_data): 
+                        $category = isset($question_data['category']) ? $question_data['category'] : 'other';
+                        $display_name = isset($question_data['display_name']) ? $question_data['display_name'] : $question_key;
+                        $completion_rate = 0;
+                        if (isset($question_data['field_count']) && $question_data['field_count'] > 0) {
+                            $completion_rate = round(($question_data['answered_count'] / $question_data['field_count']) * 100);
+                        }
                     ?>
-                        <div class="question-section" data-question="<?php echo esc_attr($question_key); ?>">
+                        <div class="question-section enhanced" 
+                             data-question="<?php echo esc_attr($question_key); ?>"
+                             data-category="<?php echo esc_attr($category); ?>"
+                             data-completion="<?php echo $completion_rate; ?>">
+                            
                             <div class="question-header">
                                 <button class="toggle-section" aria-expanded="true">
                                     <span class="dashicons dashicons-arrow-down-alt2"></span>
                                 </button>
                                 
-                                <div class="question-title">
-                                    <span class="question-number"><?php echo esc_html($question_key); ?></span>
-                                    <?php if (isset($question_labels[$question_key])): ?>
+                                <div class="question-meta">
+                                    <div class="category-badge <?php echo esc_attr($category); ?>">
+                                        <?php 
+                                        $category_icons = [
+                                            'personal' => 'dashicons-admin-users',
+                                            'contact' => 'dashicons-phone', 
+                                            'education' => 'dashicons-welcome-learn-more',
+                                            'work' => 'dashicons-businessman',
+                                            'survey' => 'dashicons-clipboard',
+                                            'other' => 'dashicons-admin-generic'
+                                        ];
+                                        $icon = isset($category_icons[$category]) ? $category_icons[$category] : 'dashicons-admin-generic';
+                                        ?>
+                                        <span class="dashicons <?php echo $icon; ?>"></span>
+                                    </div>
+                                    
+                                    <div class="question-title">
+                                        <span class="question-number"><?php echo esc_html($question_key); ?></span>
                                         <span class="question-text">
-                                            <?php echo esc_html($question_labels[$question_key]); ?>
+                                            <?php echo esc_html($display_name); ?>
+                                        </span>
+                                    </div>
+                                </div>
+                                
+                                <div class="question-stats">
+                                    <?php if (isset($question_data['field_count']) && $question_data['field_count'] > 1): ?>
+                                        <span class="completion-indicator">
+                                            <span class="completion-bar">
+                                                <span class="completion-fill" style="width: <?php echo $completion_rate; ?>%"></span>
+                                            </span>
+                                            <span class="completion-text"><?php echo $completion_rate; ?>%</span>
                                         </span>
                                     <?php endif; ?>
+                                    
+                                    <span class="field-count">
+                                        <?php 
+                                        $total_fields = (isset($question_data['field_count']) ? $question_data['field_count'] : 1);
+                                        if ($total_fields > 1) {
+                                            echo $total_fields . ' ' . __('ฟิลด์', 'tpak-dq-system');
+                                        }
+                                        ?>
+                                    </span>
                                 </div>
                             </div>
                             
@@ -275,7 +475,10 @@ $question_labels = array();
                                 <!-- Main Answer -->
                                 <?php if ($question_data['main'] !== null): ?>
                                     <div class="main-answer">
-                                        <div class="answer-label"><?php _e('คำตอบหลัก:', 'tpak-dq-system'); ?></div>
+                                        <div class="answer-label">
+                                            <span class="dashicons dashicons-yes-alt"></span>
+                                            <?php _e('คำตอบหลัก:', 'tpak-dq-system'); ?>
+                                        </div>
                                         <div class="answer-value">
                                             <?php echo nl2br(esc_html($question_data['main'])); ?>
                                         </div>
@@ -286,24 +489,30 @@ $question_labels = array();
                                 <?php if (!empty($question_data['sub_questions'])): ?>
                                     <div class="sub-questions">
                                         <div class="sub-questions-header">
+                                            <span class="dashicons dashicons-list-view"></span>
                                             <?php _e('คำถามย่อย:', 'tpak-dq-system'); ?>
+                                            <span class="sub-count">(<?php echo count($question_data['sub_questions']); ?> รายการ)</span>
                                         </div>
                                         
-                                        <?php foreach ($question_data['sub_questions'] as $sub_key => $sub_value): ?>
-                                            <div class="sub-question-item">
-                                                <div class="sub-question-key">
-                                                    <?php echo esc_html($sub_key); ?>
-                                                    <?php if (isset($question_labels[$sub_key])): ?>
+                                        <div class="sub-questions-grid">
+                                            <?php foreach ($question_data['sub_questions'] as $sub_key => $sub_data): 
+                                                $sub_value = is_array($sub_data) ? $sub_data['value'] : $sub_data;
+                                                $sub_display_name = is_array($sub_data) && isset($sub_data['display_name']) ? 
+                                                    $sub_data['display_name'] : generateDisplayName($sub_key);
+                                            ?>
+                                                <div class="sub-question-item">
+                                                    <div class="sub-question-header">
+                                                        <span class="sub-question-key"><?php echo esc_html($sub_key); ?></span>
                                                         <span class="sub-question-label">
-                                                            - <?php echo esc_html($question_labels[$sub_key]); ?>
+                                                            <?php echo esc_html($sub_display_name); ?>
                                                         </span>
-                                                    <?php endif; ?>
+                                                    </div>
+                                                    <div class="sub-question-value">
+                                                        <?php echo nl2br(esc_html($sub_value)); ?>
+                                                    </div>
                                                 </div>
-                                                <div class="sub-question-value">
-                                                    <?php echo nl2br(esc_html($sub_value)); ?>
-                                                </div>
-                                            </div>
-                                        <?php endforeach; ?>
+                                            <?php endforeach; ?>
+                                        </div>
                                     </div>
                                 <?php endif; ?>
                             </div>

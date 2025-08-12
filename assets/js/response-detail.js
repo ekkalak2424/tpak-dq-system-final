@@ -279,22 +279,178 @@ jQuery(document).ready(function($) {
         $('.toggle-section').attr('aria-expanded', 'false');
     });
     
-    // Search functionality
+    // Enhanced search functionality
     $(document).on('keyup', '#question-search', function() {
         var searchTerm = $(this).val().toLowerCase();
+        var visibleCount = 0;
         
         $('.question-section').each(function() {
             var section = $(this);
             var questionText = section.find('.question-title').text().toLowerCase();
             var answerText = section.find('.question-content').text().toLowerCase();
+            var questionKey = section.data('question').toString().toLowerCase();
             
-            if (questionText.indexOf(searchTerm) !== -1 || answerText.indexOf(searchTerm) !== -1) {
-                section.removeClass('filtered-out');
+            var isMatch = questionText.indexOf(searchTerm) !== -1 || 
+                         answerText.indexOf(searchTerm) !== -1 ||
+                         questionKey.indexOf(searchTerm) !== -1;
+            
+            if (isMatch || searchTerm === '') {
+                section.removeClass('filtered-out').show();
+                visibleCount++;
             } else {
-                section.addClass('filtered-out');
+                section.addClass('filtered-out').hide();
             }
         });
+        
+        // Update search results count
+        updateSearchResults(visibleCount, searchTerm);
     });
+    
+    // Category filter
+    $(document).on('change', '#category-filter', function() {
+        var selectedCategory = $(this).val();
+        var visibleCount = 0;
+        
+        $('.question-section').each(function() {
+            var section = $(this);
+            var category = section.data('category');
+            
+            if (selectedCategory === '' || category === selectedCategory) {
+                section.removeClass('category-filtered').show();
+                visibleCount++;
+            } else {
+                section.addClass('category-filtered').hide();
+            }
+        });
+        
+        updateCategoryResults(visibleCount, selectedCategory);
+    });
+    
+    // Display mode selector
+    $(document).on('change', '#display-mode', function() {
+        var mode = $(this).val();
+        var container = $('.questions-container');
+        
+        // Remove all mode classes
+        container.removeClass('mode-enhanced mode-grouped mode-flat mode-table');
+        
+        // Add selected mode class
+        container.addClass('mode-' + mode);
+        container.attr('data-display-mode', mode);
+        
+        // Apply mode-specific changes
+        applyDisplayMode(mode);
+    });
+    
+    function updateSearchResults(count, term) {
+        var totalQuestions = $('.question-section').length;
+        var message = '';
+        
+        if (term) {
+            message = 'พบ ' + count + ' จาก ' + totalQuestions + ' คำถาม';
+        } else {
+            message = 'แสดง ' + totalQuestions + ' คำถามทั้งหมด';
+        }
+        
+        // Update or create search results indicator
+        var indicator = $('.search-results-indicator');
+        if (indicator.length === 0) {
+            $('.filter-stats').append('<span class="stat-item search-results-indicator"></span>');
+            indicator = $('.search-results-indicator');
+        }
+        indicator.text(message);
+    }
+    
+    function updateCategoryResults(count, category) {
+        var categoryNames = {
+            'personal': 'ข้อมูลส่วนตัว',
+            'contact': 'ข้อมูลติดต่อ', 
+            'education': 'การศึกษา',
+            'work': 'การทำงาน',
+            'survey': 'คำถามสำรวจ',
+            'other': 'อื่นๆ'
+        };
+        
+        var message = category ? 
+            'แสดง ' + count + ' คำถามในหมวด ' + (categoryNames[category] || category) :
+            'แสดงทุกหมวดหมู่';
+            
+        console.log('Category filter:', message);
+    }
+    
+    function applyDisplayMode(mode) {
+        var sections = $('.question-section');
+        
+        switch(mode) {
+            case 'flat':
+                sections.removeClass('enhanced').addClass('flat-mode');
+                $('.question-content').show();
+                $('.toggle-section').hide();
+                break;
+                
+            case 'grouped':
+                sections.removeClass('flat-mode').addClass('enhanced');
+                groupByCategory();
+                $('.toggle-section').show();
+                break;
+                
+            case 'table':
+                sections.removeClass('enhanced flat-mode').addClass('table-mode');
+                convertToTable();
+                break;
+                
+            case 'enhanced':
+            default:
+                sections.removeClass('flat-mode table-mode').addClass('enhanced');
+                $('.toggle-section').show();
+                break;
+        }
+    }
+    
+    function groupByCategory() {
+        var categories = {};
+        var container = $('.questions-container');
+        
+        // Group sections by category
+        $('.question-section').each(function() {
+            var section = $(this);
+            var category = section.data('category') || 'other';
+            
+            if (!categories[category]) {
+                categories[category] = [];
+            }
+            categories[category].push(section.detach());
+        });
+        
+        // Create category headers and append sections
+        var categoryNames = {
+            'personal': 'ข้อมูลส่วนตัว',
+            'contact': 'ข้อมูลติดต่อ', 
+            'education': 'การศึกษา',
+            'work': 'การทำงาน',
+            'survey': 'คำถามสำรวจ',
+            'other': 'อื่นๆ'
+        };
+        
+        Object.keys(categories).forEach(function(category) {
+            if (categories[category].length > 0) {
+                var categoryHeader = $('<div class="category-header"><h3>' + 
+                    (categoryNames[category] || category) + 
+                    ' (' + categories[category].length + ' คำถาม)</h3></div>');
+                
+                container.append(categoryHeader);
+                categories[category].forEach(function(section) {
+                    container.append(section);
+                });
+            }
+        });
+    }
+    
+    function convertToTable() {
+        // This would convert the display to a table format
+        // Implementation depends on specific requirements
+        console.log('Table mode activated');
+    }
     
     // Quick navigation
     $(document).on('click', '.nav-item', function(e) {
