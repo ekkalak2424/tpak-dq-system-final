@@ -65,6 +65,46 @@ class TPAK_DQ_Workflow {
     }
     
     /**
+     * Get user verification role
+     */
+    public function get_user_verification_role($user_id = null) {
+        if (!$user_id) {
+            $user_id = get_current_user_id();
+        }
+        
+        $user = get_user_by('id', $user_id);
+        if (!$user) {
+            return false;
+        }
+        
+        // Check user roles in order of priority
+        if (user_can($user_id, 'manage_options')) {
+            return 'administrator';
+        }
+        
+        $user_roles = $user->roles;
+        
+        if (in_array('tpak_examiner', $user_roles)) {
+            return 'examiner';
+        }
+        
+        if (in_array('tpak_supervisor', $user_roles)) {
+            return 'supervisor';
+        }
+        
+        if (in_array('tpak_interviewer', $user_roles)) {
+            return 'interviewer';
+        }
+        
+        // Default for administrators
+        if (in_array('administrator', $user_roles)) {
+            return 'administrator';
+        }
+        
+        return false;
+    }
+    
+    /**
      * Check if user can perform action on batch
      */
     public function can_perform_action($post_id, $action, $user_id = null) {
@@ -80,6 +120,11 @@ class TPAK_DQ_Workflow {
         $current_status = $this->get_batch_status($post_id);
         $user_role = $this->get_user_verification_role($user_id);
         
+        // Allow administrators to perform any action
+        if ($user_role === 'administrator') {
+            return true;
+        }
+        
         switch ($action) {
             case 'approve_a':
                 return $user_role === 'interviewer' && $current_status === 'pending_a';
@@ -88,6 +133,7 @@ class TPAK_DQ_Workflow {
                 return $user_role === 'supervisor' && $current_status === 'pending_b';
                 
             case 'approve_b':
+            case 'approve_batch_supervisor':
                 return $user_role === 'supervisor' && $current_status === 'pending_b';
                 
             case 'reject_c':
@@ -462,6 +508,37 @@ class TPAK_DQ_Workflow {
         }
         
         return $actions;
+    }
+    
+    /**
+     * Validate user action
+     */
+    public function validate_user_action($post_id, $action, $user_id = null) {
+        if (!$user_id) {
+            $user_id = get_current_user_id();
+        }
+        
+        // Check if post exists and is correct type
+        $post = get_post($post_id);
+        if (!$post || $post->post_type !== 'verification_batch') {
+            return array(
+                'valid' => false,
+                'message' => __('Invalid post ID or post type', 'tpak-dq-system')
+            );
+        }
+        
+        // Check if user can perform this action
+        if (!$this->can_perform_action($post_id, $action, $user_id)) {
+            return array(
+                'valid' => false,
+                'message' => __('Action not allowed for current user and status', 'tpak-dq-system')
+            );
+        }
+        
+        return array(
+            'valid' => true,
+            'message' => __('Action is valid', 'tpak-dq-system')
+        );
     }
     
     /**
