@@ -959,36 +959,4 @@ class TPAK_DQ_Admin_Menu {
         }
     }
     
-    /**
-     * Enqueue admin scripts and styles
-     */
-    public function enqueue_admin_scripts($hook) {
-        // Only load on our plugin pages
-        if (strpos($hook, 'tpak-dq') === false) {
-            return;
-        }
-        
-        // Enqueue admin script
-        wp_enqueue_script(
-            'tpak-dq-admin-script',
-            TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/admin-script.js',
-            array('jquery'),
-            TPAK_DQ_SYSTEM_VERSION,
-            true
-        );
-        
-        // Enqueue admin styles
-        wp_enqueue_style(
-            'tpak-dq-admin-style',
-            TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/css/admin-style.css',
-            array(),
-            TPAK_DQ_SYSTEM_VERSION
-        );
-        
-        // Localize script with AJAX data
-        wp_localize_script('tpak-dq-admin-script', 'tpak_dq_ajax', array(
-            'ajax_url' => admin_url('admin-ajax.php'),
-            'nonce' => wp_create_nonce('tpak_workflow_nonce')
-        ));
-    }
 }
