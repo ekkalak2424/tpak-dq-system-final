@@ -202,7 +202,10 @@ class TPAK_DQ_Admin_Menu {
      * Enqueue admin scripts
      */
     public function enqueue_admin_scripts($hook) {
-        if (strpos($hook, 'tpak-dq') !== false) {
+        // Load on all TPAK DQ pages
+        if (strpos($hook, 'tpak-dq') !== false || 
+            (isset($_GET['page']) && strpos($_GET['page'], 'tpak-dq') !== false)) {
+            
             wp_enqueue_script('tpak-dq-admin', TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/admin-script.js', array('jquery'), TPAK_DQ_SYSTEM_VERSION, true);
             wp_enqueue_style('tpak-dq-admin', TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/css/admin-style.css', array(), TPAK_DQ_SYSTEM_VERSION);
             
@@ -213,6 +216,18 @@ class TPAK_DQ_Admin_Menu {
             
             // Debug: Log the nonce
             error_log('TPAK DQ System: Generated nonce: ' . wp_create_nonce('tpak_workflow_nonce'));
+        }
+        
+        // Also load on verification_batch edit pages
+        global $post_type;
+        if ($post_type === 'verification_batch') {
+            wp_enqueue_script('tpak-dq-admin', TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/admin-script.js', array('jquery'), TPAK_DQ_SYSTEM_VERSION, true);
+            wp_enqueue_style('tpak-dq-admin', TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/css/admin-style.css', array(), TPAK_DQ_SYSTEM_VERSION);
+            
+            wp_localize_script('tpak-dq-admin', 'tpak_dq_ajax', array(
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('tpak_workflow_nonce')
+            ));
         }
     }
     

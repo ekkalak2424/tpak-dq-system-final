@@ -484,15 +484,24 @@ class TPAK_DQ_Workflow {
      * Admin change status (for administrators only)
      */
     public function admin_change_status() {
+        // Debug logging
+        error_log('TPAK DQ System: admin_change_status called');
+        error_log('TPAK DQ System: POST data: ' . print_r($_POST, true));
+        
         if (!wp_verify_nonce($_POST['nonce'], 'tpak_workflow_nonce')) {
-            wp_die(__('Security check failed', 'tpak-dq-system'));
+            error_log('TPAK DQ System: Nonce verification failed');
+            wp_send_json_error(array('message' => __('Security check failed', 'tpak-dq-system')));
+            return;
         }
         
         // Check if user is administrator
         if (!current_user_can('manage_options')) {
+            error_log('TPAK DQ System: User does not have manage_options capability');
             wp_send_json_error(array('message' => __('You do not have permission to perform this action', 'tpak-dq-system')));
             return;
         }
+        
+        error_log('TPAK DQ System: Permission checks passed');
         
         $post_id = intval($_POST['post_id']);
         $new_status = sanitize_text_field($_POST['new_status']);
