@@ -147,25 +147,7 @@ class TPAK_DQ_Workflow {
         }
     }
     
-    /**
-     * Get user's verification role
-     */
-    private function get_user_verification_role($user_id) {
-        $user = get_user_by('id', $user_id);
-        if (!$user) {
-            return false;
-        }
-        
-        $roles = array('interviewer', 'supervisor', 'examiner', 'administrator');
-        
-        foreach ($roles as $role) {
-            if (in_array($role, $user->roles)) {
-                return $role;
-            }
-        }
-        
-        return false;
-    }
+
     
     /**
      * Validate user action before processing
@@ -510,36 +492,7 @@ class TPAK_DQ_Workflow {
         return $actions;
     }
     
-    /**
-     * Validate user action
-     */
-    public function validate_user_action($post_id, $action, $user_id = null) {
-        if (!$user_id) {
-            $user_id = get_current_user_id();
-        }
-        
-        // Check if post exists and is correct type
-        $post = get_post($post_id);
-        if (!$post || $post->post_type !== 'verification_batch') {
-            return array(
-                'valid' => false,
-                'message' => __('Invalid post ID or post type', 'tpak-dq-system')
-            );
-        }
-        
-        // Check if user can perform this action
-        if (!$this->can_perform_action($post_id, $action, $user_id)) {
-            return array(
-                'valid' => false,
-                'message' => __('Action not allowed for current user and status', 'tpak-dq-system')
-            );
-        }
-        
-        return array(
-            'valid' => true,
-            'message' => __('Action is valid', 'tpak-dq-system')
-        );
-    }
+
     
     /**
      * Get action display name
