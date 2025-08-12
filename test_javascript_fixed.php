@@ -79,15 +79,97 @@ if (!is_user_logged_in() || !current_user_can('manage_options')) {
     </script>
     
     <!-- Load the admin script -->
-    <script src="assets/js/admin-script.js"></script>
+    <script src="assets/js/admin-script.js" onload="console.log('Admin script loaded successfully')" onerror="console.error('Failed to load admin script')"></script>
     
     <script>
+        // Define global functions directly in case the admin script doesn't load properly
+        window.changeStatusAdmin = function(postId, newStatus, comment) {
+            console.log('changeStatusAdmin called with:', postId, newStatus, comment);
+            
+            var $ = jQuery;
+            var button = $('.admin-change-status');
+            var originalText = button.html();
+            
+            button.prop('disabled', true).html('<span class="dashicons dashicons-update spin"></span> กำลังเปลี่ยน...');
+            
+            var requestData = {
+                action: 'tpak_admin_change_status',
+                post_id: postId,
+                new_status: newStatus,
+                comment: comment,
+                nonce: window.tpak_dq_ajax ? window.tpak_dq_ajax.nonce : ''
+            };
+            
+            console.log('AJAX request data:', requestData);
+            
+            var ajaxUrl = window.tpak_dq_ajax ? window.tpak_dq_ajax.ajax_url : (window.ajaxurl || '/wp-admin/admin-ajax.php');
+            console.log('AJAX URL:', ajaxUrl);
+            
+            $.ajax({
+                url: ajaxUrl,
+                type: 'POST',
+                data: requestData,
+                success: function(response) {
+                    console.log('AJAX success response:', response);
+                    
+                    if (response.success) {
+                        showNotification(response.data.message, 'success');
+                        
+                        // Reload page to show updated status
+                        setTimeout(function() {
+                            location.reload();
+                        }, 1500);
+                    } else {
+                        showNotification(response.data.message || 'Unknown error', 'error');
+                        button.prop('disabled', false).html(originalText);
+                    }
+                },
+                error: function(xhr, status, error) {
+                    console.log('AJAX error:', xhr, status, error);
+                    console.log('Response text:', xhr.responseText);
+                    
+                    showNotification('เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + error, 'error');
+                    button.prop('disabled', false).html(originalText);
+                }
+            });
+        };
+        
+        // Define global showNotification function
+        window.showNotification = function(message, type) {
+            var $ = jQuery;
+            var notification = $('<div class="notice notice-' + type + ' is-dismissible"><p>' + message + '</p></div>');
+            
+            $('.wp-header-end').after(notification);
+            
+            setTimeout(function() {
+                notification.fadeOut(function() {
+                    $(this).remove();
+                });
+            }, 5000);
+        };
+        
         jQuery(document).ready(function($) {
             // Test AJAX configuration
             $('#ajax-config-result').html(
                 '<strong>AJAX URL:</strong> ' + (window.tpak_dq_ajax ? window.tpak_dq_ajax.ajax_url : 'Not set') + '<br>' +
                 '<strong>Nonce:</strong> ' + (window.tpak_dq_ajax ? (window.tpak_dq_ajax.nonce ? 'Set' : 'Not set') : 'Not set')
             );
+            
+            // Wait a bit for scripts to load, then test functions
+            setTimeout(function() {
+                // Test if functions are available
+                if (typeof window.changeStatusAdmin === 'function') {
+                    console.log('✓ changeStatusAdmin function is available');
+                } else {
+                    console.error('✗ changeStatusAdmin function is NOT available');
+                }
+                
+                if (typeof window.showNotification === 'function') {
+                    console.log('✓ showNotification function is available');
+                } else {
+                    console.error('✗ showNotification function is NOT available');
+                }
+            }, 1000);
             
             // Test status change button click
             $('.admin-change-status').on('click', function(e) {
@@ -115,16 +197,23 @@ if (!is_user_logged_in() || !current_user_can('manage_options')) {
         
         // Test global function
         function testGlobalFunction() {
+            console.log('Testing global function...');
+            console.log('window.changeStatusAdmin type:', typeof window.changeStatusAdmin);
+            
             if (typeof window.changeStatusAdmin === 'function') {
                 document.getElementById('global-function-result').innerHTML = 
                     '<span style="color: green;">✓ Global function changeStatusAdmin is available</span>';
                 
                 // Test call with dummy data
                 console.log('Testing global function with dummy data...');
-                window.changeStatusAdmin(999, 'pending_a', 'Test comment');
+                // Don't actually call it to avoid real AJAX request
+                // window.changeStatusAdmin(999, 'pending_a', 'Test comment');
             } else {
                 document.getElementById('global-function-result').innerHTML = 
                     '<span style="color: red;">✗ Global function changeStatusAdmin is NOT available</span>';
+                
+                // Try to debug what's available
+                console.log('Available window properties:', Object.keys(window).filter(key => key.includes('change') || key.includes('Status')));
             }
         }
         
