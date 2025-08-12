@@ -10,6 +10,8 @@ if (!defined('ABSPATH')) {
 
 // Enqueue necessary scripts and styles
 wp_enqueue_script('jquery');
+
+// Enqueue main admin script
 wp_enqueue_script(
     'tpak-dq-admin-script',
     TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/admin-script.js',
@@ -17,16 +19,26 @@ wp_enqueue_script(
     TPAK_DQ_SYSTEM_VERSION,
     true
 );
+
+// Enqueue response detail specific script
+wp_enqueue_script(
+    'tpak-dq-response-detail',
+    TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/response-detail.js',
+    array('jquery', 'tpak-dq-admin-script'),
+    TPAK_DQ_SYSTEM_VERSION,
+    true
+);
+
 wp_enqueue_style('tpak-dq-admin', TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/css/admin-style.css', array(), TPAK_DQ_SYSTEM_VERSION);
 
 // Localize script with AJAX data
-wp_localize_script('tpak-dq-admin-script', 'tpak_dq_ajax', array(
+wp_localize_script('tpak-dq-response-detail', 'tpak_dq_ajax', array(
     'ajax_url' => admin_url('admin-ajax.php'),
     'nonce' => wp_create_nonce('tpak_workflow_nonce')
 ));
 
 // Also add as global variables for backward compatibility
-wp_add_inline_script('tpak-dq-admin-script', '
+wp_add_inline_script('tpak-dq-response-detail', '
     window.ajaxurl = "' . admin_url('admin-ajax.php') . '";
 ', 'before');
 
