@@ -30,6 +30,33 @@ if (!is_user_logged_in() || !current_user_can('manage_options')) {
     wp_die('Access denied');
 }
 
+// Ensure post types and taxonomies are registered
+if (!post_type_exists('verification_batch') || !taxonomy_exists('verification_status')) {
+    $post_types = new TPAK_DQ_Post_Types();
+    $post_types->register_post_types();
+    $post_types->register_taxonomies();
+}
+
+// Ensure taxonomy terms exist
+$terms = get_terms(array('taxonomy' => 'verification_status', 'hide_empty' => false));
+if (empty($terms) || is_wp_error($terms)) {
+    $default_terms = array(
+        'pending_a' => 'รอการตรวจสอบ A',
+        'pending_b' => 'รอการตรวจสอบ B', 
+        'pending_c' => 'รอการตรวจสอบ C',
+        'finalized' => 'เสร็จสมบูรณ์',
+        'finalized_by_sampling' => 'เสร็จสมบูรณ์โดยการสุ่ม',
+        'rejected_by_b' => 'ถูกส่งกลับโดย B',
+        'rejected_by_c' => 'ถูกส่งกลับโดย C'
+    );
+    
+    foreach ($default_terms as $slug => $name) {
+        if (!term_exists($slug, 'verification_status')) {
+            wp_insert_term($name, 'verification_status', array('slug' => $slug));
+        }
+    }
+}
+
 // Get a real verification_batch post for testing
 $test_posts = get_posts(array(
     'post_type' => 'verification_batch',
@@ -47,6 +74,21 @@ if (!empty($test_posts)) {
     // Get current status and available actions
     $workflow = new TPAK_DQ_Workflow();
     $current_status = $workflow->get_batch_status($test_post_id);
+    
+    // If no status, set default status for testing
+    if (!$current_status) {
+        $workflow->update_batch_status($test_post_id, 'pending_a');
+        $current_status = 'pending_a';
+        
+        // Add audit trail entry
+        $workflow->add_audit_trail_entry($test_post_id, array(
+            'user_id' => get_current_user_id(),
+            'user_name' => wp_get_current_user()->display_name,
+            'action' => 'status_initialized',
+            'comment' => 'Status initialized for testing'
+        ));
+    }
+    
     $available_actions = $workflow->get_available_actions($test_post_id);
 }
 
