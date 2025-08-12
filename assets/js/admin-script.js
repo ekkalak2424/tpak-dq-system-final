@@ -4,18 +4,55 @@
 
 jQuery(document).ready(function($) {
     
+    // Ensure tpak_dq_ajax is available
+    if (typeof tpak_dq_ajax === 'undefined') {
+        console.warn('tpak_dq_ajax is not defined, creating fallback');
+        window.tpak_dq_ajax = {
+            ajax_url: (typeof ajaxurl !== 'undefined') ? ajaxurl : '/wp-admin/admin-ajax.php',
+            nonce: ''
+        };
+    }
+    
+    console.log('TPAK DQ Admin Script loaded');
+    console.log('tpak_dq_ajax:', tpak_dq_ajax);
+    
     // Workflow action handlers
-    $('.tpak-action-btn').on('click', function(e) {
+    $(document).on('click', '.tpak-action-btn', function(e) {
         e.preventDefault();
         
         var action = $(this).data('action');
         var postId = $(this).data('post-id');
         var button = $(this);
         
+        console.log('Workflow action clicked:', action, 'Post ID:', postId);
+        
         if (action === 'reject') {
             showRejectDialog(postId, button);
         } else {
             performWorkflowAction(action, postId, button);
+        }
+    });
+    
+    // Admin status change handler
+    $(document).on('click', '.admin-change-status', function(e) {
+        e.preventDefault();
+        
+        console.log('Admin change status button clicked');
+        
+        var button = $(this);
+        var postId = button.data('id');
+        var newStatus = $('#status-select').val();
+        var comment = $('#admin-comment').val();
+        
+        console.log('Post ID:', postId, 'New Status:', newStatus, 'Comment:', comment);
+        
+        if (!newStatus) {
+            alert('กรุณาเลือกสถานะใหม่');
+            return;
+        }
+        
+        if (confirm('คุณแน่ใจหรือไม่ที่จะเปลี่ยนสถานะ?')) {
+            changeStatusAdmin(postId, newStatus, comment);
         }
     });
     
@@ -184,7 +221,7 @@ jQuery(document).ready(function($) {
         }
     }
     
-    // Show notification
+    // Show notification (local function)
     function showNotification(message, type) {
         var notification = $('<div class="notice notice-' + type + ' is-dismissible"><p>' + message + '</p></div>');
         
@@ -370,119 +407,70 @@ jQuery(document).ready(function($) {
             $(this).toggle(text.indexOf(searchTerm) > -1);
         });
     });
-});   
-  
-    // Function to perform workflow actions
-    function performWorkflowAction(action, postId, button, comment) {
-        comment = comment || '';
-        
-        var originalText = button.html();
-        button.html('<span class="dashicons dashicons-update spin"></span> กำลังดำเนินการ...').prop('disabled', true);
-        
-        var ajaxAction = '';
-        switch(action) {
-            case 'approve_a':
-                ajaxAction = 'tpak_approve_batch';
-                break;
-            case 'approve_batch_supervisor':
-                ajaxAction = 'tpak_approve_batch_supervisor';
-                break;
-            case 'reject_b':
-            case 'reject_c':
-                ajaxAction = 'tpak_reject_batch';
-                break;
-            case 'finalize':
-                ajaxAction = 'tpak_finalize_batch';
-                break;
-        }
-        
-        $.ajax({
-            url: tpak_dq_ajax.ajax_url,
-            type: 'POST',
-            data: {
-                action: ajaxAction,
-                post_id: postId,
-                comment: comment,
-                nonce: tpak_dq_ajax.nonce
-            },
-            success: function(response) {
-                if (response.success) {
-                    showNotification(response.data.message, 'success');
-                    // Reload page to show updated status
-                    setTimeout(function() {
-                        location.reload();
-                    }, 1500);
-                } else {
-                    showNotification(response.data.message, 'error');
-                    button.html(originalText).prop('disabled', false);
-                }
-            },
-            error: function() {
-                showNotification('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
-                button.html(originalText).prop('disabled', false);
-            }
-        });
-    }
     
-    // Function to show reject dialog
-    function showRejectDialog(postId, button) {
-        var comment = prompt('กรุณากรอกเหตุผลในการส่งกลับ:');
+    // Global function to change status (admin) - accessible from outside jQuery ready
+    window.changeStatusAdmin = function(postId, newStatus, comment) {
+        console.log('changeStatusAdmin called with:', postId, newStatus, comment);
         
-        if (comment && comment.trim() !== '') {
-            var action = button.data('action');
-            performWorkflowAction(action, postId, button, comment.trim());
-        }
-    }
-    
-    // Status change functionality for response detail page
-    $(document).on('click', '.admin-change-status', function() {
-        var button = $(this);
-        var postId = button.data('id');
-        var newStatus = $('#status-select').val();
-        var comment = $('#admin-comment').val();
-        
-        if (!newStatus) {
-            showNotification('กรุณาเลือกสถานะใหม่', 'error');
-            return;
-        }
-        
-        if (confirm('คุณแน่ใจหรือไม่ที่จะเปลี่ยนสถานะ?')) {
-            changeStatus(postId, newStatus, comment);
-        }
-    });
-    
-    // Function to change status (admin)
-    function changeStatus(postId, newStatus, comment) {
+        var $ = jQuery;
         var button = $('.admin-change-status');
         var originalText = button.html();
         
         button.prop('disabled', true).html('<span class="dashicons dashicons-update spin"></span> กำลังเปลี่ยน...');
         
+        var requestData = {
+            action: 'tpak_admin_change_status',
+            post_id: postId,
+            new_status: newStatus,
+            comment: comment,
+            nonce: window.tpak_dq_ajax ? window.tpak_dq_ajax.nonce : ''
+        };
+        
+        console.log('AJAX request data:', requestData);
+        
+        var ajaxUrl = window.tpak_dq_ajax ? window.tpak_dq_ajax.ajax_url : (window.ajaxurl || '/wp-admin/admin-ajax.php');
+        console.log('AJAX URL:', ajaxUrl);
+        
         $.ajax({
-            url: tpak_dq_ajax.ajax_url,
+            url: ajaxUrl,
             type: 'POST',
-            data: {
-                action: 'tpak_admin_change_status',
-                post_id: postId,
-                new_status: newStatus,
-                comment: comment,
-                nonce: tpak_dq_ajax.nonce
-            },
+            data: requestData,
             success: function(response) {
+                console.log('AJAX success response:', response);
+                
                 if (response.success) {
                     showNotification(response.data.message, 'success');
+                    
                     // Reload page to show updated status
                     setTimeout(function() {
                         location.reload();
                     }, 1500);
                 } else {
-                    showNotification(response.data.message, 'error');
+                    showNotification(response.data.message || 'Unknown error', 'error');
                     button.prop('disabled', false).html(originalText);
                 }
             },
-            error: function() {
-                showNotification('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'error');
+            error: function(xhr, status, error) {
+                console.log('AJAX error:', xhr, status, error);
+                console.log('Response text:', xhr.responseText);
+                
+                showNotification('เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + error, 'error');
                 button.prop('disabled', false).html(originalText);
             }
         });
-    }
+    };
+    
+    // Global showNotification function
+    window.showNotification = function(message, type) {
+        var $ = jQuery;
+        var notification = $('<div class="notice notice-' + type + ' is-dismissible"><p>' + message + '</p></div>');
+        
+        $('.wp-header-end').after(notification);
+        
+        setTimeout(function() {
+            notification.fadeOut(function() {
+                $(this).remove();
+            });
+        }, 5000);
+    };
+});

@@ -10,13 +10,25 @@ if (!defined('ABSPATH')) {
 
 // Enqueue necessary scripts and styles
 wp_enqueue_script('jquery');
-wp_enqueue_script('tpak-dq-admin', TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/admin-script.js', array('jquery'), TPAK_DQ_SYSTEM_VERSION, true);
+wp_enqueue_script(
+    'tpak-dq-admin-script',
+    TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/admin-script.js',
+    array('jquery'),
+    TPAK_DQ_SYSTEM_VERSION,
+    true
+);
 wp_enqueue_style('tpak-dq-admin', TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/css/admin-style.css', array(), TPAK_DQ_SYSTEM_VERSION);
 
-wp_localize_script('tpak-dq-admin', 'tpak_dq_ajax', array(
+// Localize script with AJAX data
+wp_localize_script('tpak-dq-admin-script', 'tpak_dq_ajax', array(
     'ajax_url' => admin_url('admin-ajax.php'),
     'nonce' => wp_create_nonce('tpak_workflow_nonce')
 ));
+
+// Also add as global variables for backward compatibility
+wp_add_inline_script('tpak-dq-admin-script', '
+    window.ajaxurl = "' . admin_url('admin-ajax.php') . '";
+', 'before');
 
 // Get response ID from URL
 $response_id = isset($_GET['id']) ? absint($_GET['id']) : 0;
@@ -1459,19 +1471,208 @@ jQuery(document).ready(function($) {
     function escapeRegExp(string) {
         return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     }
+    
+    // Initialize the page after all variables are ready
+    initializeStatusChange();
 });
 
-// Ensure ajaxurl is available
-if (typeof ajaxurl === 'undefined') {
-    var ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
+// Status change functionality
+function initializeStatusChange() {
+    jQuery(document).ready(function($) {
+        console.log('Initializing status change functionality');
+        
+        // Admin status change
+        $(document).on('click', '.admin-change-status', function() {
+            console.log('Admin change status button clicked');
+            
+            var button = $(this);
+            var postId = button.data('id');
+            var newStatus = $('#status-select').val();
+            var comment = $('#admin-comment').val();
+            
+            console.log('Post ID:', postId, 'New Status:', newStatus, 'Comment:', comment);
+            
+            if (!newStatus) {
+                alert('<?php _e('กรุณาเลือกสถานะใหม่', 'tpak-dq-system'); ?>');
+                return;
+            }
+            
+            if (confirm('<?php _e('คุณแน่ใจหรือไม่ที่จะเปลี่ยนสถานะ?', 'tpak-dq-system'); ?>')) {
+                changeStatus(postId, newStatus, comment, 'admin_change');
+            }
+        });
+        
+        // Workflow action buttons
+        $(document).on('click', '.workflow-action-btn', function() {
+            var button = $(this);
+            var postId = button.data('id');
+            var action = button.data('action');
+            
+            console.log('Workflow action clicked:', action, 'for post:', postId);
+            
+            // Show comment section for reject actions
+            if (action.indexOf('reject') !== -1) {
+                $('.comment-section').show();
+                $('#action-comment').focus();
+                
+                // Change button text to confirm
+                button.text('<?php _e('ยืนยันการส่งกลับ', 'tpak-dq-system'); ?>');
+                button.off('click').on('click', function() {
+                    var comment = $('#action-comment').val().trim();
+                    if (!comment) {
+                        alert('<?php _e('กรุณากรอกความคิดเห็นสำหรับการส่งกลับ', 'tpak-dq-system'); ?>');
+                        return;
+                    }
+                    
+                    if (confirm('<?php _e('คุณแน่ใจหรือไม่ที่จะส่งกลับ?', 'tpak-dq-system'); ?>')) {
+                        performWorkflowAction(postId, action, comment);
+                    }
+                });
+            } else {
+                // For approve actions
+                if (confirm('<?php _e('คุณแน่ใจหรือไม่ที่จะดำเนินการนี้?', 'tpak-dq-system'); ?>')) {
+                    performWorkflowAction(postId, action, '');
+                }
+            }
+        });
+    });
 }
 
-// Ensure jQuery is loaded
-if (typeof jQuery === 'undefined') {
-    console.error('jQuery is not loaded!');
-} else {
-    console.log('jQuery is available, version:', jQuery.fn.jquery);
-}(this).val().toLowerCase();
+// Function to change status (admin)
+function changeStatus(postId, newStatus, comment, actionType) {
+    console.log('changeStatus called with:', postId, newStatus, comment, actionType);
+    
+    var $ = jQuery;
+    var button = $('.admin-change-status');
+    var originalText = button.html();
+    
+    button.prop('disabled', true).html('<span class="dashicons dashicons-update spin"></span> <?php _e('กำลังเปลี่ยน...', 'tpak-dq-system'); ?>');
+    
+    var requestData = {
+        action: 'tpak_admin_change_status',
+        post_id: postId,
+        new_status: newStatus,
+        comment: comment,
+        nonce: window.tpak_dq_ajax.nonce
+    };
+    
+    console.log('AJAX request data:', requestData);
+    console.log('AJAX URL:', window.ajaxurl);
+    
+    $.ajax({
+        url: window.ajaxurl,
+        type: 'POST',
+        data: requestData,
+        success: function(response) {
+            console.log('AJAX success response:', response);
+            
+            if (response.success) {
+                // Show success message
+                showNotification('success', response.data.message);
+                
+                // Reload page to show updated status
+                setTimeout(function() {
+                    location.reload();
+                }, 1500);
+            } else {
+                showNotification('error', response.data.message || 'Unknown error');
+                button.prop('disabled', false).html(originalText);
+            }
+        },
+        error: function(xhr, status, error) {
+            console.log('AJAX error:', xhr, status, error);
+            showNotification('error', '<?php _e('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'tpak-dq-system'); ?>: ' + error);
+            button.prop('disabled', false).html(originalText);
+        }
+    });
+}
+
+// Function to perform workflow action
+function performWorkflowAction(postId, action, comment) {
+    var $ = jQuery;
+    var button = $('.workflow-action-btn[data-action="' + action + '"]');
+    var originalText = button.html();
+    
+    button.prop('disabled', true).html('<span class="dashicons dashicons-update spin"></span> <?php _e('กำลังดำเนินการ...', 'tpak-dq-system'); ?>');
+    
+    var ajaxAction = '';
+    switch(action) {
+        case 'approve_a':
+            ajaxAction = 'tpak_approve_batch';
+            break;
+        case 'approve_batch_supervisor':
+            ajaxAction = 'tpak_approve_batch_supervisor';
+            break;
+        case 'reject_b':
+        case 'reject_c':
+            ajaxAction = 'tpak_reject_batch';
+            break;
+        case 'finalize':
+            ajaxAction = 'tpak_finalize_batch';
+            break;
+    }
+    
+    $.ajax({
+        url: window.ajaxurl,
+        type: 'POST',
+        data: {
+            action: ajaxAction,
+            post_id: postId,
+            comment: comment,
+            nonce: window.tpak_dq_ajax.nonce
+        },
+        success: function(response) {
+            if (response.success) {
+                showNotification('success', response.data.message);
+                
+                // Reload page to show updated status
+                setTimeout(function() {
+                    location.reload();
+                }, 1500);
+            } else {
+                showNotification('error', response.data.message);
+                button.prop('disabled', false).html(originalText);
+            }
+        },
+        error: function() {
+            showNotification('error', '<?php _e('เกิดข้อผิดพลาดในการเชื่อมต่อ', 'tpak-dq-system'); ?>');
+            button.prop('disabled', false).html(originalText);
+        }
+    });
+}
+
+// Function to show notifications
+function showNotification(type, message) {
+    var $ = jQuery;
+    var notificationClass = type === 'success' ? 'notice-success' : 'notice-error';
+    var notification = $('<div class="notice ' + notificationClass + ' is-dismissible"><p>' + message + '</p></div>');
+    
+    $('.wrap').prepend(notification);
+    
+    // Auto dismiss after 5 seconds
+    setTimeout(function() {
+        notification.fadeOut();
+    }, 5000);
+}
+
+// Wait for variables to be available
+jQuery(document).ready(function($) {
+    // Ensure ajaxurl is available
+    if (typeof window.ajaxurl === 'undefined') {
+        window.ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
+    }
+    
+    // Ensure tpak_dq_ajax is available
+    if (typeof window.tpak_dq_ajax === 'undefined') {
+        window.tpak_dq_ajax = {
+            ajax_url: '<?php echo admin_url('admin-ajax.php'); ?>',
+            nonce: '<?php echo wp_create_nonce('tpak_workflow_nonce'); ?>'
+        };
+    }
+    
+    console.log('TPAK DQ: Variables initialized');
+    console.log('ajaxurl:', window.ajaxurl);
+    console.log('tpak_dq_ajax:', window.tpak_dq_ajax);(this).val().toLowerCase();
         
         if (searchTerm === '') {
             $('.question-section').removeClass('filtered-out');
