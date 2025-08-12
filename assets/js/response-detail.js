@@ -42,8 +42,8 @@ jQuery(document).ready(function($) {
         }
     });
     
-    // Workflow action buttons
-    $(document).on('click', '.workflow-action-btn', function(e) {
+    // Workflow action buttons (support multiple class names)
+    $(document).on('click', '.workflow-action-btn, .tpak-action-btn', function(e) {
         e.preventDefault();
         console.log('Workflow action button clicked');
         
@@ -52,6 +52,19 @@ jQuery(document).ready(function($) {
         var action = button.data('action');
         
         console.log('Action:', action, 'Post ID:', postId);
+        console.log('Button classes:', button.attr('class'));
+        
+        if (!action) {
+            console.error('No action data found on button');
+            alert('ไม่พบข้อมูล action บนปุ่ม');
+            return;
+        }
+        
+        if (!postId) {
+            console.error('No post ID data found on button');
+            alert('ไม่พบข้อมูล post ID บนปุ่ม');
+            return;
+        }
         
         // Show comment section for reject actions
         if (action.indexOf('reject') !== -1) {
@@ -59,8 +72,12 @@ jQuery(document).ready(function($) {
             $('#action-comment').focus();
             
             // Change button text to confirm
-            button.text('ยืนยันการส่งกลับ');
-            button.off('click').on('click', function() {
+            var originalHtml = button.html();
+            button.html('<span class="dashicons dashicons-no"></span> ยืนยันการส่งกลับ');
+            
+            // Remove previous click handlers and add new one
+            button.off('click.reject').on('click.reject', function(e) {
+                e.preventDefault();
                 var comment = $('#action-comment').val().trim();
                 if (!comment) {
                     alert('กรุณากรอกความคิดเห็นสำหรับการส่งกลับ');
@@ -140,7 +157,13 @@ jQuery(document).ready(function($) {
     function performWorkflowAction(postId, action, comment) {
         console.log('performWorkflowAction called with:', postId, action, comment);
         
-        var button = $('.workflow-action-btn[data-action="' + action + '"]');
+        // Find button by multiple possible selectors
+        var button = $('.workflow-action-btn[data-action="' + action + '"], .tpak-action-btn[data-action="' + action + '"]');
+        if (button.length === 0) {
+            console.error('Button not found for action:', action);
+            button = $('.workflow-action-btn, .tpak-action-btn').first(); // Fallback to first button
+        }
+        
         var originalText = button.html();
         
         button.prop('disabled', true).html('<span class="dashicons dashicons-update spin"></span> กำลังดำเนินการ...');
@@ -160,7 +183,14 @@ jQuery(document).ready(function($) {
             case 'finalize':
                 ajaxAction = 'tpak_finalize_batch';
                 break;
+            default:
+                console.error('Unknown action:', action);
+                showNotification('error', 'ไม่รู้จัก action: ' + action);
+                button.prop('disabled', false).html(originalText);
+                return;
         }
+        
+        console.log('Mapped AJAX action:', ajaxAction);
         
         // Get nonce and AJAX URL with fallbacks
         var nonce = (window.tpak_dq_ajax && window.tpak_dq_ajax.nonce) ? 
@@ -170,15 +200,20 @@ jQuery(document).ready(function($) {
                       window.tpak_dq_ajax.ajax_url : 
                       (window.ajaxurl || '/wp-admin/admin-ajax.php');
         
+        var requestData = {
+            action: ajaxAction,
+            post_id: postId,
+            comment: comment,
+            nonce: nonce
+        };
+        
+        console.log('Workflow AJAX request:', requestData);
+        console.log('AJAX URL:', ajaxUrl);
+        
         $.ajax({
             url: ajaxUrl,
             type: 'POST',
-            data: {
-                action: ajaxAction,
-                post_id: postId,
-                comment: comment,
-                nonce: nonce
-            },
+            data: requestData,
             success: function(response) {
                 console.log('Workflow action response:', response);
                 
@@ -190,13 +225,14 @@ jQuery(document).ready(function($) {
                         location.reload();
                     }, 1500);
                 } else {
-                    showNotification('error', response.data.message);
+                    showNotification('error', response.data.message || 'Unknown error');
                     button.prop('disabled', false).html(originalText);
                 }
             },
             error: function(xhr, status, error) {
                 console.log('Workflow action error:', xhr, status, error);
-                showNotification('error', 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                console.log('Response text:', xhr.responseText);
+                showNotification('error', 'เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + error);
                 button.prop('disabled', false).html(originalText);
             }
         });
