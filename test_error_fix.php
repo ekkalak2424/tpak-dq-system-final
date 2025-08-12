@@ -4,7 +4,27 @@
  */
 
 // Include WordPress
-require_once('../../../wp-config.php');
+// Try different paths to find wp-config.php
+$wp_config_paths = array(
+    '../../../wp-config.php',
+    '../../../../wp-config.php',
+    '../../../../../wp-config.php',
+    dirname(__FILE__) . '/../../../wp-config.php',
+    dirname(__FILE__) . '/../../../../wp-config.php'
+);
+
+$wp_loaded = false;
+foreach ($wp_config_paths as $path) {
+    if (file_exists($path)) {
+        require_once($path);
+        $wp_loaded = true;
+        break;
+    }
+}
+
+if (!$wp_loaded) {
+    die('Cannot find wp-config.php. Please check the file path.');
+}
 
 // Check if user is logged in and has admin privileges
 if (!is_user_logged_in() || !current_user_can('manage_options')) {
