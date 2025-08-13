@@ -27,7 +27,11 @@ if (!defined('ABSPATH')) {
                            value="<?php echo esc_attr($options['limesurvey_url'] ?? ''); ?>" 
                            class="regular-text" />
                     <p class="description">
-                        <?php _e('กรอก URL ของ LimeSurvey installation (เช่น: https://survey.example.com)', 'tpak-dq-system'); ?>
+                        <?php _e('กรอก URL ของ LimeSurvey RemoteControl API', 'tpak-dq-system'); ?><br>
+                        <strong><?php _e('ตัวอย่าง:', 'tpak-dq-system'); ?></strong> 
+                        <code>https://limesurvey.tpak.or.th/index.php/admin/remotecontrol</code><br>
+                        <em><?php _e('หรือ:', 'tpak-dq-system'); ?></em> 
+                        <code>https://your-domain.com/admin/remotecontrol</code>
                     </p>
                 </div>
                 

@@ -42,22 +42,33 @@ class TPAK_DQ_Validator {
             return array('valid' => false, 'message' => __('Invalid URL format', 'tpak-dq-system'));
         }
         
-        // Check for required endpoints
+        // Check for required endpoints (more flexible matching)
         if (!empty($required_endpoints)) {
             $url_clean = rtrim($url, '/');
             $endpoint_found = false;
             
             foreach ($required_endpoints as $endpoint) {
-                if (strpos($url_clean, $endpoint) !== false) {
+                // More flexible endpoint matching
+                $endpoint_clean = trim($endpoint, '/');
+                
+                // Check if URL contains the endpoint pattern
+                if (strpos($url_clean, $endpoint_clean) !== false) {
+                    $endpoint_found = true;
+                    break;
+                }
+                
+                // Also check for common variations
+                if (strpos($url_clean, 'remotecontrol') !== false) {
                     $endpoint_found = true;
                     break;
                 }
             }
             
             if (!$endpoint_found) {
+                // More user-friendly error message
                 return array(
                     'valid' => false, 
-                    'message' => sprintf(__('URL must contain one of these endpoints: %s', 'tpak-dq-system'), implode(', ', $required_endpoints))
+                    'message' => __('URL should be a LimeSurvey RemoteControl API endpoint (e.g., https://your-limesurvey.com/index.php/admin/remotecontrol)', 'tpak-dq-system')
                 );
             }
         }

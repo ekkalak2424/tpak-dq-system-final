@@ -665,7 +665,7 @@ class TPAK_DQ_Admin_Menu {
         if (!empty($input['limesurvey_url'])) {
             $url_validation = TPAK_DQ_Validator::validate_url(
                 $input['limesurvey_url'], 
-                array('/admin/remotecontrol', '/index.php/admin/remotecontrol')
+                array('/admin/remotecontrol', '/index.php/admin/remotecontrol', 'remotecontrol')
             );
             if (!$url_validation['valid']) {
                 $errors[] = $url_validation['message'];
