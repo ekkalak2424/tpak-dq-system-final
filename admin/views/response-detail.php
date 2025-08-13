@@ -67,62 +67,216 @@ $workflow = new TPAK_DQ_Workflow();
 $status = $workflow->get_batch_status($response_id);
 $audit_trail = $workflow->get_audit_trail($response_id);
 
-// Enhanced Question Organization with Smart Display Names
-function generateDisplayName($field_key) {
-    // Thai-friendly patterns for common survey fields
-    $patterns = [
-        '/^Q(\d+)$/' => 'คำถามที่ $1',
-        '/^Q(\d+)([A-Z])(\d*)$/' => 'คำถามที่ $1 ข้อย่อย $2$3',
-        '/^(\d+)([a-z]+)?$/' => 'คำถามที่ $1$2',
-        '/name/i' => 'ชื่อ',
-        '/firstname/i' => 'ชื่อจริง',
-        '/lastname/i' => 'นามสกุล',
-        '/age/i' => 'อายุ',
-        '/birth/i' => 'วันเกิด',
-        '/address/i' => 'ที่อยู่',
-        '/phone/i' => 'เบอร์โทรศัพท์',
-        '/email/i' => 'อีเมล',
-        '/gender/i' => 'เพศ',
-        '/education/i' => 'การศึกษา',
-        '/occupation/i' => 'อาชีพ',
-        '/income/i' => 'รายได้',
-        '/province/i' => 'จังหวัด',
-        '/district/i' => 'อำเภอ',
-        '/subdistrict/i' => 'ตำบล',
-        '/postal/i' => 'รหัสไปรษณีย์'
+// Advanced Question Mapping System
+class TPAK_Question_Mapper {
+    
+    private static $common_patterns = [
+        // Personal Information
+        '/^(name|firstname|first_name)$/i' => 'ชื่อจริง',
+        '/^(lastname|last_name|surname)$/i' => 'นามสกุล',
+        '/^(fullname|full_name)$/i' => 'ชื่อ-นามสกุล',
+        '/^(nickname|nick_name)$/i' => 'ชื่อเล่น',
+        '/^(age|อายุ)$/i' => 'อายุ',
+        '/^(birth|birthday|birthdate|birth_date|วันเกิด)$/i' => 'วันเกิด',
+        '/^(gender|sex|เพศ)$/i' => 'เพศ',
+        '/^(id|id_card|citizen_id|บัตรประชาชน)$/i' => 'เลขบัตรประชาชน',
+        '/^(nationality|สัญชาติ)$/i' => 'สัญชาติ',
+        '/^(religion|ศาสนา)$/i' => 'ศาสนา',
+        '/^(marital|marital_status|สถานภาพ)$/i' => 'สถานภาพสมรส',
+        
+        // Contact Information  
+        '/^(phone|tel|telephone|mobile|โทรศัพท์)$/i' => 'เบอร์โทรศัพท์',
+        '/^(email|e_mail|อีเมล)$/i' => 'อีเมล',
+        '/^(address|ที่อยู่)$/i' => 'ที่อยู่',
+        '/^(province|จังหวัด)$/i' => 'จังหวัด',
+        '/^(district|อำเภอ)$/i' => 'อำเภอ/เขต',
+        '/^(subdistrict|tambon|ตำบล)$/i' => 'ตำบล/แขวง',
+        '/^(postal|postcode|zip|รหัสไปรษณีย์)$/i' => 'รหัสไปรษณีย์',
+        
+        // Education
+        '/^(education|การศึกษา)$/i' => 'ระดับการศึกษา',
+        '/^(school|โรงเรียน)$/i' => 'โรงเรียน',
+        '/^(university|มหาวิทยาลัย)$/i' => 'มหาวิทยาลัย',
+        '/^(degree|ปริญญา)$/i' => 'ระดับปริญญา',
+        '/^(major|สาขา)$/i' => 'สาขาวิชา',
+        '/^(gpa|เกรด)$/i' => 'เกรดเฉลี่ย',
+        
+        // Work
+        '/^(job|work|occupation|อาชีพ)$/i' => 'อาชีพ',
+        '/^(company|บริษัท)$/i' => 'บริษัท/หน่วยงาน',
+        '/^(position|ตำแหน่ง)$/i' => 'ตำแหน่งงาน',
+        '/^(income|salary|เงินเดือน|รายได้)$/i' => 'รายได้',
+        '/^(experience|ประสบการณ์)$/i' => 'ประสบการณ์การทำงาน',
+        
+        // Survey specific patterns
+        '/^Q(\d+)$/i' => 'คำถามที่ $1',
+        '/^Q(\d+)([A-Z])(\d*)$/i' => 'คำถามที่ $1 ข้อย่อย $2$3',
+        '/^(\d+)([a-z]+)?$/i' => 'คำถามที่ $1$2',
     ];
     
-    foreach ($patterns as $pattern => $replacement) {
-        if (preg_match($pattern, $field_key)) {
-            return preg_replace($pattern, $replacement, $field_key);
+    private static $value_mappings = [
+        // Gender mappings
+        'gender' => [
+            'M' => 'ชาย', 'Male' => 'ชาย', '1' => 'ชาย', 'male' => 'ชาย',
+            'F' => 'หญิง', 'Female' => 'หญิง', '2' => 'หญิง', 'female' => 'หญิง',
+            'O' => 'อื่นๆ', 'Other' => 'อื่นๆ', '3' => 'อื่นๆ', 'other' => 'อื่นๆ'
+        ],
+        
+        // Yes/No mappings
+        'yesno' => [
+            'Y' => 'ใช่', 'Yes' => 'ใช่', '1' => 'ใช่', 'yes' => 'ใช่', 'true' => 'ใช่',
+            'N' => 'ไม่ใช่', 'No' => 'ไม่ใช่', '0' => 'ไม่ใช่', 'no' => 'ไม่ใช่', 'false' => 'ไม่ใช่'
+        ],
+        
+        // Education level mappings
+        'education' => [
+            '1' => 'ประถมศึกษา',
+            '2' => 'มัธยมศึกษาตอนต้น', 
+            '3' => 'มัธยมศึกษาตอนปลาย',
+            '4' => 'ปวช./ปวส.',
+            '5' => 'ปริญญาตรี',
+            '6' => 'ปริญญาโท',
+            '7' => 'ปริญญาเอก'
+        ],
+        
+        // Marital status mappings
+        'marital' => [
+            '1' => 'โสด', 'single' => 'โสด',
+            '2' => 'สมรส', 'married' => 'สมรส', 
+            '3' => 'หย่าร้าง', 'divorced' => 'หย่าร้าง',
+            '4' => 'หม้าย', 'widowed' => 'หม้าย'
+        ]
+    ];
+    
+    public static function getQuestionLabel($field_key, $survey_id = null) {
+        // Try to get from database first (if we have survey structure)
+        if ($survey_id) {
+            $cached_label = self::getCachedQuestionLabel($field_key, $survey_id);
+            if ($cached_label) {
+                return $cached_label;
+            }
+        }
+        
+        // Use pattern matching
+        foreach (self::$common_patterns as $pattern => $replacement) {
+            if (preg_match($pattern, $field_key)) {
+                return preg_replace($pattern, $replacement, $field_key);
+            }
+        }
+        
+        // Fallback: clean up field key
+        return self::cleanFieldKey($field_key);
+    }
+    
+    public static function getAnswerValue($field_key, $raw_value, $context = null) {
+        if (empty($raw_value) && $raw_value !== '0') {
+            return $raw_value;
+        }
+        
+        // Detect answer type from field key
+        $answer_type = self::detectAnswerType($field_key);
+        
+        if (isset(self::$value_mappings[$answer_type][$raw_value])) {
+            return self::$value_mappings[$answer_type][$raw_value];
+        }
+        
+        // Try to format common value types
+        return self::formatValue($raw_value, $answer_type);
+    }
+    
+    private static function detectAnswerType($field_key) {
+        $field_lower = strtolower($field_key);
+        
+        if (preg_match('/(gender|sex|เพศ)/', $field_lower)) return 'gender';
+        if (preg_match('/(yes|no|agree|disagree)/', $field_lower)) return 'yesno';
+        if (preg_match('/(education|การศึกษา)/', $field_lower)) return 'education';
+        if (preg_match('/(marital|สถานภาพ)/', $field_lower)) return 'marital';
+        
+        return 'text';
+    }
+    
+    private static function formatValue($value, $type) {
+        switch ($type) {
+            case 'text':
+                // Format long text
+                if (strlen($value) > 100) {
+                    return nl2br(esc_html($value));
+                }
+                return esc_html($value);
+                
+            case 'number':
+                if (is_numeric($value)) {
+                    return number_format($value);
+                }
+                return $value;
+                
+            case 'date':
+                if (preg_match('/^\d{4}-\d{2}-\d{2}/', $value)) {
+                    return date('j F Y', strtotime($value));
+                }
+                return $value;
+                
+            default:
+                return esc_html($value);
         }
     }
     
-    // Fallback: clean up field key
-    $clean = str_replace(['_', '-'], ' ', $field_key);
-    return ucfirst(trim($clean));
+    private static function cleanFieldKey($field_key) {
+        // Remove common prefixes/suffixes
+        $clean = preg_replace('/^(Q|question|ans|answer)_?/i', '', $field_key);
+        $clean = str_replace(['_', '-'], ' ', $clean);
+        $clean = ucwords(strtolower($clean));
+        
+        return $clean ?: $field_key;
+    }
+    
+    private static function getCachedQuestionLabel($field_key, $survey_id) {
+        // This would query a cache table or API
+        // For now, return null to use pattern matching
+        return null;
+    }
+    
+    public static function getQuestionCategory($field_key) {
+        $field_lower = strtolower($field_key);
+        
+        $categories = [
+            'personal' => ['name', 'age', 'birth', 'gender', 'id', 'nationality', 'religion', 'marital'],
+            'contact' => ['phone', 'email', 'address', 'province', 'district', 'postal', 'tel'],
+            'education' => ['school', 'university', 'degree', 'grade', 'education', 'major', 'gpa'],
+            'work' => ['job', 'work', 'occupation', 'company', 'position', 'income', 'salary', 'experience'],
+            'survey' => ['Q', 'question', 'answer', 'opinion', 'rating', 'score']
+        ];
+        
+        foreach ($categories as $category => $keywords) {
+            foreach ($keywords as $keyword) {
+                if (strpos($field_lower, $keyword) !== false) {
+                    return $category;
+                }
+            }
+        }
+        
+        return 'other';
+    }
+}
+
+// Include the advanced question mapper
+require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-question-mapper.php';
+
+// Initialize the advanced mapper
+$question_mapper = TPAK_Advanced_Question_Mapper::getInstance();
+$response_mapping = $question_mapper->getResponseMapping($response_data, $lime_survey_id);
+
+// Enhanced Question Organization with Smart Display Names
+function generateDisplayName($field_key) {
+    global $response_mapping;
+    return isset($response_mapping['questions'][$field_key]) ? 
+        $response_mapping['questions'][$field_key]['display_name'] : $field_key;
 }
 
 function guessCategory($field_key) {
-    $field_lower = strtolower($field_key);
-    
-    $categories = [
-        'personal' => ['name', 'age', 'birth', 'gender', 'id', 'firstname', 'lastname'],
-        'contact' => ['phone', 'email', 'address', 'province', 'district', 'postal'],
-        'education' => ['school', 'university', 'degree', 'grade', 'education'],
-        'work' => ['job', 'occupation', 'work', 'income', 'salary', 'company'],
-        'survey' => ['Q', 'question', 'answer']
-    ];
-    
-    foreach ($categories as $category => $keywords) {
-        foreach ($keywords as $keyword) {
-            if (strpos($field_lower, $keyword) !== false) {
-                return $category;
-            }
-        }
-    }
-    
-    return 'other';
+    global $response_mapping;
+    return isset($response_mapping['questions'][$field_key]) ? 
+        $response_mapping['questions'][$field_key]['category'] : 'other';
 }
 
 // Organize questions by groups/sections with enhanced logic
@@ -393,16 +547,88 @@ $question_labels = array(); // Keep for backward compatibility
                 </h2>
                 
                 <?php if (current_user_can('manage_options')): ?>
-                    <!-- Debug Info for Admins -->
-                    <details style="margin-bottom: 20px; padding: 10px; background: #f0f0f1; border-radius: 4px;">
-                        <summary style="cursor: pointer; font-weight: bold;">🔧 Debug Information (Admin Only)</summary>
-                        <div style="margin-top: 10px; font-size: 12px;">
-                            <p><strong>Raw Response Data Keys:</strong> <?php echo $response_data ? implode(', ', array_keys($response_data)) : 'None'; ?></p>
-                            <p><strong>Organized Data Keys:</strong> <?php echo implode(', ', array_keys($organized_data)); ?></p>
-                            <p><strong>Other Data Keys:</strong> <?php echo implode(', ', array_keys($other_data)); ?></p>
-                            <p><strong>Total Response Fields:</strong> <?php echo $response_data ? count($response_data) : 0; ?></p>
+                    <!-- Survey Analysis Dashboard -->
+                    <div class="survey-analysis-dashboard" style="margin-bottom: 20px;">
+                        <div class="analysis-cards">
+                            <div class="analysis-card structure-card">
+                                <div class="card-header">
+                                    <span class="dashicons dashicons-chart-bar"></span>
+                                    <h4>โครงสร้างแบบสอบถาม</h4>
+                                </div>
+                                <div class="card-content">
+                                    <div class="structure-info">
+                                        <span class="structure-type <?php echo $response_mapping['structure']['type']; ?>">
+                                            <?php 
+                                            $structure_names = [
+                                                'limesurvey' => 'LimeSurvey Standard',
+                                                'numeric' => 'ตัวเลขเรียงลำดับ',
+                                                'descriptive' => 'ชื่อบรรยาย',
+                                                'mixed' => 'รูปแบบผสม'
+                                            ];
+                                            echo $structure_names[$response_mapping['structure']['type']] ?? 'ไม่ทราบ';
+                                            ?>
+                                        </span>
+                                        <span class="complexity-badge <?php echo $response_mapping['structure']['complexity']; ?>">
+                                            <?php 
+                                            $complexity_names = [
+                                                'simple' => 'เรียบง่าย',
+                                                'moderate' => 'ปานกลาง', 
+                                                'complex' => 'ซับซ้อน'
+                                            ];
+                                            echo $complexity_names[$response_mapping['structure']['complexity']] ?? 'ไม่ทราบ';
+                                            ?>
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="analysis-card mapping-card">
+                                <div class="card-header">
+                                    <span class="dashicons dashicons-admin-tools"></span>
+                                    <h4>คุณภาพการแปลง</h4>
+                                </div>
+                                <div class="card-content">
+                                    <div class="confidence-meter">
+                                        <div class="confidence-bar">
+                                            <div class="confidence-fill" style="width: <?php echo ($response_mapping['statistics']['confidence_average'] * 100); ?>%"></div>
+                                        </div>
+                                        <span class="confidence-text">
+                                            <?php echo round($response_mapping['statistics']['confidence_average'] * 100); ?>% ความแม่นยำ
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="analysis-card completion-card">
+                                <div class="card-header">
+                                    <span class="dashicons dashicons-yes-alt"></span>
+                                    <h4>ความสมบูรณ์</h4>
+                                </div>
+                                <div class="card-content">
+                                    <div class="completion-stats">
+                                        <div class="completion-number"><?php echo $response_mapping['statistics']['completion_rate']; ?>%</div>
+                                        <div class="completion-detail">
+                                            <?php echo $response_mapping['statistics']['answered_questions']; ?> / 
+                                            <?php echo $response_mapping['statistics']['total_questions']; ?> คำถาม
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </details>
+                    </div>
+                    
+                    <?php if (current_user_can('manage_options')): ?>
+                        <!-- Debug Info for Admins -->
+                        <details style="margin-bottom: 20px; padding: 10px; background: #f0f0f1; border-radius: 4px;">
+                            <summary style="cursor: pointer; font-weight: bold;">🔧 Debug Information (Admin Only)</summary>
+                            <div style="margin-top: 10px; font-size: 12px;">
+                                <p><strong>Survey Structure:</strong> <?php echo json_encode($response_mapping['structure'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE); ?></p>
+                                <p><strong>Statistics:</strong> <?php echo json_encode($response_mapping['statistics'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE); ?></p>
+                                <p><strong>Categories:</strong> <?php echo implode(', ', array_keys($response_mapping['statistics']['categories'])); ?></p>
+                                <p><strong>Raw Response Data Keys:</strong> <?php echo $response_data ? implode(', ', array_keys($response_data)) : 'None'; ?></p>
+                            </div>
+                        </details>
+                    <?php endif; ?>
                 <?php endif; ?>
                 
                 <?php if (!empty($organized_data)): ?>
@@ -480,7 +706,13 @@ $question_labels = array(); // Keep for backward compatibility
                                             <?php _e('คำตอบหลัก:', 'tpak-dq-system'); ?>
                                         </div>
                                         <div class="answer-value">
-                                            <?php echo nl2br(esc_html($question_data['main'])); ?>
+                                            <?php 
+                                            if (isset($response_mapping['questions'][$question_key])) {
+                                                echo $response_mapping['questions'][$question_key]['formatted_value'];
+                                            } else {
+                                                echo nl2br(esc_html($question_data['main']));
+                                            }
+                                            ?>
                                         </div>
                                     </div>
                                 <?php endif; ?>
@@ -508,7 +740,13 @@ $question_labels = array(); // Keep for backward compatibility
                                                         </span>
                                                     </div>
                                                     <div class="sub-question-value">
-                                                        <?php echo nl2br(esc_html($sub_value)); ?>
+                                                        <?php 
+                                                        if (isset($response_mapping['questions'][$sub_key])) {
+                                                            echo $response_mapping['questions'][$sub_key]['formatted_value'];
+                                                        } else {
+                                                            echo nl2br(esc_html($sub_value));
+                                                        }
+                                                        ?>
                                                     </div>
                                                 </div>
                                             <?php endforeach; ?>
