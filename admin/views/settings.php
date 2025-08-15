@@ -28,10 +28,10 @@ if (!defined('ABSPATH')) {
                            class="regular-text" />
                     <p class="description">
                         <?php _e('กรอก URL ของ LimeSurvey RemoteControl API', 'tpak-dq-system'); ?><br>
-                        <strong><?php _e('ตัวอย่าง:', 'tpak-dq-system'); ?></strong> 
-                        <code>https://limesurvey.tpak.or.th/index.php/admin/remotecontrol</code><br>
-                        <em><?php _e('หรือ:', 'tpak-dq-system'); ?></em> 
-                        <code>https://your-domain.com/admin/remotecontrol</code>
+                        <strong><?php _e('สำหรับ TPAK:', 'tpak-dq-system'); ?></strong> 
+                        <code>https://limesurvey.tpak.or.th/index.php?r=admin/remotecontrol</code><br>
+                        <em><?php _e('รูปแบบอื่น:', 'tpak-dq-system'); ?></em> 
+                        <code>https://your-domain.com/index.php/admin/remotecontrol</code>
                     </p>
                 </div>
                 
