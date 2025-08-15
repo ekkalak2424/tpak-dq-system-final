@@ -53,73 +53,158 @@ if ($current_url === $correct_url) {
 // Test the API connection with correct URL
 echo "<h3>🧪 Testing API Connection:</h3>";
 
-// Include the API handler
-require_once 'includes/class-api-handler.php';
-
-$api = new TPAK_DQ_API_Handler();
-$test_result = $api->test_connection();
-
-if ($test_result['success']) {
-    echo "<div style='background: #d4edda; padding: 15px; border-radius: 5px; color: #155724;'>";
-    echo "✅ <strong>API Connection Successful!</strong><br>";
-    echo "Message: " . esc_html($test_result['message']);
+// Try to include and test the API handler class
+$api_test_success = false;
+try {
+    if (file_exists('includes/class-api-handler.php')) {
+        require_once 'includes/class-api-handler.php';
+        $api = new TPAK_DQ_API_Handler();
+        $api_test_success = $api->test_connection();
+        
+        if ($api_test_success) {
+            echo "<div style='background: #d4edda; padding: 15px; border-radius: 5px; color: #155724;'>";
+            echo "✅ <strong>API Handler Class Test: SUCCESS</strong>";
+            echo "</div>";
+        } else {
+            echo "<div style='background: #fff3cd; padding: 15px; border-radius: 5px; color: #856404;'>";
+            echo "⚠️ <strong>API Handler Class Test: FAILED</strong> - Will try manual test";
+            echo "</div>";
+        }
+    } else {
+        echo "<div style='background: #fff3cd; padding: 15px; border-radius: 5px; color: #856404;'>";
+        echo "⚠️ <strong>API Handler Class not found</strong> - Will try manual test";
+        echo "</div>";
+    }
+} catch (Exception $e) {
+    echo "<div style='background: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24;'>";
+    echo "❌ <strong>API Handler Error:</strong> " . esc_html($e->getMessage());
     echo "</div>";
+}
+
+// Manual API test as fallback
+$api_url = $correct_url;
+$username = 'admin';
+$password = 'tpakOwen21';
+
+// Test session key
+$request_data = array(
+    'method' => 'get_session_key',
+    'params' => array(
+        'username' => $username,
+        'password' => $password
+    ),
+    'id' => 1
+);
+
+$args = array(
+    'body' => json_encode($request_data),
+    'headers' => array(
+        'Content-Type' => 'application/json',
+        'Accept' => 'application/json'
+    ),
+    'timeout' => 30
+);
+
+$response = wp_remote_post($api_url, $args);
+
+if (is_wp_error($response)) {
+    echo "<div style='background: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24;'>";
+    echo "❌ <strong>API Connection Failed:</strong> " . $response->get_error_message();
+    echo "</div>";
+} else {
+    $response_code = wp_remote_retrieve_response_code($response);
+    $response_body = wp_remote_retrieve_body($response);
+    $data = json_decode($response_body, true);
     
-    // Try to get surveys list
-    echo "<h4>📋 Getting Surveys List:</h4>";
-    $surveys = $api->get_surveys();
-    
-    if ($surveys && is_array($surveys)) {
-        $survey_count = count($surveys);
+    if ($data && isset($data['result']) && is_string($data['result'])) {
+        $session_key = $data['result'];
         echo "<div style='background: #d4edda; padding: 15px; border-radius: 5px; color: #155724;'>";
-        echo "✅ <strong>Found $survey_count surveys</strong>";
+        echo "✅ <strong>API Connection Successful!</strong><br>";
+        echo "Session Key: " . esc_html(substr($session_key, 0, 10)) . "...";
         echo "</div>";
         
-        // Look for the target survey
-        $target_survey_id = '734631';
-        $target_survey = null;
+        // Test surveys list
+        echo "<h4>📋 Getting Surveys List:</h4>";
         
-        foreach ($surveys as $survey) {
-            if ($survey['sid'] == $target_survey_id) {
-                $target_survey = $survey;
-                break;
-            }
-        }
+        $surveys_request = array(
+            'method' => 'list_surveys',
+            'params' => array(
+                'sSessionKey' => $session_key,
+                'sUsername' => $username
+            ),
+            'id' => 1
+        );
         
-        if ($target_survey) {
-            echo "<div style='background: #d1ecf1; padding: 15px; border-radius: 5px; color: #0c5460; margin: 10px 0;'>";
-            echo "🎯 <strong>Target Survey Found:</strong><br>";
-            echo "ID: " . esc_html($target_survey['sid']) . "<br>";
-            echo "Title: " . esc_html($target_survey['surveyls_title']) . "<br>";
-            echo "Active: " . ($target_survey['active'] == 'Y' ? '✅ Yes' : '❌ No');
-            echo "</div>";
+        $args['body'] = json_encode($surveys_request);
+        $surveys_response = wp_remote_post($api_url, $args);
+        
+        if (!is_wp_error($surveys_response)) {
+            $surveys_body = wp_remote_retrieve_body($surveys_response);
+            $surveys_data = json_decode($surveys_body, true);
             
-            if ($target_survey['active'] == 'Y') {
+            if ($surveys_data && isset($surveys_data['result']) && is_array($surveys_data['result'])) {
+                $surveys = $surveys_data['result'];
+                $survey_count = count($surveys);
+                
                 echo "<div style='background: #d4edda; padding: 15px; border-radius: 5px; color: #155724;'>";
-                echo "🚀 <strong>Ready for Import!</strong> The survey is active and accessible.";
+                echo "✅ <strong>Found $survey_count surveys</strong>";
                 echo "</div>";
+                
+                // Look for target survey
+                $target_survey_id = '734631';
+                $target_survey = null;
+                
+                foreach ($surveys as $survey) {
+                    if ($survey['sid'] == $target_survey_id) {
+                        $target_survey = $survey;
+                        break;
+                    }
+                }
+                
+                if ($target_survey) {
+                    echo "<div style='background: #d1ecf1; padding: 15px; border-radius: 5px; color: #0c5460; margin: 10px 0;'>";
+                    echo "🎯 <strong>Target Survey Found:</strong><br>";
+                    echo "ID: " . esc_html($target_survey['sid']) . "<br>";
+                    echo "Title: " . esc_html($target_survey['surveyls_title']) . "<br>";
+                    echo "Active: " . ($target_survey['active'] == 'Y' ? '✅ Yes' : '❌ No');
+                    echo "</div>";
+                    
+                    if ($target_survey['active'] == 'Y') {
+                        echo "<div style='background: #d4edda; padding: 15px; border-radius: 5px; color: #155724;'>";
+                        echo "🚀 <strong>Ready for Import!</strong> The survey is active and accessible.";
+                        echo "</div>";
+                    } else {
+                        echo "<div style='background: #fff3cd; padding: 15px; border-radius: 5px; color: #856404;'>";
+                        echo "⚠️ <strong>Survey is not active.</strong> You need to activate it in LimeSurvey first.";
+                        echo "</div>";
+                    }
+                } else {
+                    echo "<div style='background: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24;'>";
+                    echo "❌ <strong>Target Survey Not Found:</strong> Survey ID $target_survey_id is not accessible.";
+                    echo "</div>";
+                }
             } else {
-                echo "<div style='background: #fff3cd; padding: 15px; border-radius: 5px; color: #856404;'>";
-                echo "⚠️ <strong>Survey is not active.</strong> You need to activate it in LimeSurvey first.";
+                echo "<div style='background: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24;'>";
+                echo "❌ <strong>Failed to get surveys list</strong>";
                 echo "</div>";
             }
-        } else {
-            echo "<div style='background: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24;'>";
-            echo "❌ <strong>Target Survey Not Found:</strong> Survey ID $target_survey_id is not accessible.";
-            echo "</div>";
         }
+        
+        // Release session
+        $release_request = array(
+            'method' => 'release_session_key',
+            'params' => array('sSessionKey' => $session_key),
+            'id' => 1
+        );
+        $args['body'] = json_encode($release_request);
+        wp_remote_post($api_url, $args);
         
     } else {
         echo "<div style='background: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24;'>";
-        echo "❌ <strong>Failed to get surveys list</strong>";
+        echo "❌ <strong>API Authentication Failed</strong><br>";
+        echo "Response: " . esc_html($response_body);
         echo "</div>";
     }
-    
-} else {
-    echo "<div style='background: #f8d7da; padding: 15px; border-radius: 5px; color: #721c24;'>";
-    echo "❌ <strong>API Connection Failed</strong><br>";
-    echo "Error: " . esc_html($test_result['message']);
-    echo "</div>";
 }
 
 echo "<h3>📝 Next Steps:</h3>";
