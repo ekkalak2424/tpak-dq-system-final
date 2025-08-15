@@ -652,41 +652,126 @@ class TPAK_DQ_API_Handler {
      * Get survey structure (questions)
      */
     public function get_survey_structure($survey_id) {
+        // Check cache first
+        $cache_key = 'survey_structure_' . $survey_id;
+        $cached = get_transient($cache_key);
+        if ($cached !== false) {
+            error_log('TPAK DQ System: Using cached survey structure for survey ID: ' . $survey_id);
+            return $cached;
+        }
+        
         $session_key = $this->get_session_key();
         if (!$session_key) {
             return false;
         }
         
-        $response = $this->make_api_request('list_questions', array(
+        // Try multiple API methods to get survey structure
+        $methods = ['list_questions', 'get_survey_properties'];
+        $structure = false;
+        
+        foreach ($methods as $method) {
+            error_log('TPAK DQ System: Trying API method: ' . $method . ' for survey ID: ' . $survey_id);
+            
+            $response = $this->make_api_request($method, array(
+                'sSessionKey' => $session_key,
+                'iSurveyID' => $survey_id
+            ));
+            
+            if ($response && isset($response['result'])) {
+                // Check if the result is an error message
+                if (is_array($response['result']) && isset($response['result']['status'])) {
+                    error_log('TPAK DQ System: API returned error status for survey structure: ' . $response['result']['status']);
+                    continue;
+                }
+                
+                // Check if result is a string (error message)
+                if (is_string($response['result'])) {
+                    error_log('TPAK DQ System: API returned string result for survey structure (likely error): ' . $response['result']);
+                    continue;
+                }
+                
+                // Check if result is an array of questions
+                if (is_array($response['result'])) {
+                    error_log('TPAK DQ System: Successfully got survey structure using ' . $method . ' - count: ' . count($response['result']));
+                    $structure = $response['result'];
+                    break;
+                }
+            }
+        }
+        
+        if ($structure) {
+            // Process and enhance structure
+            $enhanced_structure = $this->process_survey_structure($structure, $survey_id);
+            
+            // Cache for 1 hour
+            set_transient($cache_key, $enhanced_structure, 3600);
+            
+            return $enhanced_structure;
+        }
+        
+        // If still no structure, try to get just survey properties to confirm survey exists
+        $response = $this->make_api_request('get_survey_properties', array(
             'sSessionKey' => $session_key,
-            'iSurveyID' => $survey_id
+            'iSurveyID' => $survey_id,
+            'aProperties' => array('surveyls_title')
         ));
         
-        if ($response && isset($response['result'])) {
-            // Check if the result is an error message
-            if (is_array($response['result']) && isset($response['result']['status'])) {
-                error_log('TPAK DQ System: API returned error status for survey structure: ' . $response['result']['status']);
-                return false;
-            }
-            
-            // Check if result is a string (error message)
-            if (is_string($response['result'])) {
-                error_log('TPAK DQ System: API returned string result for survey structure (likely error): ' . $response['result']);
-                return false;
-            }
-            
-            // Check if result is an array of questions
-            if (is_array($response['result'])) {
-                error_log('TPAK DQ System: Successfully got survey structure - count: ' . count($response['result']));
-                return $response['result'];
-            }
-            
-            error_log('TPAK DQ System: Unexpected survey structure result type: ' . gettype($response['result']));
-            return false;
+        if ($response && isset($response['result']) && !is_string($response['result'])) {
+            error_log('TPAK DQ System: Survey exists but cannot get structure - using minimal structure');
+            // Return minimal structure indicating survey exists
+            return array('survey_exists' => true, 'title' => $response['result']['surveyls_title'] ?? 'Unknown');
         }
         
         error_log('TPAK DQ System: Failed to get survey structure - response: ' . print_r($response, true));
         return false;
+    }
+    
+    /**
+     * Process and enhance survey structure with additional information
+     */
+    private function process_survey_structure($structure, $survey_id) {
+        $enhanced = array(
+            'survey_id' => $survey_id,
+            'questions' => array(),
+            'structure_type' => 'unknown',
+            'last_updated' => current_time('mysql'),
+            'question_count' => 0
+        );
+        
+        if (!is_array($structure)) {
+            return $enhanced;
+        }
+        
+        foreach ($structure as $question) {
+            if (isset($question['qid']) && isset($question['title'])) {
+                $enhanced['questions'][$question['title']] = array(
+                    'qid' => $question['qid'],
+                    'title' => $question['title'],
+                    'question' => isset($question['question']) ? strip_tags($question['question']) : $question['title'],
+                    'type' => isset($question['type']) ? $question['type'] : 'text',
+                    'help' => isset($question['help']) ? strip_tags($question['help']) : '',
+                    'mandatory' => isset($question['mandatory']) ? $question['mandatory'] : 'N',
+                    'other' => isset($question['other']) ? $question['other'] : 'N'
+                );
+                $enhanced['question_count']++;
+            }
+        }
+        
+        // Analyze structure type
+        $titles = array_keys($enhanced['questions']);
+        if (!empty($titles)) {
+            if (preg_match('/^Q\d+/', $titles[0])) {
+                $enhanced['structure_type'] = 'limesurvey';
+            } elseif (preg_match('/^\d+/', $titles[0])) {
+                $enhanced['structure_type'] = 'numeric';
+            } elseif (preg_match('/^[a-zA-Z]/', $titles[0])) {
+                $enhanced['structure_type'] = 'descriptive';
+            } else {
+                $enhanced['structure_type'] = 'mixed';
+            }
+        }
+        
+        return $enhanced;
     }
     
     /**

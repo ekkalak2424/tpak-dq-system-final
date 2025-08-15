@@ -440,11 +440,65 @@ class TPAK_Advanced_Question_Mapper {
     }
     
     /**
-     * Get question from database (placeholder for future implementation)
+     * Get question from database or API
      */
     private function getQuestionFromDatabase($field_key, $survey_id) {
-        // This would query LimeSurvey database or cached survey structure
-        // For now, return null to use pattern matching
+        if (!$survey_id) {
+            return null;
+        }
+        
+        // Try to get survey structure from API handler
+        $api_handler = new TPAK_DQ_API_Handler();
+        $survey_structure = $api_handler->get_survey_structure($survey_id);
+        
+        if ($survey_structure && isset($survey_structure['questions'][$field_key])) {
+            $question_data = $survey_structure['questions'][$field_key];
+            
+            return [
+                'display_name' => $question_data['question'],
+                'category' => $this->guessCategory($question_data['question']),
+                'type' => $this->mapLimesurveyType($question_data['type']),
+                'help' => $question_data['help'] ?? '',
+                'mandatory' => ($question_data['mandatory'] === 'Y')
+            ];
+        }
+        
         return null;
+    }
+    
+    /**
+     * Map LimeSurvey question types to our internal types
+     */
+    private function mapLimesurveyType($lime_type) {
+        $type_mapping = [
+            'T' => 'textarea',      // Long free text
+            'S' => 'text',          // Short free text
+            'N' => 'number',        // Numerical input
+            'D' => 'date',          // Date
+            'G' => 'gender',        // Gender
+            'Y' => 'yesno',         // Yes/No
+            'L' => 'text',          // List (Radio)
+            'O' => 'text',          // List with comment
+            'M' => 'text',          // Multiple choice
+            'P' => 'text',          // Multiple choice with comments
+            'A' => 'text',          // Array
+            'B' => 'text',          // Array (10 point choice)
+            'C' => 'text',          // Array (Yes/No/Uncertain)
+            'E' => 'text',          // Array (Increase/Same/Decrease)
+            'F' => 'text',          // Array (Flexible Labels)
+            'H' => 'text',          // Array (Flexible Labels) by Column
+            'Q' => 'text',          // Multiple Short Text
+            'K' => 'text',          // Multiple Numerical Input
+            'R' => 'rating',        // Ranking
+            'I' => 'text',          // Language Switch
+            'X' => 'text',          // Boilerplate question
+            '1' => 'text',          // Array dual scale
+            ':' => 'text',          // Array (Numbers)
+            ';' => 'text',          // Array (Texts)
+            '|' => 'text',          // File upload
+            '*' => 'text'           // Equation
+        ];
+        
+        return $type_mapping[$lime_type] ?? 'text';
     }
 }

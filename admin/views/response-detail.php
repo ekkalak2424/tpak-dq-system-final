@@ -259,12 +259,38 @@ class TPAK_Question_Mapper {
     }
 }
 
-// Include the advanced question mapper
+// Include the advanced question mapper and survey adapter
 require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-question-mapper.php';
+require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-adapter.php';
 
-// Initialize the advanced mapper
+// Initialize the advanced mapper and survey adapter
 $question_mapper = TPAK_Advanced_Question_Mapper::getInstance();
+$survey_adapter = TPAK_Survey_Adapter::getInstance();
+
+// Process response with appropriate adapter
+$adapter_result = $survey_adapter->processResponse($lime_survey_id, $response_data);
 $response_mapping = $question_mapper->getResponseMapping($response_data, $lime_survey_id);
+
+// Merge adapter results with mapper results for better accuracy
+if ($adapter_result && isset($adapter_result['questions'])) {
+    foreach ($adapter_result['questions'] as $key => $adapter_data) {
+        if (isset($response_mapping['questions'][$key])) {
+            // Use adapter's display name if confidence is higher
+            if ($adapter_data['confidence'] > $response_mapping['questions'][$key]['confidence']) {
+                $response_mapping['questions'][$key]['display_name'] = $adapter_data['display_name'];
+                $response_mapping['questions'][$key]['category'] = $adapter_data['category'];
+                $response_mapping['questions'][$key]['confidence'] = $adapter_data['confidence'];
+            }
+        } else {
+            // Add new question from adapter
+            $response_mapping['questions'][$key] = $adapter_data;
+        }
+    }
+    
+    // Update structure info
+    $response_mapping['structure']['adapter_type'] = $adapter_result['structure_type'];
+    $response_mapping['structure']['adapter_confidence'] = $adapter_result['confidence'];
+}
 
 // Enhanced Question Organization with Smart Display Names
 function generateDisplayName($field_key) {
