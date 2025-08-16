@@ -360,9 +360,53 @@ try {
 
 // Enhanced Question Organization with Smart Display Names
 function generateDisplayName($field_key) {
-    global $response_mapping;
-    return isset($response_mapping['questions'][$field_key]) ? 
-        $response_mapping['questions'][$field_key]['display_name'] : $field_key;
+    global $response_mapping, $lime_survey_id;
+    
+    // First check from response mapping
+    if (isset($response_mapping['questions'][$field_key])) {
+        return $response_mapping['questions'][$field_key]['display_name'];
+    }
+    
+    // Fallback: Try to get from LSS structure directly
+    $lss_structure = get_option('tpak_lss_structure_' . $lime_survey_id, false);
+    if ($lss_structure) {
+        // Try exact match first
+        if (isset($lss_structure['questions'][$field_key])) {
+            $qid = $lss_structure['questions'][$field_key]['qid'];
+            if (isset($lss_structure['question_texts'][$qid]['question'])) {
+                return strip_tags($lss_structure['question_texts'][$qid]['question']);
+            }
+        }
+        
+        // Try pattern matching for complex keys like PA1TT2[1]
+        foreach ($lss_structure['questions'] as $title => $question_data) {
+            if ($title === $field_key || strpos($field_key, $title) !== false || strpos($title, $field_key) !== false) {
+                $qid = $question_data['qid'];
+                if (isset($lss_structure['question_texts'][$qid]['question'])) {
+                    $question_text = strip_tags($lss_structure['question_texts'][$qid]['question']);
+                    
+                    // Add sub-key info if it's a complex field
+                    if (preg_match('/\[(\d+)\]$/', $field_key, $matches)) {
+                        $question_text .= ' [' . $matches[1] . ']';
+                    }
+                    
+                    return $question_text;
+                }
+            }
+        }
+    }
+    
+    // Final fallback: Try Question Dictionary
+    require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-question-dictionary.php';
+    $dictionary = TPAK_Question_Dictionary::getInstance();
+    $dictionary->loadCustomMappings($lime_survey_id);
+    $dict_result = $dictionary->getQuestionText($field_key);
+    
+    if ($dict_result !== $field_key) {
+        return $dict_result;
+    }
+    
+    return $field_key;
 }
 
 function guessCategory($field_key) {

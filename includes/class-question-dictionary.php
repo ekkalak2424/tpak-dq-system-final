@@ -300,10 +300,13 @@ class TPAK_Question_Dictionary {
         // This could load survey-specific mappings from database
         $custom_mappings = get_option('tpak_question_mappings_' . $survey_id, array());
         
-        if (!empty($custom_mappings)) {
+        if (!empty($custom_mappings) && is_array($custom_mappings)) {
             foreach ($custom_mappings as $type => $mappings) {
-                foreach ($mappings as $code => $text) {
-                    $this->addMapping($type, $code, $text);
+                // Ensure mappings is an array before iterating
+                if (is_array($mappings)) {
+                    foreach ($mappings as $code => $text) {
+                        $this->addMapping($type, $code, $text);
+                    }
                 }
             }
         }
