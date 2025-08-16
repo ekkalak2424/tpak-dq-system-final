@@ -42,10 +42,10 @@ wp_enqueue_script(
     true
 );
 
-// Load debug script for Native Survey
+// Load simple Native Survey handler
 wp_enqueue_script(
-    'tpak-native-debug',
-    TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/native-debug.js',
+    'tpak-native-simple',
+    TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/native-survey-simple.js',
     array('jquery'), // Requires jQuery
     TPAK_DQ_SYSTEM_VERSION,
     true
@@ -89,6 +89,7 @@ window.ajaxurl = "' . admin_url('admin-ajax.php') . '";
 window.tpakSurveyId = "' . esc_js($lime_survey_id) . '";
 window.tpakResponseId = "' . esc_js($response_id) . '";
 window.tpakNonce = "' . wp_create_nonce('native_view_nonce') . '";
+window.tpakSurveyNonce = "' . wp_create_nonce('native_survey_nonce') . '";
 </script>';
 
 // Advanced Question Mapping System
