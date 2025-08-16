@@ -2202,6 +2202,23 @@ body.wp-admin #wpbody-content {
 <!-- Inline debug script -->
 <script>
 console.log('=== INLINE DEBUG SCRIPT ===');
+alert('🔥 SCRIPT IS LOADING! Check console for debug info');
+
+// IMMEDIATE TEST - Check if basic elements exist
+var nativeTabImmediate = document.querySelector('a[data-tab="native"]');
+var nativeContentImmediate = document.getElementById('tab-native');
+console.log('⚡ Immediate check - Native tab:', nativeTabImmediate ? 'FOUND' : 'NOT FOUND');
+console.log('⚡ Immediate check - Native content:', nativeContentImmediate ? 'FOUND' : 'NOT FOUND');
+
+if (nativeTabImmediate) {
+    alert('✅ NATIVE TAB FOUND IMMEDIATELY!');
+    nativeTabImmediate.style.background = 'red';
+    nativeTabImmediate.style.color = 'white';
+    nativeTabImmediate.style.padding = '20px';
+    nativeTabImmediate.innerHTML = '🎯 FOUND!';
+} else {
+    alert('❌ NATIVE TAB NOT FOUND IMMEDIATELY');
+}
 
 // Test basic functionality immediately
 document.addEventListener('DOMContentLoaded', function() {
@@ -2288,17 +2305,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (rect.y > 1000) {
                     console.log('🚨 Element too far down, fixing position...');
                     
-                    // Force position to be visible
+                    // Force position to be visible with EXTREME styles
                     nativeContent.style.setProperty('position', 'fixed', 'important');
-                    nativeContent.style.setProperty('top', '200px', 'important');
-                    nativeContent.style.setProperty('left', '50px', 'important');
-                    nativeContent.style.setProperty('right', '50px', 'important');
-                    nativeContent.style.setProperty('z-index', '999999', 'important');
-                    nativeContent.style.setProperty('background', '#fff', 'important');
-                    nativeContent.style.setProperty('box-shadow', '0 0 20px rgba(0,0,0,0.5)', 'important');
+                    nativeContent.style.setProperty('top', '100px', 'important');
+                    nativeContent.style.setProperty('left', '100px', 'important');
+                    nativeContent.style.setProperty('right', '100px', 'important');
+                    nativeContent.style.setProperty('z-index', '2147483647', 'important'); // Max z-index
+                    nativeContent.style.setProperty('background', '#ff0000', 'important'); // Red background to see
+                    nativeContent.style.setProperty('color', '#ffffff', 'important');
+                    nativeContent.style.setProperty('border', '5px solid #00ff00', 'important'); // Green border
+                    nativeContent.style.setProperty('box-shadow', '0 0 50px rgba(255,0,0,0.8)', 'important');
                     nativeContent.style.setProperty('border-radius', '8px', 'important');
-                    nativeContent.style.setProperty('max-height', '80vh', 'important');
+                    nativeContent.style.setProperty('max-height', '70vh', 'important');
                     nativeContent.style.setProperty('overflow-y', 'auto', 'important');
+                    nativeContent.style.setProperty('padding', '30px', 'important');
+                    nativeContent.style.setProperty('font-size', '16px', 'important');
+                    nativeContent.style.setProperty('line-height', '1.5', 'important');
+                    
+                    // Force all children visible
+                    nativeContent.innerHTML = '<h1 style="color: white; font-size: 24px;">🎯 NATIVE SURVEY MODAL</h1>' + 
+                                             '<p style="color: white;">Modal is working! Position: ' + rect.x + ',' + rect.y + '</p>' +
+                                             nativeContent.innerHTML;
                     
                     // Add close button
                     var closeBtn = document.createElement('button');
