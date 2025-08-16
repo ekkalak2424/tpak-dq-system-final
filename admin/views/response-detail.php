@@ -1245,7 +1245,7 @@ $question_labels = array(); // Keep for backward compatibility
             </div>
         </div>
         
-        <?php do_action('tpak_response_detail_content'); ?>
+        <?php // Removed do_action to prevent duplicate tabs from Enhanced Response Viewer ?>
         
     </div> <!-- End tpak-detail-content -->
 </div> <!-- End wrap -->
@@ -1267,7 +1267,7 @@ $question_labels = array(); // Keep for backward compatibility
 }
 
 .tab-content {
-    display: none;
+    display: none !important;
 }
 
 .tab-content.active {
@@ -2031,83 +2031,61 @@ if (typeof window.ajaxurl === 'undefined') {
     }
     
     $(document).ready(function() {
-        console.log('Document ready - Starting tab initialization');
+        console.log('=== TPAK DQ System Tab Initialization ===');
+        console.log('jQuery version:', $.fn.jquery);
+        console.log('Available tabs:', $('.nav-tab').length);
         
-        // Initialize tabs only if elements exist
-        if ($('.nav-tab').length > 0) {
-            initTabSwitching();
-        } else {
-            console.log('No tabs found - skipping tab initialization');
-        }
-        
-        // Initialize other functionality
+        // Direct tab initialization without timeouts
+        initTabSwitching();
         initNativeSurvey();
     });
     
     function initTabSwitching() {
-        console.log('Initializing tab switching');
-        console.log('Available tabs:', $('.nav-tab').length);
+        console.log('=== Tab Switching Init ===');
+        console.log('Number of tabs found:', $('.nav-tab').length);
         
         // Debug each tab
         $('.nav-tab').each(function(index) {
-            var tabId = $(this).data('tab');
-            var href = $(this).attr('href');
-            console.log('Tab ' + index + ':', 'data-tab=' + tabId, 'href=' + href);
+            var $tab = $(this);
+            var tabId = $tab.data('tab');
+            var href = $tab.attr('href');
+            console.log('Tab ' + index + ': data-tab="' + tabId + '" href="' + href + '"');
         });
         
-        // Tab switching functionality - use both click events
-        $('.nav-tab').off('click.tabs').on('click.tabs', function(e) {
+        // Remove all existing event handlers to prevent conflicts
+        $('.nav-tab').off('click');
+        
+        // Simple, direct tab switching
+        $('.nav-tab').on('click', function(e) {
             e.preventDefault();
-            e.stopPropagation();
-            console.log('Tab clicked!', this);
+            console.log('=== Tab Clicked ===');
             
-            var tabId = $(this).data('tab');
-            console.log('Tab ID from data-tab:', tabId);
+            var $clickedTab = $(this);
+            var tabId = $clickedTab.data('tab');
             
-            // Fallback: get from href if data-tab is missing
-            if (!tabId) {
-                var href = $(this).attr('href');
-                if (href && href.indexOf('#tab-') === 0) {
-                    tabId = href.replace('#tab-', '');
-                    console.log('Tab ID from href:', tabId);
-                }
-            }
+            console.log('Clicked tab ID:', tabId);
             
             if (!tabId) {
-                console.log('No tab ID found! Element:', this);
-                return;
+                console.log('ERROR: No tab ID found!');
+                return false;
             }
             
-            // Remove active class from all tabs and content
+            // Switch tab appearance
             $('.nav-tab').removeClass('nav-tab-active');
-            $('.tab-content').removeClass('active').hide();
+            $clickedTab.addClass('nav-tab-active');
             
-            // Add active class to clicked tab and corresponding content
-            $(this).addClass('nav-tab-active');
-            var targetTab = $('#tab-' + tabId);
-            console.log('Target tab element:', targetTab.length);
-            targetTab.addClass('active').show();
+            // Switch content
+            $('.tab-content').hide().removeClass('active');
+            var $targetContent = $('#tab-' + tabId);
+            $targetContent.show().addClass('active');
             
-            console.log('Tab switching completed to:', tabId);
+            console.log('Tab switched to:', tabId);
+            console.log('Target content visible:', $targetContent.is(':visible'));
+            
+            return false;
         });
         
-        // Alternative handler for direct clicks
-        $(document).off('click.tabs-alt').on('click.tabs-alt', '.nav-tab', function(e) {
-            console.log('Alternative tab handler triggered');
-            e.preventDefault();
-            
-            var tabId = $(this).data('tab') || $(this).attr('href').replace('#tab-', '');
-            
-            if (tabId) {
-                $('.nav-tab').removeClass('nav-tab-active');
-                $('.tab-content').removeClass('active').hide();
-                
-                $(this).addClass('nav-tab-active');
-                $('#tab-' + tabId).addClass('active').show();
-                
-                console.log('Alternative tab switching to:', tabId);
-            }
-        });
+        console.log('Tab switching initialized successfully');
     }
     
     function initNativeSurvey() {

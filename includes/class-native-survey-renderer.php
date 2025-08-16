@@ -1224,6 +1224,56 @@ class TPAK_Native_Survey_Renderer {
     }
     
     /**
+     * ดึงข้อมูล review และ workflow status
+     */
+    private function get_review_data($response_id) {
+        global $wpdb;
+        
+        // ข้อมูลเริ่มต้น
+        $review_data = array(
+            'status' => 'draft',
+            'reviews' => array(),
+            'approvals' => array(),
+            'can_edit' => true,
+            'can_review' => false,
+            'can_approve' => false,
+            'notes' => array()
+        );
+        
+        if (!$response_id) {
+            return $review_data;
+        }
+        
+        // ดึงข้อมูลจาก audit table
+        $audit_table = $wpdb->prefix . 'tpak_survey_audit';
+        if ($wpdb->get_var("SHOW TABLES LIKE '$audit_table'")) {
+            $audit_logs = $wpdb->get_results($wpdb->prepare(
+                "SELECT * FROM $audit_table WHERE response_id = %s ORDER BY created_at DESC",
+                $response_id
+            ), ARRAY_A);
+            
+            if ($audit_logs) {
+                foreach ($audit_logs as $log) {
+                    if (in_array($log['action'], array('reviewed', 'approved', 'rejected'))) {
+                        $review_data['reviews'][] = $log;
+                    }
+                }
+                
+                // กำหนดสถานะล่าสุด
+                $latest_log = $audit_logs[0];
+                $review_data['status'] = $latest_log['action'];
+            }
+        }
+        
+        // ตรวจสอบสิทธิ์ของผู้ใช้ปัจจุบัน
+        $review_data['can_edit'] = current_user_can('edit_survey_responses');
+        $review_data['can_review'] = current_user_can('review_survey_responses');
+        $review_data['can_approve'] = current_user_can('approve_survey_responses');
+        
+        return $review_data;
+    }
+    
+    /**
      * Enqueue assets สำหรับ frontend
      */
     public function enqueue_survey_assets() {
