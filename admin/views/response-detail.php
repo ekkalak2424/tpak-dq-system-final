@@ -1271,11 +1271,11 @@ $question_labels = array(); // Keep for backward compatibility
 }
 
 .tab-content {
-    display: none !important;
+    display: none;
 }
 
 .tab-content.active {
-    display: block !important;
+    display: block;
 }
 
 .nav-tab {

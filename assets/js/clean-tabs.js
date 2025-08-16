@@ -56,16 +56,17 @@ function initCleanTabs() {
                 
                 // Hide all content
                 contents.forEach(function(content) {
-                    content.style.display = 'none';
                     content.classList.remove('active');
+                    content.style.display = 'none';
                 });
                 
                 // Show target content
                 var targetContent = document.getElementById('tab-' + tabId);
                 if (targetContent) {
-                    targetContent.style.display = 'block';
                     targetContent.classList.add('active');
+                    targetContent.style.display = 'block';
                     console.log('Switched to tab:', tabId);
+                    console.log('Target content visible:', targetContent.offsetHeight > 0);
                 } else {
                     console.log('ERROR: Target content not found for tab:', tabId);
                 }
@@ -79,7 +80,15 @@ function initCleanTabs() {
     
     console.log('Clean tab system initialized');
     
-    // Test click on Native tab after 2 seconds
+    // Make sure the first tab content is visible on load
+    var firstTabContent = document.querySelector('.tab-content.active');
+    if (firstTabContent) {
+        firstTabContent.style.display = 'block';
+        console.log('First tab content made visible');
+    }
+    
+    // Test click on Native tab after 2 seconds (optional - for debugging)
+    /*
     setTimeout(function() {
         console.log('=== Testing Native tab click ===');
         var nativeTab = document.querySelector('a[data-tab="native"]');
@@ -90,6 +99,7 @@ function initCleanTabs() {
             console.log('Native tab not found');
         }
     }, 2000);
+    */
 }
 
 // Native survey functionality (using vanilla JS)
