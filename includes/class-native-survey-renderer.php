@@ -133,6 +133,19 @@ class TPAK_Native_Survey_Renderer {
                     <div class="loading-spinner"></div>
                     <p>กำลังโหลดแบบสอบถาม...</p>
                 </div>
+                
+                <!-- Auto-load survey data if available -->
+                <?php if ($survey_id && $response_id): ?>
+                <script>
+                jQuery(document).ready(function($) {
+                    console.log('Auto-loading survey data...');
+                    // Trigger load survey button click
+                    setTimeout(function() {
+                        $('.load-survey').trigger('click');
+                    }, 500);
+                });
+                </script>
+                <?php endif; ?>
             </div>
             
             <!-- Survey Progress -->

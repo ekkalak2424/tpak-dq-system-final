@@ -42,6 +42,15 @@ wp_enqueue_script(
     true
 );
 
+// Load debug script for Native Survey
+wp_enqueue_script(
+    'tpak-native-debug',
+    TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/native-debug.js',
+    array('jquery'), // Requires jQuery
+    TPAK_DQ_SYSTEM_VERSION,
+    true
+);
+
 wp_enqueue_style('tpak-dq-admin', TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/css/admin-style.css', array(), TPAK_DQ_SYSTEM_VERSION);
 
 // Check user permissions first

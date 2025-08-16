@@ -135,7 +135,7 @@ class TPAK_DQ_System {
             TPAK_Survey_Export_Manager::getInstance();
             TPAK_Survey_Audit_Manager::getInstance();
             TPAK_Survey_User_Manager::getInstance();
-            // TPAK_Enhanced_Response_Viewer::getInstance(); // Disabled to prevent tab conflicts
+            TPAK_Enhanced_Response_Viewer::getInstance(); // Re-enabled for AJAX handlers
         }
         
         // Check if we need to flush rewrite rules
