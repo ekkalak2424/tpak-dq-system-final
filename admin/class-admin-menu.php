@@ -105,7 +105,7 @@ class TPAK_DQ_Admin_Menu {
             null, // Parent slug set to null to hide from menu
             __('รายละเอียดแบบสอบถาม', 'tpak-dq-system'),
             __('รายละเอียดแบบสอบถาม', 'tpak-dq-system'),
-            'manage_options',
+            'edit_posts',
             'tpak-dq-response-view',
             array($this, 'response_detail_page')
         );

@@ -42,6 +42,11 @@ wp_add_inline_script('tpak-dq-response-detail', '
     window.ajaxurl = "' . admin_url('admin-ajax.php') . '";
 ', 'before');
 
+// Check user permissions first
+if (!current_user_can('edit_posts')) {
+    wp_die(__('Sorry, you are not allowed to access this page.', 'tpak-dq-system'));
+}
+
 // Get response ID from URL
 $response_id = isset($_GET['id']) ? absint($_GET['id']) : 0;
 
