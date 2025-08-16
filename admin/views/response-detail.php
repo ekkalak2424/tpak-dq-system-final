@@ -1213,40 +1213,109 @@ $question_labels = array(); // Keep for backward compatibility
             </div> <!-- End content-main -->
         </div> <!-- End tab-original -->
         
-        <!-- Native Tab Content -->
+        <!-- Native Tab Content - IFRAME VERSION -->
         <div id="tab-native" class="tab-content">
-            <div class="native-integration-header">
-                <h3>🎯 ระบบแก้ไขแบบสอบถาม Native 100%</h3>
-                <p>ดึงแบบสอบถามมาแบบสมบูรณ์และแก้ไขได้เต็มรูปแบบ</p>
+            <div class="iframe-integration-header">
+                <h3>🎯 ระบบแก้ไขแบบสอบถาม LimeSurvey Iframe</h3>
+                <p>ดึงแบบสอบถามมาจาก LimeSurvey โดยตรงและบันทึกลงฐานข้อมูล WordPress</p>
                 
                 <div class="integration-controls">
-                    <button type="button" class="button button-primary" id="activate-native">
-                        🚀 เปิดใช้งาน Native Mode
+                    <button type="button" class="button button-primary" id="load-iframe">
+                        🚀 โหลด LimeSurvey
                     </button>
-                    <button type="button" class="button" id="compare-views">
-                        🔍 เปรียบเทียบกับแบบเดิม
+                    <button type="button" class="button button-secondary" id="save-responses">
+                        💾 บันทึกคำตอบ
+                    </button>
+                    <button type="button" class="button" id="edit-mode">
+                        ✏️ โหมดแก้ไข
                     </button>
                 </div>
                 
                 <div class="integration-status">
                     <div class="status-item">
-                        <label>แบบเดิม:</label>
-                        <span class="status-indicator original-status">✅ โหลดแล้ว</span>
+                        <label>📊 Survey ID:</label>
+                        <span class="status-value"><?php echo esc_html($lime_survey_id); ?></span>
                     </div>
                     <div class="status-item">
-                        <label>แบบ Native:</label>
-                        <span class="status-indicator native-status">⏳ รอโหลด</span>
+                        <label>📝 Response ID:</label>
+                        <span class="status-value"><?php echo esc_html($response_id); ?></span>
+                    </div>
+                    <div class="status-item">
+                        <label>🔄 สถานะ:</label>
+                        <span class="status-indicator iframe-status">⏳ รอโหลด</span>
                     </div>
                 </div>
             </div>
             
-            <div id="native-survey-container">
-                <div class="native-initial-content">
-                    <p><strong>📍 สถานะ:</strong> พร้อมใช้งาน</p>
-                    <p><strong>📊 Survey ID:</strong> <?php echo esc_html($lime_survey_id); ?></p>
-                    <p><strong>📝 Response ID:</strong> <?php echo esc_html($response_id); ?></p>
-                    <p>คลิกปุ่ม "🚀 เปิดใช้งาน Native Mode" เพื่อโหลดแบบสอบถามแบบ Native 100%</p>
+            <div id="iframe-survey-container" style="display: none;">
+                <div class="iframe-wrapper">
+                    <iframe id="limesurvey-iframe" 
+                            src=""
+                            style="width: 100%; height: 800px; border: 1px solid #ddd; border-radius: 8px;"
+                            onload="handleIframeLoad()">
+                    </iframe>
                 </div>
+                
+                <div class="iframe-controls">
+                    <button type="button" class="button button-primary" onclick="extractAndSaveData()">
+                        💾 บันทึกข้อมูลจาก LimeSurvey
+                    </button>
+                    <button type="button" class="button" onclick="refreshIframe()">
+                        🔄 รีเฟรช
+                    </button>
+                </div>
+            </div>
+            
+            <div id="saved-responses-display" style="display: none;">
+                <h4>📝 คำตอบที่บันทึกแล้ว</h4>
+                <div id="responses-content"></div>
+                <div class="edit-controls">
+                    <button type="button" class="button button-primary" onclick="enableEditMode()">
+                        ✏️ เข้าสู่โหมดแก้ไข
+                    </button>
+                    <button type="button" class="button button-secondary" onclick="loadSavedData()">
+                        🔄 โหลดข้อมูลที่บันทึกไว้
+                    </button>
+                    <button type="button" class="button" onclick="showAuditTrail()">
+                        📊 ประวัติการแก้ไข
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Edit Mode Interface -->
+            <div id="edit-mode-interface" style="display: none;">
+                <div class="edit-mode-header">
+                    <h4>✏️ โหมดแก้ไขคำตอบ</h4>
+                    <p>คลิกที่คำตอบที่ต้องการแก้ไข หรือใช้ฟอร์มด้านล่าง</p>
+                </div>
+                
+                <div class="edit-form">
+                    <div class="form-group">
+                        <label for="edit-field-name">ชื่อฟิลด์:</label>
+                        <input type="text" id="edit-field-name" class="regular-text" placeholder="ระบุชื่อฟิลด์ที่ต้องการแก้ไข">
+                    </div>
+                    <div class="form-group">
+                        <label for="edit-field-value">ค่าใหม่:</label>
+                        <textarea id="edit-field-value" class="large-text" rows="3" placeholder="ระบุค่าใหม่"></textarea>
+                    </div>
+                    <div class="form-actions">
+                        <button type="button" class="button button-primary" onclick="saveFieldEdit()">
+                            💾 บันทึกการแก้ไข
+                        </button>
+                        <button type="button" class="button" onclick="cancelEditMode()">
+                            ❌ ยกเลิก
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Audit Trail Display -->
+            <div id="audit-trail-display" style="display: none;">
+                <div class="audit-header">
+                    <h4>📊 ประวัติการแก้ไข</h4>
+                    <button type="button" class="button" onclick="hideAuditTrail()">❌ ปิด</button>
+                </div>
+                <div id="audit-content"></div>
             </div>
         </div>
         
@@ -2197,197 +2266,616 @@ body.wp-admin #wpbody-content {
     bottom: auto !important;
     transform: none !important;
 }
-</style>
 
-<!-- Inline debug script -->
-<script>
-console.log('=== INLINE DEBUG SCRIPT ===');
-alert('🔥 SCRIPT IS LOADING! Check console for debug info');
-
-// IMMEDIATE TEST - Check if basic elements exist
-var nativeTabImmediate = document.querySelector('a[data-tab="native"]');
-var nativeContentImmediate = document.getElementById('tab-native');
-console.log('⚡ Immediate check - Native tab:', nativeTabImmediate ? 'FOUND' : 'NOT FOUND');
-console.log('⚡ Immediate check - Native content:', nativeContentImmediate ? 'FOUND' : 'NOT FOUND');
-
-if (nativeTabImmediate) {
-    alert('✅ NATIVE TAB FOUND IMMEDIATELY!');
-    nativeTabImmediate.style.background = 'red';
-    nativeTabImmediate.style.color = 'white';
-    nativeTabImmediate.style.padding = '20px';
-    nativeTabImmediate.innerHTML = '🎯 FOUND!';
-} else {
-    alert('❌ NATIVE TAB NOT FOUND IMMEDIATELY');
+/* Iframe Integration Styles */
+.iframe-integration-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
 }
 
-// Test basic functionality immediately
+.iframe-integration-header h3 {
+    margin: 0 0 10px 0;
+    color: white;
+}
+
+.integration-controls {
+    margin: 15px 0;
+}
+
+.integration-controls button {
+    margin-right: 10px;
+}
+
+.integration-status {
+    display: flex;
+    gap: 20px;
+    margin-top: 15px;
+    font-size: 14px;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-value {
+    font-weight: bold;
+    color: #fff;
+}
+
+.iframe-wrapper {
+    border: 2px solid #ddd;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.iframe-controls {
+    text-align: center;
+    padding: 15px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.iframe-controls button {
+    margin: 0 10px;
+}
+
+/* Edit Mode Styles */
+.edit-controls {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+}
+
+.edit-controls button {
+    margin-right: 10px;
+}
+
+#edit-mode-interface {
+    background: #fff3cd;
+    border: 2px solid #ffc107;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.edit-mode-header h4 {
+    margin: 0 0 10px 0;
+    color: #856404;
+}
+
+.edit-mode-header p {
+    margin: 0 0 20px 0;
+    color: #856404;
+}
+
+.edit-form .form-group {
+    margin-bottom: 15px;
+}
+
+.edit-form label {
+    display: block;
+    margin-bottom: 5px;
+    font-weight: bold;
+    color: #333;
+}
+
+.edit-form input,
+.edit-form textarea {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.form-actions {
+    margin-top: 20px;
+}
+
+.form-actions button {
+    margin-right: 10px;
+}
+
+/* Audit Trail Styles */
+#audit-trail-display {
+    background: #e7f3ff;
+    border: 2px solid #0073aa;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.audit-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.audit-header h4 {
+    margin: 0;
+    color: #0073aa;
+}
+
+.audit-placeholder {
+    padding: 20px;
+    text-align: center;
+    color: #0073aa;
+}
+
+/* Data info styling */
+.data-info {
+    background: #d1ecf1;
+    border: 1px solid #bee5eb;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 15px;
+}
+
+.data-info p {
+    margin: 5px 0;
+    color: #0c5460;
+}
+
+/* Table editing styles */
+.responses-table table {
+    margin-top: 15px;
+}
+
+.responses-table tbody tr:hover {
+    background-color: #f0f8ff;
+}
+
+.responses-table tbody tr.editable {
+    cursor: pointer;
+}
+
+.responses-table tbody tr.selected {
+    background-color: #fff3cd !important;
+    border: 2px solid #ffc107;
+}
+</style>
+
+<!-- LimeSurvey Iframe Integration Script -->
+<script>
+console.log('=== LIMESURVEY IFRAME INTEGRATION ===');
+
+// Survey configuration
+var surveyConfig = {
+    surveyId: <?php echo json_encode($lime_survey_id); ?>,
+    responseId: <?php echo json_encode($response_id); ?>,
+    limesurveyUrl: 'https://survey.tpak.or.th', // ปรับ URL ตาม LimeSurvey ของคุณ
+    iframeLoaded: false
+};
+
+// Initialize iframe system
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('✅ DOM Content Loaded');
+    console.log('✅ LimeSurvey Iframe System Loading');
     
-    // Check for tabs
+    // Initialize tab system
+    initTabSystem();
+    
+    // Initialize iframe functionality
+    initIframeSystem();
+});
+
+// Simple tab system
+function initTabSystem() {
     var tabs = document.querySelectorAll('.nav-tab');
     var contents = document.querySelectorAll('.tab-content');
     
-    console.log('📋 Found tabs:', tabs.length);
-    console.log('📋 Found tab contents:', contents.length);
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            var tabId = tab.getAttribute('data-tab');
+            console.log('Tab clicked:', tabId);
+            
+            // Update tabs
+            tabs.forEach(function(t) { t.classList.remove('nav-tab-active'); });
+            tab.classList.add('nav-tab-active');
+            
+            // Update content
+            contents.forEach(function(c) { 
+                c.style.display = 'none';
+                c.classList.remove('active');
+            });
+            
+            var target = document.getElementById('tab-' + tabId);
+            if (target) {
+                target.style.display = 'block';
+                target.classList.add('active');
+            }
+        });
+    });
+}
+
+// Iframe system functions
+function initIframeSystem() {
+    console.log('🎯 Initializing LimeSurvey Iframe System');
     
-    // Check native tab specifically
-    var nativeTab = document.querySelector('a[data-tab="native"]');
-    var nativeContent = document.getElementById('tab-native');
+    // Load iframe button
+    document.getElementById('load-iframe').addEventListener('click', function() {
+        loadLimeSurveyIframe();
+    });
     
-    console.log('🎯 Native tab element:', nativeTab ? 'FOUND' : 'NOT FOUND');
-    console.log('🎯 Native content element:', nativeContent ? 'FOUND' : 'NOT FOUND');
+    // Save responses button
+    document.getElementById('save-responses').addEventListener('click', function() {
+        extractAndSaveData();
+    });
     
-    if (nativeContent) {
-        console.log('📊 Native content HTML length:', nativeContent.innerHTML.length);
-        console.log('📊 Native content visible:', nativeContent.offsetHeight > 0);
-        console.log('📊 Native content display:', window.getComputedStyle(nativeContent).display);
+    // Edit mode button
+    document.getElementById('edit-mode').addEventListener('click', function() {
+        enableEditMode();
+    });
+}
+
+// Load LimeSurvey in iframe
+function loadLimeSurveyIframe() {
+    console.log('🚀 Loading LimeSurvey iframe...');
+    
+    var iframe = document.getElementById('limesurvey-iframe');
+    var container = document.getElementById('iframe-survey-container');
+    var status = document.querySelector('.iframe-status');
+    
+    // สร้าง URL สำหรับ LimeSurvey
+    var surveyUrl = surveyConfig.limesurveyUrl + '/index.php/survey/index/sid/' + surveyConfig.surveyId;
+    
+    // หากมี response ID ให้เพิ่ม token
+    if (surveyConfig.responseId) {
+        surveyUrl += '?token=' + surveyConfig.responseId;
     }
     
-    // Test tab clicks
-    if (nativeTab) {
-        nativeTab.addEventListener('click', function(e) {
-            e.preventDefault();
-            console.log('🎯 Native tab clicked via inline script!');
+    console.log('Loading URL:', surveyUrl);
+    
+    // อัพเดทสถานะ
+    status.innerHTML = '🔄 กำลังโหลด...';
+    status.className = 'status-indicator iframe-status loading';
+    
+    // โหลด iframe
+    iframe.src = surveyUrl;
+    container.style.display = 'block';
+    
+    // แสดงผลหลังโหลดเสร็จ
+    iframe.onload = function() {
+        console.log('✅ LimeSurvey iframe loaded');
+        status.innerHTML = '✅ โหลดแล้ว';
+        status.className = 'status-indicator iframe-status loaded';
+        surveyConfig.iframeLoaded = true;
+    };
+}
+
+// Handle iframe load event
+function handleIframeLoad() {
+    console.log('📡 Iframe load event triggered');
+    var status = document.querySelector('.iframe-status');
+    status.innerHTML = '✅ LimeSurvey โหลดแล้ว';
+    surveyConfig.iframeLoaded = true;
+}
+
+// Extract data from iframe and save to WordPress
+function extractAndSaveData() {
+    console.log('💾 Extracting and saving survey data...');
+    
+    if (!surveyConfig.iframeLoaded) {
+        alert('กรุณาโหลด LimeSurvey ก่อน');
+        return;
+    }
+    
+    var iframe = document.getElementById('limesurvey-iframe');
+    
+    try {
+        // พยายามดึงข้อมูลจาก iframe (อาจมีข้อจำกัดเรื่อง CORS)
+        var iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        var formData = new FormData();
+        
+        // ดึงข้อมูลจาก form ใน iframe
+        var forms = iframeDoc.querySelectorAll('form');
+        if (forms.length > 0) {
+            var form = forms[0];
+            var inputs = form.querySelectorAll('input, select, textarea');
             
-            // Force show content
-            if (nativeContent) {
-                // Hide all tabs
-                contents.forEach(function(c) {
-                    c.style.display = 'none';
-                    c.classList.remove('active');
-                });
+            var responseData = {};
+            inputs.forEach(function(input) {
+                if (input.name && input.value) {
+                    responseData[input.name] = input.value;
+                }
+            });
+            
+            console.log('🔍 Extracted data:', responseData);
+            
+            // ส่งข้อมูลไป save
+            saveResponseData(responseData);
+        } else {
+            alert('ไม่พบ form ในแบบสอบถาม');
+        }
+        
+    } catch (error) {
+        console.log('❌ Cannot access iframe content (CORS restriction)');
+        // แทนที่จะใช้วิธี postMessage
+        usePostMessageMethod();
+    }
+}
+
+// Alternative method using postMessage
+function usePostMessageMethod() {
+    console.log('📡 Using postMessage method...');
+    
+    var iframe = document.getElementById('limesurvey-iframe');
+    
+    // ส่งข้อความไป iframe เพื่อขอข้อมูล
+    iframe.contentWindow.postMessage({
+        action: 'getSurveyData',
+        source: 'wordpress-tpak'
+    }, '*');
+    
+    // รับข้อมูลกลับจาก iframe
+    window.addEventListener('message', function(event) {
+        if (event.data.action === 'surveyDataResponse') {
+            console.log('📨 Received survey data:', event.data.data);
+            saveResponseData(event.data.data);
+        }
+    });
+}
+
+// Save response data to WordPress
+function saveResponseData(responseData) {
+    console.log('💾 Saving response data to WordPress...');
+    
+    // ใช้ jQuery Ajax ส่งข้อมูลไป WordPress
+    if (typeof jQuery !== 'undefined') {
+        jQuery.ajax({
+            url: window.ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'save_iframe_survey_data',
+                survey_id: surveyConfig.surveyId,
+                response_id: surveyConfig.responseId,
+                response_data: JSON.stringify(responseData),
+                nonce: window.tpakNonce
+            },
+            success: function(response) {
+                console.log('✅ Data saved successfully:', response);
                 
-                // Force show ALL parent containers
-                var parentContainers = [
-                    document.querySelector('.tpak-detail-content'),
-                    document.querySelector('.wrap'),
-                    nativeContent.parentElement,
-                    nativeContent.parentElement?.parentElement
-                ];
+                if (response.success) {
+                    alert('✅ บันทึกข้อมูลสำเร็จ!');
+                    displaySavedResponses(responseData);
+                } else {
+                    alert('❌ เกิดข้อผิดพลาด: ' + response.data);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('❌ Save error:', error);
+                alert('❌ ไม่สามารถบันทึกข้อมูลได้');
+            }
+        });
+    } else {
+        alert('❌ jQuery ไม่พร้อมใช้งาน');
+    }
+}
+
+// Display saved responses
+function displaySavedResponses(responseData) {
+    var container = document.getElementById('saved-responses-display');
+    var content = document.getElementById('responses-content');
+    
+    var html = '<div class="responses-table">';
+    html += '<table class="wp-list-table widefat fixed striped">';
+    html += '<thead><tr><th>คำถาม</th><th>คำตอบ</th></tr></thead>';
+    html += '<tbody>';
+    
+    for (var key in responseData) {
+        html += '<tr>';
+        html += '<td><strong>' + key + '</strong></td>';
+        html += '<td>' + responseData[key] + '</td>';
+        html += '</tr>';
+    }
+    
+    html += '</tbody></table>';
+    html += '</div>';
+    
+    content.innerHTML = html;
+    container.style.display = 'block';
+}
+
+// Global variable to store current data
+var currentSurveyData = null;
+var currentDataId = null;
+
+// Load saved survey data from WordPress
+function loadSavedData() {
+    console.log('🔄 Loading saved data from WordPress...');
+    
+    if (typeof jQuery !== 'undefined') {
+        jQuery.ajax({
+            url: window.ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'load_saved_survey_data',
+                survey_id: surveyConfig.surveyId,
+                response_id: surveyConfig.responseId,
+                nonce: window.tpakNonce
+            },
+            success: function(response) {
+                console.log('📨 Loaded data response:', response);
                 
-                parentContainers.forEach(function(container) {
-                    if (container) {
-                        container.style.setProperty('display', 'block', 'important');
-                        container.style.setProperty('visibility', 'visible', 'important');
-                        container.style.setProperty('opacity', '1', 'important');
-                        container.style.setProperty('height', 'auto', 'important');
-                        console.log('👥 Forced parent visible:', container.className || container.tagName);
-                    }
-                });
-                
-                // Force show native content with aggressive styling
-                nativeContent.style.setProperty('display', 'block', 'important');
-                nativeContent.style.setProperty('visibility', 'visible', 'important');
-                nativeContent.style.setProperty('opacity', '1', 'important');
-                nativeContent.style.setProperty('height', 'auto', 'important');
-                nativeContent.style.setProperty('min-height', '400px', 'important');
-                nativeContent.style.setProperty('background', '#fff', 'important');
-                nativeContent.style.setProperty('border', '2px solid #667eea', 'important');
-                nativeContent.style.setProperty('padding', '20px', 'important');
-                nativeContent.style.setProperty('position', 'relative', 'important');
-                nativeContent.style.setProperty('z-index', '9999', 'important');
-                nativeContent.classList.add('active');
-                
-                // Force show all child elements
-                var allChildren = nativeContent.querySelectorAll('*');
-                allChildren.forEach(function(child) {
-                    child.style.setProperty('display', 'block', 'important');
-                    child.style.setProperty('visibility', 'visible', 'important');
-                    child.style.setProperty('opacity', '1', 'important');
-                    child.style.setProperty('position', 'relative', 'important');
-                });
-                
-                // Fix position - element is way below screen
-                var rect = nativeContent.getBoundingClientRect();
-                console.log('📍 Original position:', rect);
-                
-                // ALWAYS show the modal - remove condition for debugging
-                console.log('🚨 FORCING MODAL TO SHOW - rect.y:', rect.y);
+                if (response.success) {
+                    currentSurveyData = response.data.response_data;
+                    currentDataId = response.data.data.id;
+                    displaySavedResponses(currentSurveyData);
                     
-                    // Force position to be visible with EXTREME styles - UPDATED FOR MAXIMUM VISIBILITY
-                    nativeContent.style.setProperty('position', 'fixed', 'important');
-                    nativeContent.style.setProperty('top', '50px', 'important');
-                    nativeContent.style.setProperty('left', '50px', 'important');
-                    nativeContent.style.setProperty('right', '50px', 'important');
-                    nativeContent.style.setProperty('bottom', '50px', 'important');
-                    nativeContent.style.setProperty('z-index', '2147483647', 'important'); // Max z-index
-                    nativeContent.style.setProperty('background', '#ff0000', 'important'); // Red background to see
-                    nativeContent.style.setProperty('color', '#ffffff', 'important');
-                    nativeContent.style.setProperty('border', '10px solid #00ff00', 'important'); // Thicker green border
-                    nativeContent.style.setProperty('box-shadow', '0 0 100px rgba(255,0,0,1)', 'important'); // Stronger shadow
-                    nativeContent.style.setProperty('border-radius', '20px', 'important');
-                    nativeContent.style.setProperty('overflow-y', 'auto', 'important');
-                    nativeContent.style.setProperty('padding', '40px', 'important');
-                    nativeContent.style.setProperty('font-size', '20px', 'important');
-                    nativeContent.style.setProperty('line-height', '1.8', 'important');
-                    nativeContent.style.setProperty('font-weight', 'bold', 'important');
-                    nativeContent.style.setProperty('text-align', 'center', 'important');
+                    // Show additional info
+                    var info = '<div class="data-info">';
+                    info += '<p><strong>📅 สร้างเมื่อ:</strong> ' + response.data.created_at + '</p>';
+                    info += '<p><strong>📅 แก้ไขล่าสุด:</strong> ' + response.data.updated_at + '</p>';
+                    info += '<p><strong>🆔 Data ID:</strong> ' + response.data.data.id + '</p>';
+                    info += '</div>';
                     
-                    // Force all children visible with HUGE content
-                    nativeContent.innerHTML = 
-                        '<div style="color: white; text-align: center; padding: 50px;">' +
-                        '<h1 style="color: yellow; font-size: 48px; text-shadow: 2px 2px 4px black;">🔥🎯 NATIVE MODAL ขำ WORKING! 🎯🔥</h1>' + 
-                        '<h2 style="color: white; font-size: 32px; margin: 30px 0;">✅ ระบบ Native 100% พร้อมใช้งาน!</h2>' +
-                        '<p style="color: lime; font-size: 24px; font-weight: bold;">📍 Position: ' + rect.x + ', ' + rect.y + '</p>' +
-                        '<p style="color: cyan; font-size: 20px;">🚀 คลิกปุ่มด้านล่างเพื่อเริ่มใช้งาน</p>' +
-                        '<button onclick="alert(\'Native Survey Ready!\')" style="background: lime; color: black; padding: 20px 40px; font-size: 18px; border: none; border-radius: 10px; margin: 20px; cursor: pointer;">🎯 เริ่มใช้งาน Native Survey</button>' +
-                        '<div style="margin-top: 30px; background: rgba(0,0,0,0.5); padding: 20px; border-radius: 10px;">' +
-                        '<p style="color: white; font-size: 16px;">📊 Survey ID: 836511</p>' +
-                        '<p style="color: white; font-size: 16px;">📝 Response ID: 20103</p>' +
-                        '<p style="color: yellow; font-size: 16px;">🎉 Modal แสดงผลสำเร็จแล้ว!</p>' +
-                        '</div>' +
-                        '</div>';
-                    
-                    // Add close button
-                    var closeBtn = document.createElement('button');
-                    closeBtn.innerHTML = '❌ ปิด';
-                    closeBtn.style.cssText = 'position: absolute; top: 10px; right: 10px; background: #dc3232; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; z-index: 1000000;';
-                    closeBtn.addEventListener('click', function() {
-                        nativeContent.style.setProperty('position', 'static', 'important');
-                        nativeContent.style.removeProperty('top');
-                        nativeContent.style.removeProperty('left');
-                        nativeContent.style.removeProperty('right');
-                        nativeContent.style.removeProperty('box-shadow');
-                        closeBtn.remove();
-                    });
-                    nativeContent.appendChild(closeBtn);
-                    
-                    // Force scroll to top to see modal
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                    
-                    // Alert to confirm modal is showing
-                    setTimeout(function() {
-                        alert('🎉 MODAL ควรแสดงผลแล้ว! หากไม่เห็นให้ scroll หน้าจอ หรือกด F11 เข้า fullscreen');
-                    }, 500);
-                    
-                    console.log('✅ Repositioned element to fixed position with close button');
-                
-                console.log('✅ Native content FORCE styled with parents');
-                console.log('📊 After force - visible:', nativeContent.offsetHeight > 0);
-                console.log('📊 After force - display:', window.getComputedStyle(nativeContent).display);
-                console.log('📊 After force - visibility:', window.getComputedStyle(nativeContent).visibility);
-                console.log('📊 Final bounding rect:', nativeContent.getBoundingClientRect());
+                    jQuery('#saved-responses-display').prepend(info);
+                } else {
+                    alert('❌ ไม่พบข้อมูลที่บันทึกไว้: ' + response.data);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('❌ Load error:', error);
+                alert('❌ ไม่สามารถโหลดข้อมูลได้');
             }
         });
     }
+}
+
+// Enable edit mode
+function enableEditMode() {
+    console.log('✏️ Enabling edit mode...');
     
-    // Test activate button
-    setTimeout(function() {
-        var activateBtn = document.getElementById('activate-native');
-        console.log('🚀 Activate button found:', activateBtn ? 'YES' : 'NO');
+    if (!currentSurveyData) {
+        alert('กรุณาโหลดข้อมูลก่อนเข้าสู่โหมดแก้ไข');
+        return;
+    }
+    
+    var editInterface = document.getElementById('edit-mode-interface');
+    editInterface.style.display = 'block';
+    
+    // Make table rows clickable for editing
+    makeTableRowsEditable();
+}
+
+// Make table rows clickable for editing
+function makeTableRowsEditable() {
+    var rows = document.querySelectorAll('#saved-responses-display tbody tr');
+    
+    rows.forEach(function(row) {
+        row.style.cursor = 'pointer';
+        row.title = 'คลิกเพื่อแก้ไข';
         
-        if (activateBtn) {
-            console.log('🚀 Button visible:', activateBtn.offsetHeight > 0);
-            console.log('🚀 Button text:', activateBtn.textContent);
+        row.addEventListener('click', function() {
+            var fieldName = row.cells[0].textContent;
+            var fieldValue = row.cells[1].textContent;
             
-            activateBtn.addEventListener('click', function() {
-                console.log('🚀 ACTIVATE BUTTON CLICKED!');
-                alert('Native Mode button works!');
-            });
-        }
-    }, 1000);
-});
+            document.getElementById('edit-field-name').value = fieldName;
+            document.getElementById('edit-field-value').value = fieldValue;
+            
+            // Highlight selected row
+            rows.forEach(function(r) { r.style.backgroundColor = ''; });
+            row.style.backgroundColor = '#fff3cd';
+        });
+    });
+}
+
+// Save field edit
+function saveFieldEdit() {
+    var fieldName = document.getElementById('edit-field-name').value.trim();
+    var fieldValue = document.getElementById('edit-field-value').value.trim();
+    
+    if (!fieldName || !fieldValue) {
+        alert('กรุณาระบุชื่อฟิลด์และค่าใหม่');
+        return;
+    }
+    
+    if (!currentDataId) {
+        alert('ไม่พบ ID ข้อมูล กรุณาโหลดข้อมูลใหม่');
+        return;
+    }
+    
+    console.log('💾 Saving field edit:', fieldName, '=', fieldValue);
+    
+    if (typeof jQuery !== 'undefined') {
+        jQuery.ajax({
+            url: window.ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'update_survey_response',
+                data_id: currentDataId,
+                field_name: fieldName,
+                field_value: fieldValue,
+                nonce: window.tpakNonce
+            },
+            success: function(response) {
+                console.log('✅ Edit saved:', response);
+                
+                if (response.success) {
+                    alert('✅ บันทึกการแก้ไขสำเร็จ!');
+                    
+                    // Update current data
+                    currentSurveyData[fieldName] = fieldValue;
+                    
+                    // Refresh display
+                    displaySavedResponses(currentSurveyData);
+                    makeTableRowsEditable();
+                    
+                    // Clear form
+                    document.getElementById('edit-field-name').value = '';
+                    document.getElementById('edit-field-value').value = '';
+                    
+                } else {
+                    alert('❌ เกิดข้อผิดพลาด: ' + response.data);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('❌ Save edit error:', error);
+                alert('❌ ไม่สามารถบันทึกการแก้ไขได้');
+            }
+        });
+    }
+}
+
+// Cancel edit mode
+function cancelEditMode() {
+    var editInterface = document.getElementById('edit-mode-interface');
+    editInterface.style.display = 'none';
+    
+    // Remove edit styling from rows
+    var rows = document.querySelectorAll('#saved-responses-display tbody tr');
+    rows.forEach(function(row) {
+        row.style.cursor = '';
+        row.style.backgroundColor = '';
+        row.title = '';
+        row.removeEventListener('click', function() {});
+    });
+}
+
+// Show audit trail
+function showAuditTrail() {
+    console.log('📊 Loading audit trail...');
+    
+    if (!currentDataId) {
+        alert('กรุณาโหลดข้อมูลก่อนดูประวัติ');
+        return;
+    }
+    
+    // For now, show placeholder
+    var auditDisplay = document.getElementById('audit-trail-display');
+    var auditContent = document.getElementById('audit-content');
+    
+    auditContent.innerHTML = '<div class="audit-placeholder">' +
+        '<p>📊 ประวัติการแก้ไขสำหรับ Data ID: ' + currentDataId + '</p>' +
+        '<p>🔧 ระบบประวัติการแก้ไขกำลังพัฒนา</p>' +
+        '<p>จะแสดงรายการการแก้ไข, ผู้แก้ไข, และเวลาที่แก้ไข</p>' +
+        '</div>';
+    
+    auditDisplay.style.display = 'block';
+}
+
+// Hide audit trail
+function hideAuditTrail() {
+    document.getElementById('audit-trail-display').style.display = 'none';
+}
+
+// Refresh iframe
+function refreshIframe() {
+    console.log('🔄 Refreshing iframe...');
+    var iframe = document.getElementById('limesurvey-iframe');
+    iframe.src = iframe.src;
+}
 </script>
 
 <?php

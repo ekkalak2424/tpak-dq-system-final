@@ -88,6 +88,9 @@ class TPAK_DQ_System {
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-auto-structure-detector.php';
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-layout-renderer.php';
         
+        // Iframe Survey Integration
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-iframe-survey-handler.php';
+        
         // Admin files
         if (is_admin()) {
             require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'admin/class-admin-menu.php';
@@ -136,6 +139,9 @@ class TPAK_DQ_System {
             TPAK_Survey_Audit_Manager::getInstance();
             TPAK_Survey_User_Manager::getInstance();
             TPAK_Enhanced_Response_Viewer::getInstance(); // Re-enabled for AJAX handlers
+            
+            // Initialize new Iframe Survey Handler
+            new TPAK_Iframe_Survey_Handler();
         }
         
         // Check if we need to flush rewrite rules
