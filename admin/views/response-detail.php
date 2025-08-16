@@ -420,6 +420,46 @@ function guessCategory($field_key) {
         $response_mapping['questions'][$field_key]['category'] : 'other';
 }
 
+function formatAnswerValue($field_key, $raw_value, $survey_id = null) {
+    global $response_mapping;
+    
+    // First check from response mapping
+    if (isset($response_mapping['questions'][$field_key])) {
+        return $response_mapping['questions'][$field_key]['formatted_value'];
+    }
+    
+    // Fallback: Use Question Dictionary to format
+    require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-question-dictionary.php';
+    $dictionary = TPAK_Question_Dictionary::getInstance();
+    if ($survey_id) {
+        $dictionary->loadCustomMappings($survey_id);
+    }
+    
+    // Format common answer patterns
+    if (strtoupper($raw_value) === 'Y') {
+        return 'ใช่';
+    } elseif (strtoupper($raw_value) === 'N') {
+        return 'ไม่ใช่';
+    } elseif (is_numeric($raw_value)) {
+        $num = intval($raw_value);
+        // 1-5 scale
+        if ($num >= 1 && $num <= 5) {
+            $scale = array(
+                1 => 'น้อยที่สุด',
+                2 => 'น้อย', 
+                3 => 'ปานกลาง',
+                4 => 'มาก',
+                5 => 'มากที่สุด'
+            );
+            return isset($scale[$num]) ? $scale[$num] . ' (' . $num . ')' : $raw_value;
+        }
+    }
+    
+    // Use dictionary
+    $formatted = $dictionary->getAnswerText($raw_value);
+    return $formatted !== $raw_value ? $formatted : nl2br(esc_html($raw_value));
+}
+
 // Organize questions by groups/sections with enhanced logic
 $organized_data = array();
 $other_data = array();
@@ -810,10 +850,10 @@ $question_labels = array(); // Keep for backward compatibility
                                     </div>
                                     
                                     <div class="question-title">
-                                        <span class="question-number"><?php echo esc_html($question_key); ?></span>
                                         <span class="question-text">
                                             <?php echo esc_html($display_name); ?>
                                         </span>
+                                        <small class="question-number"><?php echo esc_html($question_key); ?></small>
                                     </div>
                                 </div>
                                 
@@ -847,13 +887,7 @@ $question_labels = array(); // Keep for backward compatibility
                                             <?php _e('คำตอบหลัก:', 'tpak-dq-system'); ?>
                                         </div>
                                         <div class="answer-value">
-                                            <?php 
-                                            if (isset($response_mapping['questions'][$question_key])) {
-                                                echo $response_mapping['questions'][$question_key]['formatted_value'];
-                                            } else {
-                                                echo nl2br(esc_html($question_data['main']));
-                                            }
-                                            ?>
+                                            <?php echo formatAnswerValue($question_key, $question_data['main'], $lime_survey_id); ?>
                                         </div>
                                     </div>
                                 <?php endif; ?>
@@ -875,18 +909,13 @@ $question_labels = array(); // Keep for backward compatibility
                                             ?>
                                                 <div class="sub-question-item">
                                                     <div class="sub-question-header">
-                                                        <span class="sub-question-key"><?php echo esc_html($sub_key); ?></span>
                                                         <span class="sub-question-label">
                                                             <?php echo esc_html($sub_display_name); ?>
                                                         </span>
+                                                        <small class="sub-question-key"><?php echo esc_html($sub_key); ?></small>
                                                     </div>
                                                     <div class="sub-question-value">
-                                                        <?php 
-                                                        if (isset($response_mapping['questions'][$sub_key])) {
-                                                            echo $response_mapping['questions'][$sub_key]['formatted_value'];
-                                                        } else {
-                                                            echo nl2br(esc_html($sub_value));
-                                                        }
+                                                        <?php echo formatAnswerValue($sub_key, $sub_value, $lime_survey_id);
                                                         ?>
                                                     </div>
                                                 </div>
