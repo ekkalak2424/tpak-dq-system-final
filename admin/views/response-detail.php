@@ -1266,9 +1266,26 @@ $question_labels = array(); // Keep for backward compatibility
 }
 
 .tab-content.active {
-    display: block;
+    display: block !important;
 }
 
+.nav-tab {
+    cursor: pointer !important;
+    text-decoration: none;
+    border: 1px solid #c3c4c7;
+    border-bottom: none;
+    margin-left: 0.5em;
+    padding: 5px 14px;
+    background: #f6f7f7;
+    color: #50575e;
+    font-size: 12px;
+    line-height: 16px;
+    display: inline-block;
+}
+.nav-tab:hover {
+    background-color: #fff;
+    color: #2271b1;
+}
 /* Native Integration Styles */
 .native-integration-header {
     background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -1998,8 +2015,10 @@ jQuery(document).ready(function($) {
     // Tab switching functionality
     $('.nav-tab').on('click', function(e) {
         e.preventDefault();
+        console.log('Tab clicked!');
         
         var tabId = $(this).data('tab');
+        console.log('Tab ID:', tabId);
         
         // Remove active class from all tabs and content
         $('.nav-tab').removeClass('nav-tab-active');
@@ -2008,11 +2027,41 @@ jQuery(document).ready(function($) {
         // Add active class to clicked tab and corresponding content
         $(this).addClass('nav-tab-active');
         $('#tab-' + tabId).addClass('active');
+        
+        console.log('Tab switching completed to:', tabId);
+    });
+    
+    // Fallback: Handle tab clicking with alternative method
+    $(document).on('click', '.nav-tab', function(e) {
+        console.log('Fallback tab handler triggered');
+        e.preventDefault();
+        
+        var tabId = $(this).data('tab');
+        if (!tabId) {
+            console.log('No tab ID found');
+            return;
+        }
+        
+        // Manual tab switching
+        $('.nav-tab').removeClass('nav-tab-active');
+        $('.tab-content').hide().removeClass('active');
+        
+        $(this).addClass('nav-tab-active');
+        $('#tab-' + tabId).show().addClass('active');
+        
+        console.log('Fallback tab switching completed to:', tabId);
     });
     
     // Native Survey Integration
-    var surveyId = '<?php echo esc_js($lime_survey_id ?: $survey_id); ?>';
+    var surveyId = '<?php echo esc_js($lime_survey_id); ?>';
     var responseId = '<?php echo esc_js($response_id); ?>';
+    
+    // Debug log
+    console.log('Tab switching initialized');
+    console.log('jQuery version:', $.fn.jquery);
+    console.log('Number of tabs found:', $('.nav-tab').length);
+    console.log('Survey ID:', surveyId);
+    console.log('Response ID:', responseId);
     
     $('#activate-native').on('click', function() {
         var button = $(this);
