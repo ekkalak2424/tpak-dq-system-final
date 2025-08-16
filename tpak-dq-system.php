@@ -74,6 +74,7 @@ class TPAK_DQ_System {
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-question-mapper.php';
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-question-dictionary.php';
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-adapter.php';
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-lss-parser.php';
         
         // Admin files
         if (is_admin()) {

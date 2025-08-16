@@ -83,6 +83,16 @@ class TPAK_DQ_Admin_Menu {
             array($this, 'import_page')
         );
         
+        // Import LSS structure submenu
+        add_submenu_page(
+            'tpak-dq-system',
+            'นำเข้าโครงสร้าง (.lss)',
+            'นำเข้าโครงสร้าง',
+            'manage_options',
+            'tpak-dq-system-import-lss',
+            array($this, 'import_lss_page')
+        );
+        
         // Survey Responses submenu
         add_submenu_page(
             'tpak-dq-system',
@@ -957,6 +967,13 @@ class TPAK_DQ_Admin_Menu {
         } else {
             wp_send_json_error(array('message' => $result['message']));
         }
+    }
+    
+    public function import_lss_page() {
+        // Ensure post types are registered before accessing
+        $this->ensure_post_types_registered();
+        
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'admin/views/import-lss.php';
     }
     
 }
