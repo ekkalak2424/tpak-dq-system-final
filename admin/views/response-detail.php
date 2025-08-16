@@ -2171,6 +2171,32 @@ $question_labels = array(); // Keep for backward compatibility
     border-radius: 8px !important;
     margin-bottom: 20px !important;
 }
+
+/* Force ALL parent containers visible */
+.tpak-detail-content,
+.wrap {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
+/* Force visible for debug purposes */
+body.wp-admin #wpbody-content {
+    display: block !important;
+    visibility: visible !important;
+}
+
+/* Override any WordPress hiding */
+.wp-admin #tab-native {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+}
 </style>
 
 <!-- Inline debug script -->
@@ -2215,6 +2241,24 @@ document.addEventListener('DOMContentLoaded', function() {
                     c.classList.remove('active');
                 });
                 
+                // Force show ALL parent containers
+                var parentContainers = [
+                    document.querySelector('.tpak-detail-content'),
+                    document.querySelector('.wrap'),
+                    nativeContent.parentElement,
+                    nativeContent.parentElement?.parentElement
+                ];
+                
+                parentContainers.forEach(function(container) {
+                    if (container) {
+                        container.style.setProperty('display', 'block', 'important');
+                        container.style.setProperty('visibility', 'visible', 'important');
+                        container.style.setProperty('opacity', '1', 'important');
+                        container.style.setProperty('height', 'auto', 'important');
+                        console.log('👥 Forced parent visible:', container.className || container.tagName);
+                    }
+                });
+                
                 // Force show native content with aggressive styling
                 nativeContent.style.setProperty('display', 'block', 'important');
                 nativeContent.style.setProperty('visibility', 'visible', 'important');
@@ -2224,19 +2268,27 @@ document.addEventListener('DOMContentLoaded', function() {
                 nativeContent.style.setProperty('background', '#fff', 'important');
                 nativeContent.style.setProperty('border', '2px solid #667eea', 'important');
                 nativeContent.style.setProperty('padding', '20px', 'important');
+                nativeContent.style.setProperty('position', 'relative', 'important');
+                nativeContent.style.setProperty('z-index', '9999', 'important');
                 nativeContent.classList.add('active');
                 
                 // Force show all child elements
                 var allChildren = nativeContent.querySelectorAll('*');
                 allChildren.forEach(function(child) {
+                    child.style.setProperty('display', 'block', 'important');
                     child.style.setProperty('visibility', 'visible', 'important');
                     child.style.setProperty('opacity', '1', 'important');
+                    child.style.setProperty('position', 'relative', 'important');
                 });
                 
-                console.log('✅ Native content FORCE styled');
+                // Force scroll to the element
+                nativeContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                console.log('✅ Native content FORCE styled with parents');
                 console.log('📊 After force - visible:', nativeContent.offsetHeight > 0);
                 console.log('📊 After force - display:', window.getComputedStyle(nativeContent).display);
                 console.log('📊 After force - visibility:', window.getComputedStyle(nativeContent).visibility);
+                console.log('📊 Bounding rect:', nativeContent.getBoundingClientRect());
             }
         });
     }
