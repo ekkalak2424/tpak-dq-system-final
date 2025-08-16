@@ -44,20 +44,12 @@ wp_enqueue_script(
 
 wp_enqueue_style('tpak-dq-admin', TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/css/admin-style.css', array(), TPAK_DQ_SYSTEM_VERSION);
 
-// Set global variables for JavaScript
-echo '<script>
-window.ajaxurl = "' . admin_url('admin-ajax.php') . '";
-window.tpakSurveyId = "' . esc_js($lime_survey_id) . '";
-window.tpakResponseId = "' . esc_js($response_id) . '";
-window.tpakNonce = "' . wp_create_nonce('native_view_nonce') . '";
-</script>';
-
 // Check user permissions first
 if (!current_user_can('edit_posts')) {
     wp_die(__('Sorry, you are not allowed to access this page.', 'tpak-dq-system'));
 }
 
-// Get response ID from URL
+// Get response ID from URL FIRST - before using it
 $response_id = isset($_GET['id']) ? absint($_GET['id']) : 0;
 
 if (!$response_id) {
@@ -81,6 +73,14 @@ $import_date = get_post_meta($response_id, '_import_date', true);
 $workflow = new TPAK_DQ_Workflow();
 $status = $workflow->get_batch_status($response_id);
 $audit_trail = $workflow->get_audit_trail($response_id);
+
+// Set global JavaScript variables AFTER getting the data
+echo '<script>
+window.ajaxurl = "' . admin_url('admin-ajax.php') . '";
+window.tpakSurveyId = "' . esc_js($lime_survey_id) . '";
+window.tpakResponseId = "' . esc_js($response_id) . '";
+window.tpakNonce = "' . wp_create_nonce('native_view_nonce') . '";
+</script>';
 
 // Advanced Question Mapping System
 class TPAK_Question_Mapper {
