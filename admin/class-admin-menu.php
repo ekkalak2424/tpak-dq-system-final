@@ -26,6 +26,7 @@ class TPAK_DQ_Admin_Menu {
         add_action('wp_ajax_tpak_test_api', array($this, 'test_api_connection'));
         add_action('wp_ajax_tpak_import_survey', array($this, 'import_survey_ajax'));
         add_action('wp_ajax_tpak_manual_import', array($this, 'manual_import_ajax'));
+        add_action('wp_ajax_tpak_auto_detect_structure', array($this, 'auto_detect_structure_ajax'));
         
         // AJAX actions registered (debug logging removed)
     }
@@ -970,6 +971,140 @@ class TPAK_DQ_Admin_Menu {
         $this->ensure_post_types_registered();
         
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'admin/views/import-lss.php';
+    }
+    
+    /**
+     * Auto detect structure via AJAX
+     */
+    public function auto_detect_structure_ajax() {
+        // Check nonce
+        if (!wp_verify_nonce($_POST['nonce'], 'tpak_workflow_nonce')) {
+            wp_send_json_error(array('message' => 'Security check failed'));
+        }
+        
+        // Check permissions
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error(array('message' => 'Permission denied'));
+        }
+        
+        $survey_id = sanitize_text_field($_POST['survey_id']);
+        if (empty($survey_id)) {
+            wp_send_json_error(array('message' => 'Survey ID is required'));
+        }
+        
+        // ใช้ Auto Structure Detector
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-auto-structure-detector.php';
+        $detector = TPAK_Auto_Structure_Detector::getInstance();
+        
+        $result = $detector->auto_detect_structure($survey_id);
+        
+        if ($result['success']) {
+            // สร้าง HTML สำหรับแสดงผล
+            $html = $this->render_detection_results($result);
+            
+            wp_send_json_success(array(
+                'message' => 'ตรวจจับโครงสร้างสำเร็จ',
+                'html' => $html,
+                'analysis' => $result['analysis'],
+                'recommendations' => $result['recommendations']
+            ));
+        } else {
+            wp_send_json_error(array('message' => 'ไม่สามารถตรวจจับโครงสร้างได้'));
+        }
+    }
+    
+    /**
+     * สร้าง HTML สำหรับแสดงผลการตรวจจับ
+     */
+    private function render_detection_results($result) {
+        $html = '<div class="detection-results">';
+        
+        // Status
+        $html .= '<div class="detection-status ' . ($result['success'] ? 'success' : 'error') . '">';
+        $html .= '<h4>สถานะการตรวจจับ</h4>';
+        
+        if ($result['lss_imported']) {
+            $html .= '<p>✅ พบและโหลดไฟล์ .lss สำเร็จ</p>';
+        } elseif ($result['api_structure']) {
+            $html .= '<p>✅ ดึงโครงสร้างจาก API สำเร็จ</p>';
+        } else {
+            $html .= '<p>❌ ไม่พบโครงสร้างแบบสอบถาม</p>';
+        }
+        $html .= '</div>';
+        
+        if ($result['success'] && isset($result['analysis'])) {
+            $analysis = $result['analysis'];
+            
+            // Survey Info
+            $html .= '<div class="survey-analysis">';
+            $html .= '<h4>ข้อมูลแบบสอบถาม</h4>';
+            $html .= '<ul>';
+            
+            if (isset($analysis['survey_info']['title'])) {
+                $html .= '<li><strong>ชื่อ:</strong> ' . esc_html($analysis['survey_info']['title']) . '</li>';
+            }
+            
+            if (isset($analysis['total_questions'])) {
+                $html .= '<li><strong>จำนวนคำถาม:</strong> ' . $analysis['total_questions'] . ' คำถาม</li>';
+            }
+            
+            if (isset($analysis['total_groups'])) {
+                $html .= '<li><strong>จำนวนกลุ่ม:</strong> ' . $analysis['total_groups'] . ' กลุ่ม</li>';
+            }
+            
+            if (isset($analysis['structure_complexity'])) {
+                $complexity_text = array(
+                    'simple' => 'ง่าย',
+                    'medium' => 'ปานกลาง', 
+                    'complex' => 'ซับซ้อน'
+                );
+                $html .= '<li><strong>ระดับความซับซ้อน:</strong> ' . 
+                         ($complexity_text[$analysis['structure_complexity']] ?? $analysis['structure_complexity']) . '</li>';
+            }
+            
+            $html .= '</ul>';
+            $html .= '</div>';
+            
+            // Question Types
+            if (isset($analysis['question_types']) && !empty($analysis['question_types'])) {
+                $html .= '<div class="question-types">';
+                $html .= '<h4>ประเภทคำถาม</h4>';
+                $html .= '<ul>';
+                foreach ($analysis['question_types'] as $type => $count) {
+                    $html .= '<li>' . esc_html($type) . ': ' . $count . ' คำถาม</li>';
+                }
+                $html .= '</ul>';
+                $html .= '</div>';
+            }
+            
+            // Groups
+            if (isset($analysis['groups_structure']) && !empty($analysis['groups_structure'])) {
+                $html .= '<div class="groups-structure">';
+                $html .= '<h4>โครงสร้างกลุ่ม</h4>';
+                $html .= '<ul>';
+                foreach ($analysis['groups_structure'] as $gid => $group) {
+                    $html .= '<li><strong>' . esc_html($group['name']) . '</strong> (' . $group['questions_count'] . ' คำถาม)</li>';
+                }
+                $html .= '</ul>';
+                $html .= '</div>';
+            }
+        }
+        
+        // Recommendations
+        if (!empty($result['recommendations'])) {
+            $html .= '<div class="recommendations">';
+            $html .= '<h4>คำแนะนำ</h4>';
+            $html .= '<ul>';
+            foreach ($result['recommendations'] as $recommendation) {
+                $html .= '<li>' . esc_html($recommendation) . '</li>';
+            }
+            $html .= '</ul>';
+            $html .= '</div>';
+        }
+        
+        $html .= '</div>';
+        
+        return $html;
     }
     
 }

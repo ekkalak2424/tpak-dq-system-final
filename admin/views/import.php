@@ -50,6 +50,40 @@ if (!defined('ABSPATH')) {
                 <?php endif; ?>
             </div>
             
+            <!-- Auto Structure Detection Section -->
+            <div class="tpak-auto-detection" style="margin-bottom: 30px; padding: 20px; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 5px;">
+                <h3>🔍 ระบบตรวจจับโครงสร้างอัตโนมัติ</h3>
+                <p>ระบุ Survey ID แล้วระบบจะตรวจหาไฟล์ .lss และวิเคราะห์โครงสร้างอัตโนมัติ</p>
+                
+                <div class="auto-detection-form">
+                    <table class="form-table">
+                        <tr>
+                            <th scope="row"><?php _e('Survey ID', 'tpak-dq-system'); ?></th>
+                            <td>
+                                <input type="number" 
+                                       id="auto_detect_survey_id" 
+                                       name="auto_detect_survey_id" 
+                                       value="<?php echo esc_attr($options['survey_id'] ?? ''); ?>" 
+                                       class="regular-text" 
+                                       placeholder="เช่น 836511" />
+                                <button type="button" 
+                                        id="btn_auto_detect" 
+                                        class="button button-primary"
+                                        style="margin-left: 10px;">
+                                    🔍 ตรวจจับโครงสร้าง
+                                </button>
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    <!-- Detection Results -->
+                    <div id="detection_results" style="display: none; margin-top: 20px;">
+                        <h4>ผลการตรวจจับ:</h4>
+                        <div id="detection_content"></div>
+                    </div>
+                </div>
+            </div>
+            
             <?php if (isset($result)): ?>
                 <?php if ($result['success']): ?>
                     <div class="tpak-import-status success">

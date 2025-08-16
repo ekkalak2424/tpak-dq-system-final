@@ -16,6 +16,71 @@ jQuery(document).ready(function($) {
     console.log('TPAK DQ Admin Script loaded');
     console.log('tpak_dq_ajax:', tpak_dq_ajax);
     
+    // Display Mode Switcher
+    $(document).on('change', '#display-mode', function() {
+        var mode = $(this).val();
+        
+        // ซ่อนทุก layout
+        $('#original-layout, #enhanced-layout').hide();
+        
+        // แสดง layout ที่เลือก
+        if (mode === 'original') {
+            $('#original-layout').show();
+        } else {
+            $('#enhanced-layout').show();
+        }
+        
+        console.log('Display mode changed to:', mode);
+    });
+    
+    // Auto Structure Detection
+    $(document).on('click', '#btn_auto_detect', function(e) {
+        e.preventDefault();
+        
+        var button = $(this);
+        var surveyId = $('#auto_detect_survey_id').val();
+        
+        if (!surveyId) {
+            alert('กรุณาระบุ Survey ID');
+            return;
+        }
+        
+        // แสดง loading
+        button.prop('disabled', true).html('🔍 กำลังตรวจจับ...');
+        $('#detection_results').hide();
+        
+        $.ajax({
+            url: tpak_dq_ajax.ajax_url,
+            type: 'POST',
+            data: {
+                action: 'tpak_auto_detect_structure',
+                survey_id: surveyId,
+                nonce: tpak_dq_ajax.nonce
+            },
+            success: function(response) {
+                console.log('Auto detection response:', response);
+                
+                if (response.success) {
+                    $('#detection_content').html(response.data.html);
+                    $('#detection_results').show();
+                    
+                    // แสดงข้อความสำเร็จ
+                    showNotification('success', 'ตรวจจับโครงสร้างสำเร็จ!');
+                } else {
+                    alert('ข้อผิดพลาด: ' + response.data.message);
+                }
+            },
+            error: function(xhr, status, error) {
+                console.error('Auto detection error:', error);
+                alert('เกิดข้อผิดพลาดในการตรวจจับโครงสร้าง');
+            },
+            complete: function() {
+                // คืนสถานะปุ่ม
+                button.prop('disabled', false).html('🔍 ตรวจจับโครงสร้าง');
+            }
+        });
+    });
+    
     // Workflow action handlers
     $(document).on('click', '.tpak-action-btn', function(e) {
         e.preventDefault();

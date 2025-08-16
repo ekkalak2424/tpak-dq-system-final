@@ -267,6 +267,8 @@ class TPAK_Question_Mapper {
 // Include the advanced question mapper and survey adapter
 require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-question-mapper.php';
 require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-adapter.php';
+require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-auto-structure-detector.php';
+require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-layout-renderer.php';
 
 // Initialize variables with error handling
 $question_mapper = null;
@@ -283,6 +285,23 @@ try {
     // Initialize the advanced mapper and survey adapter
     $question_mapper = TPAK_Advanced_Question_Mapper::getInstance();
     $survey_adapter = TPAK_Survey_Adapter::getInstance();
+    
+    // ตรวจจับโครงสร้างอัตโนมัติถ้ายังไม่มี
+    $detector = TPAK_Auto_Structure_Detector::getInstance();
+    $detection_result = $detector->get_cached_result($lime_survey_id);
+    
+    if (!$detection_result) {
+        error_log('TPAK DQ System: Running auto-detection for Survey ID: ' . $lime_survey_id);
+        $detection_result = $detector->auto_detect_structure($lime_survey_id);
+    }
+    
+    // เตรียม Survey Layout Renderer
+    $layout_renderer = TPAK_Survey_Layout_Renderer::getInstance();
+    $layout_prepared = $layout_renderer->prepare_survey_display(
+        $lime_survey_id, 
+        $response_data, 
+        $detection_result['display_config'] ?? null
+    );
     
     error_log('TPAK DQ System: Processing response for Survey ID: ' . $lime_survey_id . ' with ' . count($response_data) . ' fields');
     
@@ -655,7 +674,8 @@ $question_labels = array(); // Keep for backward compatibility
                     <div class="display-mode-selector">
                         <label><?php _e('รูปแบบการแสดงผล:', 'tpak-dq-system'); ?></label>
                         <select id="display-mode" class="display-mode-select">
-                            <option value="enhanced"><?php _e('แบบปรับปรุง (แนะนำ)', 'tpak-dq-system'); ?></option>
+                            <option value="original" <?php echo $layout_prepared ? 'selected' : ''; ?>><?php _e('🎯 แบบต้นฉบับ (ใหม่!)', 'tpak-dq-system'); ?></option>
+                            <option value="enhanced" <?php echo !$layout_prepared ? 'selected' : ''; ?>><?php _e('แบบปรับปรุง', 'tpak-dq-system'); ?></option>
                             <option value="grouped"><?php _e('จัดกลุ่มตามหมวด', 'tpak-dq-system'); ?></option>
                             <option value="flat"><?php _e('แสดงแบบเรียบ', 'tpak-dq-system'); ?></option>
                             <option value="table"><?php _e('แสดงแบบตาราง', 'tpak-dq-system'); ?></option>
@@ -811,6 +831,21 @@ $question_labels = array(); // Keep for backward compatibility
                         </details>
                     <?php endif; ?>
                 <?php endif; ?>
+                
+                <!-- Original Survey Layout (ใหม่!) -->
+                <?php if ($layout_prepared): ?>
+                    <div id="original-layout" class="survey-layout-container" style="display: block;">
+                        <div class="layout-header">
+                            <h3>🎯 รูปแบบแบบสอบถามต้นฉบับ</h3>
+                            <p class="layout-description">แสดงผลตามโครงสร้างดั้งเดิมของแบบสอบถาม พร้อมกลุ่มคำถามและลำดับที่ถูกต้อง</p>
+                        </div>
+                        
+                        <?php echo $layout_renderer->render_survey_layout(); ?>
+                    </div>
+                <?php endif; ?>
+                
+                <!-- Enhanced Layout (เดิม) -->
+                <div id="enhanced-layout" class="enhanced-layout-container" style="display: <?php echo $layout_prepared ? 'none' : 'block'; ?>;">
                 
                 <?php if (!empty($organized_data)): ?>
                     <?php 
