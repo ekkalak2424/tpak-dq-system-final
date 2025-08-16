@@ -8,45 +8,31 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Force remove ALL conflicting scripts before any other scripts load
-function tpak_remove_conflicting_scripts() {
+// Completely remove all jQuery UI scripts that cause conflicts
+add_action('wp_print_scripts', function() {
     global $wp_scripts;
     
-    // List of scripts to remove
-    $scripts_to_remove = array(
-        'jquery-ui-datepicker',
-        'jquery-ui-core', 
-        'jquery-migrate',
-        'jquery-ui',
-        'jqueryui'
+    $conflicting_scripts = array(
+        'jquery-ui-datepicker', 'jquery-ui-core', 'jquery-migrate', 
+        'jquery-ui', 'jqueryui', 'jquery-ui-widget', 'jquery-ui-mouse',
+        'jquery-ui-position', 'jquery-ui-draggable', 'jquery-ui-droppable'
     );
     
-    foreach ($scripts_to_remove as $script) {
+    foreach ($conflicting_scripts as $script) {
         wp_deregister_script($script);
         wp_dequeue_script($script);
+        unset($wp_scripts->registered[$script]);
     }
-}
+}, 100);
 
-add_action('wp_enqueue_scripts', 'tpak_remove_conflicting_scripts', 1);
-add_action('admin_enqueue_scripts', 'tpak_remove_conflicting_scripts', 1);
-
-// Enqueue only jQuery core
+// Enqueue only jQuery core - no dependencies
 wp_enqueue_script('jquery');
 
-// Load clean tab system JavaScript
+// Load complete TPAK system - single file with everything
 wp_enqueue_script(
-    'tpak-clean-tabs',
-    TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/clean-tabs.js',
-    array(), // No dependencies
-    TPAK_DQ_SYSTEM_VERSION,
-    true
-);
-
-// Load simple Native Survey handler
-wp_enqueue_script(
-    'tpak-native-simple',
-    TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/native-survey-simple.js',
-    array('jquery'), // Requires jQuery
+    'tpak-final-system',
+    TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/tpak-final.js',
+    array('jquery'), // Only depends on jQuery core
     TPAK_DQ_SYSTEM_VERSION,
     true
 );
@@ -2026,6 +2012,42 @@ $question_labels = array(); // Keep for backward compatibility
     .other-data-grid {
         grid-template-columns: 1fr;
     }
+}
+
+/* Native Survey Styles */
+.survey-form-wrapper {
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.survey-data-display {
+    max-height: 600px;
+    overflow-y: auto;
+}
+
+.info-box, .groups-box, .questions-box {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 15px;
+    margin: 10px 0;
+    font-family: monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    overflow-x: auto;
+}
+
+.survey-loading {
+    text-align: center;
+    padding: 40px;
+    font-size: 16px;
+}
+
+#native-survey-container {
+    min-height: 200px;
 }
 </style>
 
