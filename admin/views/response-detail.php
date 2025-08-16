@@ -1273,10 +1273,16 @@ $question_labels = array(); // Keep for backward compatibility
 
 .tab-content {
     display: none;
+    opacity: 0;
+    visibility: hidden;
 }
 
 .tab-content.active {
-    display: block;
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    height: auto !important;
+    min-height: 300px;
 }
 
 .nav-tab {
@@ -2110,6 +2116,61 @@ $question_labels = array(); // Keep for backward compatibility
 .status-indicator {
     font-weight: bold;
 }
+
+/* Force visible styles for Native tab */
+#tab-native {
+    background: #fff !important;
+    border: 2px solid #667eea !important;
+    border-radius: 8px !important;
+    padding: 20px !important;
+    margin: 20px 0 !important;
+}
+
+#tab-native.active {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    min-height: 400px !important;
+    z-index: 1000 !important;
+}
+
+/* Force button visibility */
+#activate-native {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    background: #0073aa !important;
+    color: white !important;
+    border: none !important;
+    padding: 10px 20px !important;
+    border-radius: 4px !important;
+    font-size: 14px !important;
+    cursor: pointer !important;
+}
+
+/* Force native container visibility */
+#native-survey-container {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    background: #f9f9f9 !important;
+    border: 1px solid #ddd !important;
+    border-radius: 8px !important;
+    padding: 20px !important;
+    margin: 20px 0 !important;
+    min-height: 200px !important;
+}
+
+.native-integration-header {
+    display: block !important;
+    visibility: visible !important;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+    color: white !important;
+    padding: 20px !important;
+    border-radius: 8px !important;
+    margin-bottom: 20px !important;
+}
 </style>
 
 <!-- Inline debug script -->
@@ -2154,12 +2215,28 @@ document.addEventListener('DOMContentLoaded', function() {
                     c.classList.remove('active');
                 });
                 
-                // Show native content
-                nativeContent.style.display = 'block';
+                // Force show native content with aggressive styling
+                nativeContent.style.setProperty('display', 'block', 'important');
+                nativeContent.style.setProperty('visibility', 'visible', 'important');
+                nativeContent.style.setProperty('opacity', '1', 'important');
+                nativeContent.style.setProperty('height', 'auto', 'important');
+                nativeContent.style.setProperty('min-height', '400px', 'important');
+                nativeContent.style.setProperty('background', '#fff', 'important');
+                nativeContent.style.setProperty('border', '2px solid #667eea', 'important');
+                nativeContent.style.setProperty('padding', '20px', 'important');
                 nativeContent.classList.add('active');
                 
-                console.log('✅ Native content forced visible');
+                // Force show all child elements
+                var allChildren = nativeContent.querySelectorAll('*');
+                allChildren.forEach(function(child) {
+                    child.style.setProperty('visibility', 'visible', 'important');
+                    child.style.setProperty('opacity', '1', 'important');
+                });
+                
+                console.log('✅ Native content FORCE styled');
                 console.log('📊 After force - visible:', nativeContent.offsetHeight > 0);
+                console.log('📊 After force - display:', window.getComputedStyle(nativeContent).display);
+                console.log('📊 After force - visibility:', window.getComputedStyle(nativeContent).visibility);
             }
         });
     }
