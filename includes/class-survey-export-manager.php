@@ -373,12 +373,7 @@ class TPAK_Survey_Export_Manager {
         // ใช้ PHPSpreadsheet
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'libs/phpspreadsheet/vendor/autoload.php';
         
-        use PhpOffice\PhpSpreadsheet\Spreadsheet;
-        use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
-        use PhpOffice\PhpSpreadsheet\Style\Color;
-        use PhpOffice\PhpSpreadsheet\Style\Fill;
-        
-        $spreadsheet = new Spreadsheet();
+        $spreadsheet = new \PhpOffice\PhpSpreadsheet\Spreadsheet();
         $sheet = $spreadsheet->getActiveSheet();
         
         // หัวข้อ
@@ -405,7 +400,7 @@ class TPAK_Survey_Export_Manager {
         $headerStyle = [
             'font' => ['bold' => true],
             'fill' => [
-                'fillType' => Fill::FILL_SOLID,
+                'fillType' => \PhpOffice\PhpSpreadsheet\Style\Fill::FILL_SOLID,
                 'startColor' => ['rgb' => 'E2EFDA']
             ]
         ];
@@ -443,7 +438,7 @@ class TPAK_Survey_Export_Manager {
         
         wp_mkdir_p($upload_dir['basedir'] . '/tpak-exports/');
         
-        $writer = new Xlsx($spreadsheet);
+        $writer = new \PhpOffice\PhpSpreadsheet\Writer\Xlsx($spreadsheet);
         $writer->save($file_path);
         
         return $upload_dir['baseurl'] . '/tpak-exports/' . $file_name;
