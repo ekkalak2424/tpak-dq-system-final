@@ -20,6 +20,7 @@ define('TPAK_DQ_SYSTEM_VERSION', '1.0.0');
 define('TPAK_DQ_SYSTEM_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('TPAK_DQ_SYSTEM_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('TPAK_DQ_SYSTEM_PLUGIN_BASENAME', plugin_basename(__FILE__));
+define('TPAK_DQ_SYSTEM_PLUGIN_FILE', __FILE__);
 
 /**
  * Main TPAK DQ System Class
@@ -77,6 +78,16 @@ class TPAK_DQ_System {
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-lss-parser.php';
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-error-handler.php';
         
+        // Enhanced Survey System (Native 100%)
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-native-survey-renderer.php';
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-review-workflow.php';
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-export-manager.php';
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-audit-manager.php';
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-user-manager.php';
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-enhanced-response-viewer.php';
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-auto-structure-detector.php';
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-layout-renderer.php';
+        
         // Admin files
         if (is_admin()) {
             require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'admin/class-admin-menu.php';
@@ -117,6 +128,16 @@ class TPAK_DQ_System {
         // Initialize notifications
         new TPAK_DQ_Notifications();
         
+        // Initialize Enhanced Survey System
+        if (is_admin()) {
+            TPAK_Native_Survey_Renderer::getInstance();
+            TPAK_Survey_Review_Workflow::getInstance();
+            TPAK_Survey_Export_Manager::getInstance();
+            TPAK_Survey_Audit_Manager::getInstance();
+            TPAK_Survey_User_Manager::getInstance();
+            TPAK_Enhanced_Response_Viewer::getInstance();
+        }
+        
         // Check if we need to flush rewrite rules
         if (get_option('tpak_dq_system_flush_rewrite', false)) {
             flush_rewrite_rules();
@@ -147,6 +168,19 @@ class TPAK_DQ_System {
         $post_types = new TPAK_DQ_Post_Types();
         $post_types->register_post_types();
         $post_types->register_taxonomies();
+        
+        // Create Enhanced Survey System database tables
+        if (class_exists('TPAK_Survey_Audit_Manager')) {
+            $audit_manager = TPAK_Survey_Audit_Manager::getInstance();
+            $audit_manager->create_audit_tables();
+        }
+        
+        // Create User Management roles and capabilities
+        if (class_exists('TPAK_Survey_User_Manager')) {
+            $user_manager = TPAK_Survey_User_Manager::getInstance();
+            $user_manager->register_custom_roles();
+            $user_manager->register_custom_capabilities();
+        }
         
         // Flush rewrite rules to ensure custom post types are recognized
         flush_rewrite_rules();

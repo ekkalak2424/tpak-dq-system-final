@@ -617,13 +617,27 @@ $question_labels = array(); // Keep for backward compatibility
         </div>
     </div>
     
+    <!-- Tab Navigation -->
+    <div class="nav-tab-wrapper">
+        <a href="#tab-original" class="nav-tab nav-tab-active" data-tab="original">
+            📊 แบบเดิม
+        </a>
+        <a href="#tab-native" class="nav-tab" data-tab="native">
+            🎯 Native 100%
+        </a>
+        <?php do_action('tpak_response_detail_tabs'); ?>
+    </div>
+    
     <!-- Main Content Area -->
     <div class="tpak-detail-content">
-        <div class="content-main">
-            
-            <!-- Response Info Card -->
-            <div class="info-card">
-                <h2><?php _e('ข้อมูลทั่วไป', 'tpak-dq-system'); ?></h2>
+        
+        <!-- Original Tab Content -->
+        <div id="tab-original" class="tab-content active">
+            <div class="content-main">
+                
+                <!-- Response Info Card -->
+                <div class="info-card">
+                    <h2><?php _e('ข้อมูลทั่วไป', 'tpak-dq-system'); ?></h2>
                 <div class="info-grid">
                     <div class="info-item">
                         <label><?php _e('ชื่อชุดข้อมูล:', 'tpak-dq-system'); ?></label>
@@ -1191,11 +1205,116 @@ $question_labels = array(); // Keep for backward compatibility
                     </div>
                 </div>
             </div>
+            </div> <!-- End content-main -->
+        </div> <!-- End tab-original -->
+        
+        <!-- Native Tab Content -->
+        <div id="tab-native" class="tab-content">
+            <div class="native-integration-header">
+                <h3>🎯 ระบบแก้ไขแบบสอบถาม Native 100%</h3>
+                <p>ดึงแบบสอบถามมาแบบสมบูรณ์และแก้ไขได้เต็มรูปแบบ</p>
+                
+                <div class="integration-controls">
+                    <button type="button" class="button button-primary" id="activate-native">
+                        🚀 เปิดใช้งาน Native Mode
+                    </button>
+                    <button type="button" class="button" id="compare-views">
+                        🔍 เปรียบเทียบกับแบบเดิม
+                    </button>
+                </div>
+                
+                <div class="integration-status">
+                    <div class="status-item">
+                        <label>แบบเดิม:</label>
+                        <span class="status-indicator original-status">✅ โหลดแล้ว</span>
+                    </div>
+                    <div class="status-item">
+                        <label>แบบ Native:</label>
+                        <span class="status-indicator native-status">⏳ รอโหลด</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="native-survey-container" style="display: none;">
+                <!-- Native Survey Renderer จะโหลดที่นี่ -->
+            </div>
         </div>
-    </div>
-</div>
+        
+        <?php do_action('tpak_response_detail_content'); ?>
+        
+    </div> <!-- End tpak-detail-content -->
+</div> <!-- End wrap -->
 
 <style>
+/* Tab Styles */
+.nav-tab-wrapper {
+    margin-bottom: 20px;
+}
+
+.nav-tab {
+    font-size: 14px !important;
+    padding: 10px 15px !important;
+}
+
+.nav-tab-active {
+    background: #fff !important;
+    border-bottom: 1px solid #fff !important;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+/* Native Integration Styles */
+.native-integration-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.native-integration-header h3 {
+    margin: 0 0 10px 0;
+    color: white;
+}
+
+.integration-controls {
+    margin: 15px 0;
+}
+
+.integration-controls button {
+    margin-right: 10px;
+}
+
+.integration-status {
+    display: flex;
+    gap: 20px;
+    margin-top: 15px;
+    font-size: 14px;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-indicator {
+    font-weight: bold;
+}
+
+#native-survey-container {
+    border: 2px solid #667eea;
+    border-radius: 8px;
+    padding: 20px;
+    background: #f8f9ff;
+}
+
 /* Print Styles */
 @media print {
     .tpak-detail-header .header-actions,
@@ -1876,6 +1995,56 @@ $question_labels = array(); // Keep for backward compatibility
 
 <script>
 jQuery(document).ready(function($) {
+    // Tab switching functionality
+    $('.nav-tab').on('click', function(e) {
+        e.preventDefault();
+        
+        var tabId = $(this).data('tab');
+        
+        // Remove active class from all tabs and content
+        $('.nav-tab').removeClass('nav-tab-active');
+        $('.tab-content').removeClass('active');
+        
+        // Add active class to clicked tab and corresponding content
+        $(this).addClass('nav-tab-active');
+        $('#tab-' + tabId).addClass('active');
+    });
+    
+    // Native Survey Integration
+    var surveyId = '<?php echo esc_js($lime_survey_id ?: $survey_id); ?>';
+    var responseId = '<?php echo esc_js($response_id); ?>';
+    
+    $('#activate-native').on('click', function() {
+        var button = $(this);
+        button.prop('disabled', true).text('🔄 กำลังโหลด...');
+        
+        $.ajax({
+            url: ajaxurl,
+            type: 'POST',
+            data: {
+                action: 'load_native_view',
+                survey_id: surveyId,
+                response_id: responseId,
+                post_id: responseId,
+                nonce: '<?php echo wp_create_nonce('native_view_nonce'); ?>'
+            },
+            success: function(response) {
+                if (response.success) {
+                    $('#native-survey-container').html(response.data.html).show();
+                    $('.native-status').html('✅ โหลดแล้ว').removeClass('loading').addClass('loaded');
+                    button.text('✅ Native Mode เปิดใช้งานแล้ว').addClass('button-secondary').removeClass('button-primary');
+                } else {
+                    alert('เกิดข้อผิดพลาด: ' + (response.data || 'ไม่สามารถโหลด Native view ได้'));
+                    button.prop('disabled', false).text('🚀 เปิดใช้งาน Native Mode');
+                }
+            },
+            error: function() {
+                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+                button.prop('disabled', false).text('🚀 เปิดใช้งาน Native Mode');
+            }
+        });
+    });
+    
     // Toggle question sections
     $('.toggle-section, .question-header').on('click', function(e) {
         e.preventDefault();
