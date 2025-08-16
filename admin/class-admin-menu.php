@@ -27,10 +27,7 @@ class TPAK_DQ_Admin_Menu {
         add_action('wp_ajax_tpak_import_survey', array($this, 'import_survey_ajax'));
         add_action('wp_ajax_tpak_manual_import', array($this, 'manual_import_ajax'));
         
-        // Debug: Log AJAX action registration
-        error_log('TPAK DQ System: AJAX action tpak_test_api registered');
-        error_log('TPAK DQ System: AJAX action tpak_import_survey registered');
-        error_log('TPAK DQ System: AJAX action tpak_manual_import registered');
+        // AJAX actions registered (debug logging removed)
     }
     
     /**
@@ -224,8 +221,7 @@ class TPAK_DQ_Admin_Menu {
                 'nonce' => wp_create_nonce('tpak_workflow_nonce')
             ));
             
-            // Debug: Log the nonce
-            error_log('TPAK DQ System: Generated nonce: ' . wp_create_nonce('tpak_workflow_nonce'));
+            // Nonce generated for workflow actions
         }
         
         // Also load on verification_batch edit pages

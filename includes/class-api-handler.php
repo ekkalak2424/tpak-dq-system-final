@@ -40,15 +40,16 @@ class TPAK_DQ_API_Handler {
     private function load_settings() {
         $options = get_option('tpak_dq_system_options', array());
         
-        // Debug: Log raw options
-        error_log('TPAK DQ System: Raw options from database: ' . print_r($options, true));
+        // Load API settings from database
         
         $this->api_url = isset($options['limesurvey_url']) ? $options['limesurvey_url'] : '';
         $this->username = isset($options['limesurvey_username']) ? $options['limesurvey_username'] : '';
         $this->password = isset($options['limesurvey_password']) ? $options['limesurvey_password'] : '';
         
-        // Debug: Log loaded settings
-        error_log('TPAK DQ System: Loaded API settings - URL: ' . ($this->api_url ? 'Set' : 'Not set') . ', Username: ' . ($this->username ? 'Set' : 'Not set') . ', Password: ' . ($this->password ? 'Set' : 'Not set'));
+        // Validate essential settings
+        if (empty($this->api_url) || empty($this->username) || empty($this->password)) {
+            error_log('TPAK DQ System: Missing essential API settings - URL: ' . ($this->api_url ? 'Set' : 'Missing') . ', Username: ' . ($this->username ? 'Set' : 'Missing') . ', Password: ' . ($this->password ? 'Set' : 'Missing'));
+        }
     }
     
     /**
@@ -652,12 +653,32 @@ class TPAK_DQ_API_Handler {
      * Get survey structure (questions)
      */
     public function get_survey_structure($survey_id) {
+        // Validate survey ID
+        if (empty($survey_id)) {
+            error_log('TPAK DQ System: get_survey_structure called with empty survey ID');
+            return false;
+        }
+        
         // Check cache first
         $cache_key = 'survey_structure_' . $survey_id;
         $cached = get_transient($cache_key);
         if ($cached !== false) {
             error_log('TPAK DQ System: Using cached survey structure for survey ID: ' . $survey_id);
             return $cached;
+        }
+        
+        // Check if LSS structure is available for this survey
+        $lss_structure = get_option('tpak_lss_structure_' . $survey_id, false);
+        if ($lss_structure !== false) {
+            error_log('TPAK DQ System: Using LSS structure for survey ID: ' . $survey_id);
+            
+            // Convert LSS structure to our format
+            $enhanced_structure = $this->convert_lss_to_structure($lss_structure, $survey_id);
+            
+            // Cache for 1 hour
+            set_transient($cache_key, $enhanced_structure, 3600);
+            
+            return $enhanced_structure;
         }
         
         $session_key = $this->get_session_key();
@@ -852,6 +873,82 @@ class TPAK_DQ_API_Handler {
         }
         
         return $questions;
+    }
+    
+    /**
+     * Convert LSS structure to API structure format
+     */
+    private function convert_lss_to_structure($lss_structure, $survey_id) {
+        $enhanced = array(
+            'survey_id' => $survey_id,
+            'questions' => array(),
+            'groups' => array(),
+            'structure_type' => 'lss_imported',
+            'last_updated' => current_time('mysql'),
+            'question_count' => 0
+        );
+        
+        if (!isset($lss_structure['questions']) || !is_array($lss_structure['questions'])) {
+            error_log('TPAK DQ System: LSS structure missing questions data');
+            return $enhanced;
+        }
+        
+        // Convert questions from LSS format
+        foreach ($lss_structure['questions'] as $qid => $question) {
+            $title = isset($question['title']) ? $question['title'] : $qid;
+            
+            // Get question text from question_texts
+            $question_text = $title;
+            if (isset($lss_structure['question_texts'][$qid]['question'])) {
+                $question_text = $lss_structure['question_texts'][$qid]['question'];
+            }
+            
+            $enhanced['questions'][$title] = array(
+                'qid' => $qid,
+                'title' => $title,
+                'question' => $question_text,
+                'type' => isset($question['type']) ? $question['type'] : 'text',
+                'help' => '',
+                'mandatory' => isset($question['mandatory']) ? $question['mandatory'] : 'N',
+                'other' => isset($question['other']) ? $question['other'] : 'N',
+                'group_id' => isset($question['gid']) ? $question['gid'] : null,
+                'group_name' => '',
+                'sub_questions' => array()
+            );
+            $enhanced['question_count']++;
+        }
+        
+        // Convert groups from LSS format
+        if (isset($lss_structure['groups']) && is_array($lss_structure['groups'])) {
+            foreach ($lss_structure['groups'] as $gid => $group) {
+                $enhanced['groups'][$gid] = isset($group['group_name']) ? $group['group_name'] : 'Group ' . $gid;
+                
+                // Update question group names
+                foreach ($enhanced['questions'] as $title => $question) {
+                    if ($question['group_id'] == $gid) {
+                        $enhanced['questions'][$title]['group_name'] = $enhanced['groups'][$gid];
+                    }
+                }
+            }
+        }
+        
+        // Determine structure type
+        $titles = array_keys($enhanced['questions']);
+        if (!empty($titles)) {
+            if (preg_match('/^Q\d+/', $titles[0])) {
+                $enhanced['structure_type'] = 'limesurvey';
+            } elseif (preg_match('/^\d+/', $titles[0])) {
+                $enhanced['structure_type'] = 'numeric';
+            } elseif (preg_match('/^[a-zA-Z]/', $titles[0])) {
+                $enhanced['structure_type'] = 'descriptive';
+            } else {
+                $enhanced['structure_type'] = 'mixed';
+            }
+        }
+        
+        error_log('TPAK DQ System: Converted LSS structure - ' . $enhanced['question_count'] . ' questions, type: ' . $enhanced['structure_type']);
+        
+        return $enhanced;
     }
     
     /**

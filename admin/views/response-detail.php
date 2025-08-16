@@ -263,33 +263,99 @@ class TPAK_Question_Mapper {
 require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-question-mapper.php';
 require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-adapter.php';
 
-// Initialize the advanced mapper and survey adapter
-$question_mapper = TPAK_Advanced_Question_Mapper::getInstance();
-$survey_adapter = TPAK_Survey_Adapter::getInstance();
+// Initialize variables with error handling
+$question_mapper = null;
+$survey_adapter = null;
+$adapter_result = null;
+$response_mapping = array(
+    'questions' => array(),
+    'structure' => array('type' => 'unknown'),
+    'categories' => array(),
+    'statistics' => array()
+);
 
-// Process response with appropriate adapter
-$adapter_result = $survey_adapter->processResponse($lime_survey_id, $response_data);
-$response_mapping = $question_mapper->getResponseMapping($response_data, $lime_survey_id);
-
-// Merge adapter results with mapper results for better accuracy
-if ($adapter_result && isset($adapter_result['questions'])) {
-    foreach ($adapter_result['questions'] as $key => $adapter_data) {
-        if (isset($response_mapping['questions'][$key])) {
-            // Use adapter's display name if confidence is higher
-            if ($adapter_data['confidence'] > $response_mapping['questions'][$key]['confidence']) {
-                $response_mapping['questions'][$key]['display_name'] = $adapter_data['display_name'];
-                $response_mapping['questions'][$key]['category'] = $adapter_data['category'];
-                $response_mapping['questions'][$key]['confidence'] = $adapter_data['confidence'];
-            }
-        } else {
-            // Add new question from adapter
-            $response_mapping['questions'][$key] = $adapter_data;
-        }
+try {
+    // Initialize the advanced mapper and survey adapter
+    $question_mapper = TPAK_Advanced_Question_Mapper::getInstance();
+    $survey_adapter = TPAK_Survey_Adapter::getInstance();
+    
+    error_log('TPAK DQ System: Processing response for Survey ID: ' . $lime_survey_id . ' with ' . count($response_data) . ' fields');
+    
+    // Validate survey ID and response data
+    if (empty($lime_survey_id)) {
+        throw new Exception('Survey ID is empty');
     }
     
-    // Update structure info
-    $response_mapping['structure']['adapter_type'] = $adapter_result['structure_type'];
-    $response_mapping['structure']['adapter_confidence'] = $adapter_result['confidence'];
+    if (empty($response_data) || !is_array($response_data)) {
+        throw new Exception('Response data is empty or invalid');
+    }
+    
+    // Process response with appropriate adapter
+    $adapter_result = $survey_adapter->processResponse($lime_survey_id, $response_data);
+    error_log('TPAK DQ System: Adapter processing completed. Type: ' . ($adapter_result['structure_type'] ?? 'unknown'));
+    
+    // Get response mapping
+    $response_mapping = $question_mapper->getResponseMapping($response_data, $lime_survey_id);
+    error_log('TPAK DQ System: Question mapping completed. Questions found: ' . count($response_mapping['questions']));
+    
+    // Merge adapter results with mapper results for better accuracy
+    if ($adapter_result && isset($adapter_result['questions'])) {
+        foreach ($adapter_result['questions'] as $key => $adapter_data) {
+            if (isset($response_mapping['questions'][$key])) {
+                // Use adapter's display name if confidence is higher
+                if (isset($adapter_data['confidence']) && isset($response_mapping['questions'][$key]['confidence']) &&
+                    $adapter_data['confidence'] > $response_mapping['questions'][$key]['confidence']) {
+                    $response_mapping['questions'][$key]['display_name'] = $adapter_data['display_name'];
+                    $response_mapping['questions'][$key]['category'] = $adapter_data['category'];
+                    $response_mapping['questions'][$key]['confidence'] = $adapter_data['confidence'];
+                }
+            } else {
+                // Add new question from adapter
+                $response_mapping['questions'][$key] = $adapter_data;
+            }
+        }
+        
+        // Update structure info
+        if (!isset($response_mapping['structure'])) {
+            $response_mapping['structure'] = array();
+        }
+        $response_mapping['structure']['adapter_type'] = $adapter_result['structure_type'] ?? 'unknown';
+        $response_mapping['structure']['adapter_confidence'] = $adapter_result['confidence'] ?? 0.5;
+    }
+    
+} catch (Exception $e) {
+    // Use error handler for better error management
+    $error_handler = TPAK_Error_Handler::getInstance();
+    $error_handler->log_error('Response processing failed: ' . $e->getMessage(), array(
+        'survey_id' => $lime_survey_id,
+        'response_fields' => array_keys($response_data),
+        'trace' => $e->getTraceAsString()
+    ), 'error');
+    
+    // Set default fallback values
+    $response_mapping = array(
+        'questions' => array(),
+        'structure' => array('type' => 'error', 'message' => $e->getMessage()),
+        'categories' => array(),
+        'statistics' => array()
+    );
+    
+    // Try basic fallback processing
+    if (!empty($response_data) && is_array($response_data)) {
+        foreach ($response_data as $key => $value) {
+            if (!empty($value) && $value !== ' ') {
+                $response_mapping['questions'][$key] = array(
+                    'original_key' => $key,
+                    'display_name' => $key, // Use key as fallback
+                    'category' => 'unknown',
+                    'type' => 'text',
+                    'original_value' => $value,
+                    'formatted_value' => htmlspecialchars($value),
+                    'confidence' => 0.1
+                );
+            }
+        }
+    }
 }
 
 // Enhanced Question Organization with Smart Display Names
