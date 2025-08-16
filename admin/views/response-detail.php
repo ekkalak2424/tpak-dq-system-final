@@ -2112,7 +2112,75 @@ $question_labels = array(); // Keep for backward compatibility
 }
 </style>
 
-<!-- All JavaScript moved to clean-tabs.js -->
+<!-- Inline debug script -->
+<script>
+console.log('=== INLINE DEBUG SCRIPT ===');
+
+// Test basic functionality immediately
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('✅ DOM Content Loaded');
+    
+    // Check for tabs
+    var tabs = document.querySelectorAll('.nav-tab');
+    var contents = document.querySelectorAll('.tab-content');
+    
+    console.log('📋 Found tabs:', tabs.length);
+    console.log('📋 Found tab contents:', contents.length);
+    
+    // Check native tab specifically
+    var nativeTab = document.querySelector('a[data-tab="native"]');
+    var nativeContent = document.getElementById('tab-native');
+    
+    console.log('🎯 Native tab element:', nativeTab ? 'FOUND' : 'NOT FOUND');
+    console.log('🎯 Native content element:', nativeContent ? 'FOUND' : 'NOT FOUND');
+    
+    if (nativeContent) {
+        console.log('📊 Native content HTML length:', nativeContent.innerHTML.length);
+        console.log('📊 Native content visible:', nativeContent.offsetHeight > 0);
+        console.log('📊 Native content display:', window.getComputedStyle(nativeContent).display);
+    }
+    
+    // Test tab clicks
+    if (nativeTab) {
+        nativeTab.addEventListener('click', function(e) {
+            e.preventDefault();
+            console.log('🎯 Native tab clicked via inline script!');
+            
+            // Force show content
+            if (nativeContent) {
+                // Hide all tabs
+                contents.forEach(function(c) {
+                    c.style.display = 'none';
+                    c.classList.remove('active');
+                });
+                
+                // Show native content
+                nativeContent.style.display = 'block';
+                nativeContent.classList.add('active');
+                
+                console.log('✅ Native content forced visible');
+                console.log('📊 After force - visible:', nativeContent.offsetHeight > 0);
+            }
+        });
+    }
+    
+    // Test activate button
+    setTimeout(function() {
+        var activateBtn = document.getElementById('activate-native');
+        console.log('🚀 Activate button found:', activateBtn ? 'YES' : 'NO');
+        
+        if (activateBtn) {
+            console.log('🚀 Button visible:', activateBtn.offsetHeight > 0);
+            console.log('🚀 Button text:', activateBtn.textContent);
+            
+            activateBtn.addEventListener('click', function() {
+                console.log('🚀 ACTIVATE BUTTON CLICKED!');
+                alert('Native Mode button works!');
+            });
+        }
+    }, 1000);
+});
+</script>
 
 <?php
 // End of response-detail.php

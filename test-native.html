@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Native Tab</title>
+    <style>
+    .nav-tab-wrapper {
+        margin-bottom: 20px;
+    }
+    .nav-tab {
+        font-size: 14px;
+        padding: 10px 15px;
+        cursor: pointer;
+        text-decoration: none;
+        border: 1px solid #c3c4c7;
+        border-bottom: none;
+        margin-left: 0.5em;
+        background: #f6f7f7;
+        color: #50575e;
+        display: inline-block;
+    }
+    .nav-tab-active {
+        background: #fff;
+        border-bottom: 1px solid #fff;
+    }
+    .tab-content {
+        display: none;
+        padding: 20px;
+        border: 1px solid #ddd;
+    }
+    .tab-content.active {
+        display: block;
+    }
+    .native-integration-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+    }
+    .native-integration-header h3 {
+        margin: 0 0 10px 0;
+        color: white;
+    }
+    #native-survey-container {
+        min-height: 200px;
+        background: #f9f9f9;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 20px;
+        margin: 20px 0;
+    }
+    .native-initial-content {
+        background: #fff;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        padding: 20px;
+        margin: 10px 0;
+    }
+    </style>
+</head>
+<body>
+
+<h1>Test Native Tab System</h1>
+
+<div class="nav-tab-wrapper">
+    <a href="#tab-original" class="nav-tab nav-tab-active" data-tab="original">
+        📊 แบบเดิม
+    </a>
+    <a href="#tab-native" class="nav-tab" data-tab="native">
+        🎯 Native 100%
+    </a>
+</div>
+
+<div id="tab-original" class="tab-content active">
+    <h2>Original Content</h2>
+    <p>This is the original tab content.</p>
+</div>
+
+<div id="tab-native" class="tab-content">
+    <div class="native-integration-header">
+        <h3>🎯 ระบบแก้ไขแบบสอบถาม Native 100%</h3>
+        <p>ดึงแบบสอบถามมาแบบสมบูรณ์และแก้ไขได้เต็มรูปแบบ</p>
+        
+        <div class="integration-controls">
+            <button type="button" class="button button-primary" id="activate-native">
+                🚀 เปิดใช้งาน Native Mode
+            </button>
+            <button type="button" class="button" id="compare-views">
+                🔍 เปรียบเทียบกับแบบเดิม
+            </button>
+        </div>
+        
+        <div class="integration-status">
+            <div class="status-item">
+                <label>แบบเดิม:</label>
+                <span class="status-indicator original-status">✅ โหลดแล้ว</span>
+            </div>
+            <div class="status-item">
+                <label>แบบ Native:</label>
+                <span class="status-indicator native-status">⏳ รอโหลด</span>
+            </div>
+        </div>
+    </div>
+    
+    <div id="native-survey-container">
+        <div class="native-initial-content">
+            <p><strong>📍 สถานะ:</strong> พร้อมใช้งาน</p>
+            <p><strong>📊 Survey ID:</strong> 836511</p>
+            <p><strong>📝 Response ID:</strong> 20103</p>
+            <p>คลิกปุ่ม "🚀 เปิดใช้งาน Native Mode" เพื่อโหลดแบบสอบถามแบบ Native 100%</p>
+        </div>
+    </div>
+</div>
+
+<script>
+console.log('=== TEST NATIVE TAB SYSTEM ===');
+
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('DOM loaded');
+    
+    var tabs = document.querySelectorAll('.nav-tab');
+    var contents = document.querySelectorAll('.tab-content');
+    
+    console.log('Found tabs:', tabs.length);
+    console.log('Found contents:', contents.length);
+    
+    tabs.forEach(function(tab) {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            var tabId = tab.getAttribute('data-tab');
+            console.log('Tab clicked:', tabId);
+            
+            // Remove active from all tabs
+            tabs.forEach(function(t) {
+                t.classList.remove('nav-tab-active');
+            });
+            tab.classList.add('nav-tab-active');
+            
+            // Hide all content
+            contents.forEach(function(content) {
+                content.style.display = 'none';
+                content.classList.remove('active');
+            });
+            
+            // Show target content
+            var targetContent = document.getElementById('tab-' + tabId);
+            if (targetContent) {
+                targetContent.style.display = 'block';
+                targetContent.classList.add('active');
+                console.log('Content switched to:', tabId);
+                console.log('Content HTML:', targetContent.innerHTML.substring(0, 200));
+            }
+        });
+    });
+    
+    // Test activate button
+    document.getElementById('activate-native').addEventListener('click', function() {
+        console.log('🚀 Activate Native clicked!');
+        alert('Native button works!');
+    });
+    
+    console.log('Tab system initialized');
+});
+</script>
+
+</body>
+</html>
