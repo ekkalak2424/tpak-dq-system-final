@@ -733,6 +733,7 @@ class TPAK_DQ_API_Handler {
         $enhanced = array(
             'survey_id' => $survey_id,
             'questions' => array(),
+            'groups' => array(),
             'structure_type' => 'unknown',
             'last_updated' => current_time('mysql'),
             'question_count' => 0
@@ -742,18 +743,42 @@ class TPAK_DQ_API_Handler {
             return $enhanced;
         }
         
+        // Get full question texts including Thai language
+        $full_questions = $this->get_full_questions($survey_id);
+        
         foreach ($structure as $question) {
             if (isset($question['qid']) && isset($question['title'])) {
-                $enhanced['questions'][$question['title']] = array(
-                    'qid' => $question['qid'],
-                    'title' => $question['title'],
-                    'question' => isset($question['question']) ? strip_tags($question['question']) : $question['title'],
+                $qid = $question['qid'];
+                $title = $question['title'];
+                
+                // Try to get full question text
+                $question_text = '';
+                if (isset($full_questions[$qid])) {
+                    $question_text = $full_questions[$qid]['question'];
+                } elseif (isset($question['question'])) {
+                    $question_text = strip_tags($question['question']);
+                } else {
+                    $question_text = $title;
+                }
+                
+                $enhanced['questions'][$title] = array(
+                    'qid' => $qid,
+                    'title' => $title,
+                    'question' => $question_text,
                     'type' => isset($question['type']) ? $question['type'] : 'text',
                     'help' => isset($question['help']) ? strip_tags($question['help']) : '',
                     'mandatory' => isset($question['mandatory']) ? $question['mandatory'] : 'N',
-                    'other' => isset($question['other']) ? $question['other'] : 'N'
+                    'other' => isset($question['other']) ? $question['other'] : 'N',
+                    'group_id' => isset($question['gid']) ? $question['gid'] : null,
+                    'group_name' => isset($question['group_name']) ? $question['group_name'] : '',
+                    'sub_questions' => isset($question['subquestions']) ? $question['subquestions'] : array()
                 );
                 $enhanced['question_count']++;
+                
+                // Store group information
+                if (isset($question['gid']) && isset($question['group_name'])) {
+                    $enhanced['groups'][$question['gid']] = $question['group_name'];
+                }
             }
         }
         
@@ -772,6 +797,61 @@ class TPAK_DQ_API_Handler {
         }
         
         return $enhanced;
+    }
+    
+    /**
+     * Get full question texts with all languages
+     */
+    private function get_full_questions($survey_id) {
+        $session_key = $this->get_session_key();
+        if (!$session_key) {
+            return array();
+        }
+        
+        $questions = array();
+        
+        // Try to get question properties with Thai text
+        $response = $this->make_api_request('list_questions', array(
+            'sSessionKey' => $session_key,
+            'iSurveyID' => $survey_id,
+            'sLanguage' => 'th' // Thai language
+        ));
+        
+        if ($response && isset($response['result']) && is_array($response['result'])) {
+            foreach ($response['result'] as $question) {
+                if (isset($question['qid'])) {
+                    // Get detailed question properties
+                    $detail_response = $this->make_api_request('get_question_properties', array(
+                        'sSessionKey' => $session_key,
+                        'iQuestionID' => $question['qid'],
+                        'aQuestionSettings' => array('question', 'help', 'type', 'title', 'gid', 'group_name')
+                    ));
+                    
+                    if ($detail_response && isset($detail_response['result'])) {
+                        $questions[$question['qid']] = $detail_response['result'];
+                    }
+                }
+            }
+        }
+        
+        // If Thai not available, try English
+        if (empty($questions)) {
+            $response = $this->make_api_request('list_questions', array(
+                'sSessionKey' => $session_key,
+                'iSurveyID' => $survey_id,
+                'sLanguage' => 'en'
+            ));
+            
+            if ($response && isset($response['result']) && is_array($response['result'])) {
+                foreach ($response['result'] as $question) {
+                    if (isset($question['qid'])) {
+                        $questions[$question['qid']] = $question;
+                    }
+                }
+            }
+        }
+        
+        return $questions;
     }
     
     /**

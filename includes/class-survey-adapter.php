@@ -150,7 +150,13 @@ abstract class TPAK_Survey_Adapter_Base {
  */
 class TPAK_LimeSurvey_Adapter extends TPAK_Survey_Adapter_Base {
     
+    private $dictionary;
+    
     public function process($response_data, $survey_id = null) {
+        // Initialize dictionary
+        $this->dictionary = TPAK_Question_Dictionary::getInstance();
+        $this->dictionary->loadCustomMappings($survey_id);
+        
         $processed = array(
             'questions' => array(),
             'structure_type' => 'limesurvey',
@@ -161,9 +167,14 @@ class TPAK_LimeSurvey_Adapter extends TPAK_Survey_Adapter_Base {
         $api_handler = new TPAK_DQ_API_Handler();
         $survey_structure = $api_handler->get_survey_structure($survey_id);
         $question_map = array();
+        $groups = array();
         
         if ($survey_structure && isset($survey_structure['questions'])) {
             $question_map = $survey_structure['questions'];
+        }
+        
+        if ($survey_structure && isset($survey_structure['groups'])) {
+            $groups = $survey_structure['groups'];
         }
         
         foreach ($response_data as $key => $value) {
@@ -171,25 +182,46 @@ class TPAK_LimeSurvey_Adapter extends TPAK_Survey_Adapter_Base {
                 continue;
             }
             
-            // Use survey structure if available
-            if (isset($question_map[$key])) {
-                $question_text = strip_tags($question_map[$key]['question']);
-                $type = $question_map[$key]['type'] ?? 'text';
-            } else {
-                // Fallback pattern matching
-                if (preg_match('/^Q(\d+)([A-Z]*\d*)(.*)/', $key, $matches)) {
-                    $question_text = 'คำถามที่ ' . $matches[1];
-                    if (!empty($matches[2])) {
-                        $question_text .= ' ข้อย่อย ' . $matches[2];
-                    }
-                    if (!empty($matches[3])) {
-                        $question_text .= ' ' . $this->clean_field_key($matches[3]);
-                    }
-                } else {
-                    $question_text = $this->clean_field_key($key);
+            // Parse complex field keys (e.g., PA1TT2[1])
+            $parsed = $this->parse_field_key($key);
+            $main_key = $parsed['main'];
+            $sub_key = $parsed['sub'];
+            
+            // Get question text from multiple sources
+            $question_text = '';
+            $type = 'text';
+            $confidence = 0.5;
+            
+            // 1. Try from API structure
+            if (isset($question_map[$main_key])) {
+                $question_data = $question_map[$main_key];
+                $question_text = strip_tags($question_data['question']);
+                $type = $question_data['type'] ?? 'text';
+                $confidence = 0.95;
+                
+                // Add sub-question information
+                if ($sub_key && isset($question_data['sub_questions'][$sub_key])) {
+                    $question_text .= ' - ' . $question_data['sub_questions'][$sub_key];
+                } elseif ($sub_key) {
+                    $question_text .= ' [' . $sub_key . ']';
                 }
-                $type = 'text';
             }
+            // 2. Try question dictionary
+            else {
+                $question_text = $this->dictionary->getQuestionText($main_key);
+                if ($sub_key) {
+                    $sub_text = $this->dictionary->getQuestionText($sub_key);
+                    if ($sub_text !== $sub_key) {
+                        $question_text .= ' - ' . $sub_text;
+                    } else {
+                        $question_text .= ' [' . $sub_key . ']';
+                    }
+                }
+                $confidence = 0.8;
+            }
+            
+            // Format the answer value
+            $formatted_value = $this->format_answer($value, $type, $key);
             
             $processed['questions'][$key] = array(
                 'original_key' => $key,
@@ -197,12 +229,107 @@ class TPAK_LimeSurvey_Adapter extends TPAK_Survey_Adapter_Base {
                 'category' => $this->guess_category($key, $question_text),
                 'type' => $type,
                 'original_value' => $value,
-                'formatted_value' => $this->format_value($value, $type),
-                'confidence' => isset($question_map[$key]) ? 0.95 : 0.7
+                'formatted_value' => $formatted_value,
+                'confidence' => $confidence,
+                'main_key' => $main_key,
+                'sub_key' => $sub_key
             );
         }
         
         return $processed;
+    }
+    
+    /**
+     * Parse complex field keys like PA1TT2[1] or Q1_SQ001
+     */
+    private function parse_field_key($key) {
+        $result = array(
+            'main' => $key,
+            'sub' => null,
+            'index' => null
+        );
+        
+        // Pattern 1: Field[index] format
+        if (preg_match('/^([^\[]+)\[(\d+)\]$/', $key, $matches)) {
+            $result['main'] = $matches[1];
+            $result['index'] = $matches[2];
+            $result['sub'] = $matches[2];
+        }
+        // Pattern 2: Field_SubField format
+        elseif (preg_match('/^([^_]+)_(.+)$/', $key, $matches)) {
+            $result['main'] = $matches[1];
+            $result['sub'] = $matches[2];
+        }
+        // Pattern 3: Q1A1 format
+        elseif (preg_match('/^(Q\d+)([A-Z]\d*)/', $key, $matches)) {
+            $result['main'] = $matches[1];
+            $result['sub'] = $matches[2];
+        }
+        // Pattern 4: Complex patterns like PA1TT2
+        elseif (preg_match('/^([A-Z]+\d+[A-Z]+\d+)(.*)/', $key, $matches)) {
+            $result['main'] = $matches[1];
+            if (!empty($matches[2])) {
+                $result['sub'] = trim($matches[2], '[]');
+            }
+        }
+        
+        return $result;
+    }
+    
+    /**
+     * Generate Thai label from field key
+     */
+    private function generate_thai_label($key, $parsed) {
+        $main = $parsed['main'];
+        $sub = $parsed['sub'];
+        
+        // Handle specific patterns
+        if (strpos($main, 'CONSENT') !== false) {
+            return 'การยินยอมเข้าร่วมการวิจัย' . ($sub ? ' ข้อ ' . $sub : '');
+        }
+        
+        if (preg_match('/^Q(\d+)/', $main, $matches)) {
+            $label = 'คำถามที่ ' . $matches[1];
+            if ($sub) {
+                $label .= ' ข้อย่อย ' . $sub;
+            }
+            return $label;
+        }
+        
+        if (preg_match('/^PA(\d+)/', $main, $matches)) {
+            $label = 'ส่วนที่ ' . $matches[1];
+            if ($sub) {
+                $label .= ' ข้อ ' . $sub;
+            }
+            return $label;
+        }
+        
+        // Default: clean the key
+        return $this->clean_field_key($key);
+    }
+    
+    /**
+     * Format answer based on type and value
+     */
+    private function format_answer($value, $type, $key) {
+        // Try dictionary first
+        $context = null;
+        if (stripos($key, 'CONSENT') !== false) {
+            $context = 'consent';
+        } elseif ($type === 'Y') {
+            $context = 'yesno';
+        } elseif (is_numeric($value) && strlen($value) <= 2) {
+            $context = 'scale';
+        }
+        
+        $formatted = $this->dictionary->getAnswerText($value, $context);
+        
+        if ($formatted !== $value) {
+            return $formatted;
+        }
+        
+        // Fallback to basic formatting
+        return $this->format_value($value, $type);
     }
     
     private function should_skip_field($key, $value) {

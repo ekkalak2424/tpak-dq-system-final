@@ -72,6 +72,7 @@ class TPAK_DQ_System {
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-workflow.php';
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-notifications.php';
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-question-mapper.php';
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-question-dictionary.php';
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-adapter.php';
         
         // Admin files
