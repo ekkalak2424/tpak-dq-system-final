@@ -2011,59 +2011,67 @@ $question_labels = array(); // Keep for backward compatibility
 </style>
 
 <script>
-jQuery(document).ready(function($) {
-    // Tab switching functionality
-    $('.nav-tab').on('click', function(e) {
-        e.preventDefault();
-        console.log('Tab clicked!');
-        
-        var tabId = $(this).data('tab');
-        console.log('Tab ID:', tabId);
-        
-        // Remove active class from all tabs and content
-        $('.nav-tab').removeClass('nav-tab-active');
-        $('.tab-content').removeClass('active');
-        
-        // Add active class to clicked tab and corresponding content
-        $(this).addClass('nav-tab-active');
-        $('#tab-' + tabId).addClass('active');
-        
-        console.log('Tab switching completed to:', tabId);
-    });
+// Prevent conflicts with other jQuery plugins
+(function($) {
+    'use strict';
     
-    // Fallback: Handle tab clicking with alternative method
-    $(document).on('click', '.nav-tab', function(e) {
-        console.log('Fallback tab handler triggered');
-        e.preventDefault();
+    $(document).ready(function() {
+        console.log('Document ready - Starting tab initialization');
         
-        var tabId = $(this).data('tab');
-        if (!tabId) {
-            console.log('No tab ID found');
-            return;
+        // Initialize tabs only if elements exist
+        if ($('.nav-tab').length > 0) {
+            initTabSwitching();
+        } else {
+            console.log('No tabs found - skipping tab initialization');
         }
         
-        // Manual tab switching
-        $('.nav-tab').removeClass('nav-tab-active');
-        $('.tab-content').hide().removeClass('active');
-        
-        $(this).addClass('nav-tab-active');
-        $('#tab-' + tabId).show().addClass('active');
-        
-        console.log('Fallback tab switching completed to:', tabId);
+        // Initialize other functionality
+        initNativeSurvey();
     });
     
-    // Native Survey Integration
-    var surveyId = '<?php echo esc_js($lime_survey_id); ?>';
-    var responseId = '<?php echo esc_js($response_id); ?>';
+    function initTabSwitching() {
+        console.log('Initializing tab switching');
+        
+        // Tab switching functionality
+        $('.nav-tab').off('click.tabs').on('click.tabs', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            console.log('Tab clicked!');
+            
+            var tabId = $(this).data('tab');
+            console.log('Tab ID:', tabId);
+            
+            if (!tabId) {
+                console.log('No tab ID found!');
+                return;
+            }
+            
+            // Remove active class from all tabs and content
+            $('.nav-tab').removeClass('nav-tab-active');
+            $('.tab-content').removeClass('active').hide();
+            
+            // Add active class to clicked tab and corresponding content
+            $(this).addClass('nav-tab-active');
+            $('#tab-' + tabId).addClass('active').show();
+            
+            console.log('Tab switching completed to:', tabId);
+        });
+    }
     
-    // Debug log
-    console.log('Tab switching initialized');
-    console.log('jQuery version:', $.fn.jquery);
-    console.log('Number of tabs found:', $('.nav-tab').length);
-    console.log('Survey ID:', surveyId);
-    console.log('Response ID:', responseId);
-    
-    $('#activate-native').on('click', function() {
+    function initNativeSurvey() {
+        // Native Survey Integration
+        var surveyId = '<?php echo esc_js($lime_survey_id); ?>';
+        var responseId = '<?php echo esc_js($response_id); ?>';
+        
+        // Debug log
+        console.log('Native Survey initialized');
+        console.log('jQuery version:', $.fn.jquery);
+        console.log('Number of tabs found:', $('.nav-tab').length);
+        console.log('Survey ID:', surveyId);
+        console.log('Response ID:', responseId);
+        
+        // Activate native button
+        $('#activate-native').on('click', function() {
         var button = $(this);
         button.prop('disabled', true).text('🔄 กำลังโหลด...');
         
@@ -2554,7 +2562,11 @@ jQuery(document).ready(function($) {
     
     console.log('TPAK DQ: Variables initialized');
     console.log('ajaxurl:', window.ajaxurl);
-    console.log('tpak_dq_ajax:', window.tpak_dq_ajax);(this).val().toLowerCase();
+    console.log('tpak_dq_ajax:', window.tpak_dq_ajax);
+    
+    // Search functionality
+    $('#question-search').on('keyup', function() {
+        var searchTerm = $(this).val().toLowerCase();
         
         if (searchTerm === '') {
             $('.question-section').removeClass('filtered-out');
@@ -2574,103 +2586,10 @@ jQuery(document).ready(function($) {
                 section.addClass('filtered-out');
             }
         });
-    });
-    
-    // Quick navigation
-    $('.nav-item').on('click', function(e) {
-        e.preventDefault();
-        var target = $(this).data('target');
-        var section = $('.question-section[data-question="' + target + '"]');
-        
-        if (section.length) {
-            // Scroll to section
-            $('html, body').animate({
-                scrollTop: section.offset().top - 100
-            }, 500);
-            
-            // Expand section if collapsed
-            section.removeClass('collapsed');
-            section.find('.toggle-section').attr('aria-expanded', 'true');
-            
-            // Highlight navigation
-            $('.nav-item').removeClass('active');
-            $(this).addClass('active');
-        }
-    });
-    
-    // Verification actions
-    $('.approve-btn, .reject-btn').on('click', function() {
-        var button = $(this);
-        var id = button.data('id');
-        var action = button.data('action');
-        var confirmMsg = action.includes('approve') ? 
-            'คุณต้องการอนุมัติข้อมูลนี้หรือไม่?' : 
-            'คุณต้องการส่งกลับข้อมูลนี้หรือไม่?';
-        
-        if (!confirm(confirmMsg)) {
-            return;
-        }
-        
-        // Add note if rejecting
-        var note = '';
-        if (action === 'reject') {
-            note = prompt('กรุณาระบุเหตุผล:');
-            if (!note) {
-                alert('กรุณาระบุเหตุผลในการส่งกลับ');
-                return;
-            }
-        }
-        
-        // Disable button and show loading
-        button.prop('disabled', true).text('กำลังดำเนินการ...');
-        
-        // Make AJAX call to update status
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: {
-                action: 'tpak_update_verification_status',
-                nonce: '<?php echo wp_create_nonce("tpak_verification"); ?>',
-                batch_id: id,
-                verification_action: action,
-                note: note
-            },
-            success: function(response) {
-                if (response.success) {
-                    alert(response.data.message);
-                    location.reload();
-                } else {
-                    alert('เกิดข้อผิดพลาด: ' + response.data.message);
-                    button.prop('disabled', false).text(button.text());
-                }
-            },
-            error: function() {
-                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-                button.prop('disabled', false).text(button.text());
-            }
-        });
-    });
-    
-    // Export to Excel
-    $('.export-excel').on('click', function() {
-        var id = $(this).data('id');
-        window.location.href = ajaxurl + '?action=tpak_export_response&id=' + id + '&nonce=<?php echo wp_create_nonce("tpak_export"); ?>';
-    });
-    
-    // Helper function to highlight text
-    function highlightText(element, searchTerm) {
-        // Remove existing highlights
-        element.find('.highlight').contents().unwrap();
-        
-        // Add new highlights
-        var regex = new RegExp('(' + searchTerm + ')', 'gi');
-        element.find('.answer-value, .sub-question-value, .question-text').each(function() {
-            var text = $(this).text();
-            var highlighted = text.replace(regex, '<span class="highlight">$1</span>');
-            if (highlighted !== text) {
-                $(this).html(highlighted);
-            }
-        });
     }
-});
+    
+    // Close initNativeSurvey function
+    }
+    
+})(jQuery);
 </script>
