@@ -11,23 +11,29 @@ if (!defined('ABSPATH')) {
 // Enqueue necessary scripts and styles
 wp_enqueue_script('jquery');
 
-// Enqueue main admin script
-wp_enqueue_script(
-    'tpak-dq-admin-script',
-    TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/admin-script.js',
-    array('jquery'),
-    TPAK_DQ_SYSTEM_VERSION,
-    true
-);
+// Dequeue conflicting scripts that might interfere
+wp_dequeue_script('jquery-ui-datepicker');
 
-// Enqueue response detail specific script
-wp_enqueue_script(
-    'tpak-dq-response-detail',
-    TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/response-detail.js',
-    array('jquery', 'tpak-dq-admin-script'),
-    TPAK_DQ_SYSTEM_VERSION,
-    true
-);
+// Only enqueue our scripts if they exist
+if (file_exists(TPAK_DQ_SYSTEM_PLUGIN_DIR . 'assets/js/admin-script.js')) {
+    wp_enqueue_script(
+        'tpak-dq-admin-script',
+        TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/admin-script.js',
+        array('jquery'),
+        TPAK_DQ_SYSTEM_VERSION,
+        true
+    );
+}
+
+if (file_exists(TPAK_DQ_SYSTEM_PLUGIN_DIR . 'assets/js/response-detail.js')) {
+    wp_enqueue_script(
+        'tpak-dq-response-detail',
+        TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/response-detail.js',
+        array('jquery'),
+        TPAK_DQ_SYSTEM_VERSION,
+        true
+    );
+}
 
 wp_enqueue_style('tpak-dq-admin', TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/css/admin-style.css', array(), TPAK_DQ_SYSTEM_VERSION);
 
@@ -625,7 +631,6 @@ $question_labels = array(); // Keep for backward compatibility
         <a href="#tab-native" class="nav-tab" data-tab="native">
             🎯 Native 100%
         </a>
-        <?php do_action('tpak_response_detail_tabs'); ?>
     </div>
     
     <!-- Main Content Area -->
@@ -2011,9 +2016,19 @@ $question_labels = array(); // Keep for backward compatibility
 </style>
 
 <script>
+// Ensure global variables are available
+if (typeof window.ajaxurl === 'undefined') {
+    window.ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
+}
+
 // Prevent conflicts with other jQuery plugins
 (function($) {
     'use strict';
+    
+    // Override any problematic jQuery plugins
+    if ($.fn.datepicker && $.fn.datepicker.noConflict) {
+        $.fn.datepicker.noConflict();
+    }
     
     $(document).ready(function() {
         console.log('Document ready - Starting tab initialization');
@@ -2031,18 +2046,35 @@ $question_labels = array(); // Keep for backward compatibility
     
     function initTabSwitching() {
         console.log('Initializing tab switching');
+        console.log('Available tabs:', $('.nav-tab').length);
         
-        // Tab switching functionality
+        // Debug each tab
+        $('.nav-tab').each(function(index) {
+            var tabId = $(this).data('tab');
+            var href = $(this).attr('href');
+            console.log('Tab ' + index + ':', 'data-tab=' + tabId, 'href=' + href);
+        });
+        
+        // Tab switching functionality - use both click events
         $('.nav-tab').off('click.tabs').on('click.tabs', function(e) {
             e.preventDefault();
             e.stopPropagation();
-            console.log('Tab clicked!');
+            console.log('Tab clicked!', this);
             
             var tabId = $(this).data('tab');
-            console.log('Tab ID:', tabId);
+            console.log('Tab ID from data-tab:', tabId);
+            
+            // Fallback: get from href if data-tab is missing
+            if (!tabId) {
+                var href = $(this).attr('href');
+                if (href && href.indexOf('#tab-') === 0) {
+                    tabId = href.replace('#tab-', '');
+                    console.log('Tab ID from href:', tabId);
+                }
+            }
             
             if (!tabId) {
-                console.log('No tab ID found!');
+                console.log('No tab ID found! Element:', this);
                 return;
             }
             
@@ -2052,9 +2084,29 @@ $question_labels = array(); // Keep for backward compatibility
             
             // Add active class to clicked tab and corresponding content
             $(this).addClass('nav-tab-active');
-            $('#tab-' + tabId).addClass('active').show();
+            var targetTab = $('#tab-' + tabId);
+            console.log('Target tab element:', targetTab.length);
+            targetTab.addClass('active').show();
             
             console.log('Tab switching completed to:', tabId);
+        });
+        
+        // Alternative handler for direct clicks
+        $(document).off('click.tabs-alt').on('click.tabs-alt', '.nav-tab', function(e) {
+            console.log('Alternative tab handler triggered');
+            e.preventDefault();
+            
+            var tabId = $(this).data('tab') || $(this).attr('href').replace('#tab-', '');
+            
+            if (tabId) {
+                $('.nav-tab').removeClass('nav-tab-active');
+                $('.tab-content').removeClass('active').hide();
+                
+                $(this).addClass('nav-tab-active');
+                $('#tab-' + tabId).addClass('active').show();
+                
+                console.log('Alternative tab switching to:', tabId);
+            }
         });
     }
     

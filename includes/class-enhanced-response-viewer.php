@@ -22,9 +22,9 @@ class TPAK_Enhanced_Response_Viewer {
     }
     
     public function __construct() {
-        // เพิ่มใน response detail page
-        add_action('tpak_response_detail_tabs', array($this, 'add_native_tab'));
-        add_action('tpak_response_detail_content', array($this, 'add_native_content'));
+        // เพิ่มใน response detail page (ปิดไว้เนื่องจากเราสร้างแท็บไว้แล้วใน response-detail.php)
+        // add_action('tpak_response_detail_tabs', array($this, 'add_native_tab'));
+        // add_action('tpak_response_detail_content', array($this, 'add_native_content'));
         
         // AJAX handlers
         add_action('wp_ajax_load_native_view', array($this, 'load_native_view'));
