@@ -2281,14 +2281,50 @@ document.addEventListener('DOMContentLoaded', function() {
                     child.style.setProperty('position', 'relative', 'important');
                 });
                 
-                // Force scroll to the element
-                nativeContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                // Fix position - element is way below screen
+                var rect = nativeContent.getBoundingClientRect();
+                console.log('📍 Original position:', rect);
+                
+                if (rect.y > 1000) {
+                    console.log('🚨 Element too far down, fixing position...');
+                    
+                    // Force position to be visible
+                    nativeContent.style.setProperty('position', 'fixed', 'important');
+                    nativeContent.style.setProperty('top', '200px', 'important');
+                    nativeContent.style.setProperty('left', '50px', 'important');
+                    nativeContent.style.setProperty('right', '50px', 'important');
+                    nativeContent.style.setProperty('z-index', '999999', 'important');
+                    nativeContent.style.setProperty('background', '#fff', 'important');
+                    nativeContent.style.setProperty('box-shadow', '0 0 20px rgba(0,0,0,0.5)', 'important');
+                    nativeContent.style.setProperty('border-radius', '8px', 'important');
+                    nativeContent.style.setProperty('max-height', '80vh', 'important');
+                    nativeContent.style.setProperty('overflow-y', 'auto', 'important');
+                    
+                    // Add close button
+                    var closeBtn = document.createElement('button');
+                    closeBtn.innerHTML = '❌ ปิด';
+                    closeBtn.style.cssText = 'position: absolute; top: 10px; right: 10px; background: #dc3232; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer; z-index: 1000000;';
+                    closeBtn.addEventListener('click', function() {
+                        nativeContent.style.setProperty('position', 'static', 'important');
+                        nativeContent.style.removeProperty('top');
+                        nativeContent.style.removeProperty('left');
+                        nativeContent.style.removeProperty('right');
+                        nativeContent.style.removeProperty('box-shadow');
+                        closeBtn.remove();
+                    });
+                    nativeContent.appendChild(closeBtn);
+                    
+                    console.log('✅ Repositioned element to fixed position with close button');
+                } else {
+                    // Force scroll to the element
+                    nativeContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                }
                 
                 console.log('✅ Native content FORCE styled with parents');
                 console.log('📊 After force - visible:', nativeContent.offsetHeight > 0);
                 console.log('📊 After force - display:', window.getComputedStyle(nativeContent).display);
                 console.log('📊 After force - visibility:', window.getComputedStyle(nativeContent).visibility);
-                console.log('📊 Bounding rect:', nativeContent.getBoundingClientRect());
+                console.log('📊 Final bounding rect:', nativeContent.getBoundingClientRect());
             }
         });
     }
