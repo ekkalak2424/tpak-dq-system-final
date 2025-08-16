@@ -251,7 +251,7 @@ class TPAK_Survey_Layout_Renderer {
         $html .= $this->render_survey_header();
         
         // Navigation
-        if ($this->display_config['show_navigation']) {
+        if (isset($this->display_config['show_navigation']) && $this->display_config['show_navigation']) {
             $html .= $this->render_navigation();
         }
         
@@ -371,16 +371,18 @@ class TPAK_Survey_Layout_Renderer {
         
         // Question header
         $html .= '<div class="question-header">';
-        $html .= '<div class="question-number">' . $question['title'] . '</div>';
+        if (isset($this->display_config['show_question_numbers']) && $this->display_config['show_question_numbers']) {
+            $html .= '<div class="question-number">' . $question['title'] . '</div>';
+        }
         $html .= '<div class="question-text">' . nl2br(esc_html($question['question_text'])) . '</div>';
         
-        if ($question['mandatory']) {
+        if (isset($question['mandatory']) && $question['mandatory']) {
             $html .= '<span class="required-indicator">*</span>';
         }
         $html .= '</div>';
         
         // Help text
-        if (!empty($question['help_text'])) {
+        if (isset($this->display_config['show_help_text']) && $this->display_config['show_help_text'] && !empty($question['help_text'])) {
             $html .= '<div class="question-help">' . nl2br(esc_html($question['help_text'])) . '</div>';
         }
         
@@ -416,14 +418,15 @@ class TPAK_Survey_Layout_Renderer {
      */
     private function get_default_config() {
         return array(
-            'layout_mode' => 'enhanced',
-            'show_navigation' => true,
+            'layout_mode' => 'original',
+            'show_navigation' => false,
             'group_display' => true,
             'show_question_numbers' => true,
             'show_help_text' => true,
             'answer_display_mode' => 'formatted',
             'use_original_labels' => true,
-            'responsive_layout' => true
+            'responsive_layout' => true,
+            'collapsible_sections' => false
         );
     }
 }

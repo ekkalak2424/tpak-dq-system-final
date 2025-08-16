@@ -73,9 +73,13 @@ class TPAK_Auto_Structure_Detector {
         
         // 4. วิเคราะห์และสร้าง display configuration
         if ($result['structure_found']) {
-            $result['display_config'] = $this->create_display_config($result['analysis']);
-            $result['recommendations'] = $this->generate_recommendations($result['analysis']);
+            $result['display_config'] = $this->create_display_config($result['analysis'] ?? array());
+            $result['recommendations'] = $this->generate_recommendations($result['analysis'] ?? array());
             $result['success'] = true;
+        } else {
+            // ถ้าไม่พบโครงสร้าง ให้ใช้ค่าเริ่มต้น
+            $result['display_config'] = $this->get_default_display_config();
+            $result['recommendations'] = array('ไม่พบโครงสร้างแบบสอบถาม กรุณาตรวจสอบ Survey ID หรือนำเข้าไฟล์ .lss');
         }
         
         // 5. บันทึกผลลัพธ์
@@ -291,7 +295,9 @@ class TPAK_Auto_Structure_Detector {
         );
         
         // ปรับ config ตามความซับซ้อน
-        switch ($analysis['structure_complexity']) {
+        $complexity = isset($analysis['structure_complexity']) ? $analysis['structure_complexity'] : 'simple';
+        
+        switch ($complexity) {
             case 'complex':
                 $config['layout_mode'] = 'grouped';
                 $config['group_display'] = true;
@@ -304,7 +310,7 @@ class TPAK_Auto_Structure_Detector {
                 break;
                 
             default:
-                $config['layout_mode'] = 'simple';
+                $config['layout_mode'] = 'original';
                 $config['group_display'] = false;
         }
         
@@ -317,17 +323,23 @@ class TPAK_Auto_Structure_Detector {
     private function generate_recommendations($analysis) {
         $recommendations = array();
         
-        if ($analysis['structure_complexity'] === 'complex') {
+        $complexity = isset($analysis['structure_complexity']) ? $analysis['structure_complexity'] : 'simple';
+        if ($complexity === 'complex') {
             $recommendations[] = 'แนะนำให้ใช้การแสดงผลแบบจัดกลุ่มเพื่อความง่ายในการอ่าน';
             $recommendations[] = 'ควรเปิดใช้งานการย่อ/ขยายส่วนต่างๆ';
         }
         
-        if ($analysis['has_matrix_questions']) {
+        if (isset($analysis['has_matrix_questions']) && $analysis['has_matrix_questions']) {
             $recommendations[] = 'พบคำถามแบบ Matrix ควรแสดงในรูปแบบตารางเพื่อความชัดเจน';
         }
         
-        if ($analysis['total_questions'] > 30) {
+        $total_questions = isset($analysis['total_questions']) ? $analysis['total_questions'] : 0;
+        if ($total_questions > 30) {
             $recommendations[] = 'มีคำถามจำนวนมาก แนะนำให้ใช้ระบบค้นหาและกรอง';
+        }
+        
+        if (empty($recommendations)) {
+            $recommendations[] = 'ระบบจะแสดงผลตามโครงสร้างที่เหมาะสมที่สุด';
         }
         
         return $recommendations;
@@ -364,5 +376,22 @@ class TPAK_Auto_Structure_Detector {
             global $wpdb;
             $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_tpak_auto_detection_%'");
         }
+    }
+    
+    /**
+     * ค่าเริ่มต้นสำหรับ display config
+     */
+    private function get_default_display_config() {
+        return array(
+            'layout_mode' => 'enhanced',
+            'show_navigation' => false,
+            'group_display' => true,
+            'show_question_numbers' => true,
+            'show_help_text' => true,
+            'answer_display_mode' => 'formatted',
+            'use_original_labels' => true,
+            'responsive_layout' => true,
+            'collapsible_sections' => false
+        );
     }
 }
