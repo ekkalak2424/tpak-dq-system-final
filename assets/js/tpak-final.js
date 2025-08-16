@@ -64,6 +64,20 @@ console.log('=== TPAK FINAL SYSTEM LOADING ===');
                         targetContent.style.display = 'block';
                         targetContent.classList.add('active');
                         console.log('Content switched to:', tabId);
+                        console.log('Target content height:', targetContent.offsetHeight);
+                        console.log('Target content HTML length:', targetContent.innerHTML.length);
+                        
+                        // Force visible if it's the native tab
+                        if (tabId === 'native') {
+                            console.log('📍 Native tab activated - checking content...');
+                            var nativeContainer = targetContent.querySelector('#native-survey-container');
+                            if (nativeContainer) {
+                                nativeContainer.style.display = 'block';
+                                console.log('Native container made visible');
+                            }
+                        }
+                    } else {
+                        console.log('ERROR: Target content not found for tab:', tabId);
                     }
                 }
             });
@@ -92,6 +106,8 @@ console.log('=== TPAK FINAL SYSTEM LOADING ===');
         // Handle Activate Native button
         $(document).on('click', '#activate-native', function() {
             console.log('🚀 Activate Native clicked');
+            console.log('Button element:', this);
+            console.log('Button text:', $(this).text());
             
             var button = $(this);
             var originalText = button.text();
@@ -245,6 +261,23 @@ console.log('=== TPAK FINAL SYSTEM LOADING ===');
         });
         
         console.log('Native survey system initialized');
+        
+        // Test if buttons are visible
+        setTimeout(function() {
+            var activateBtn = $('#activate-native');
+            console.log('🔍 Checking activate button:', activateBtn.length);
+            if (activateBtn.length > 0) {
+                console.log('Button visible:', activateBtn.is(':visible'));
+                console.log('Button parent visible:', activateBtn.parent().is(':visible'));
+            }
+            
+            var nativeContainer = $('#native-survey-container');
+            console.log('🔍 Checking native container:', nativeContainer.length);
+            if (nativeContainer.length > 0) {
+                console.log('Container visible:', nativeContainer.is(':visible'));
+                console.log('Container HTML:', nativeContainer.html().substring(0, 200));
+            }
+        }, 2000);
     }
     
 })();

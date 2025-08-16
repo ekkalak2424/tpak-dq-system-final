@@ -1240,8 +1240,13 @@ $question_labels = array(); // Keep for backward compatibility
                 </div>
             </div>
             
-            <div id="native-survey-container" style="display: none;">
-                <!-- Native Survey Renderer จะโหลดที่นี่ -->
+            <div id="native-survey-container">
+                <div class="native-initial-content">
+                    <p><strong>📍 สถานะ:</strong> พร้อมใช้งาน</p>
+                    <p><strong>📊 Survey ID:</strong> <?php echo esc_html($lime_survey_id); ?></p>
+                    <p><strong>📝 Response ID:</strong> <?php echo esc_html($response_id); ?></p>
+                    <p>คลิกปุ่ม "🚀 เปิดใช้งาน Native Mode" เพื่อโหลดแบบสอบถามแบบ Native 100%</p>
+                </div>
             </div>
         </div>
         
@@ -2048,6 +2053,62 @@ $question_labels = array(); // Keep for backward compatibility
 
 #native-survey-container {
     min-height: 200px;
+    background: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.native-initial-content {
+    background: #fff;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    padding: 20px;
+    margin: 10px 0;
+}
+
+.native-initial-content p {
+    margin: 10px 0;
+    font-size: 14px;
+}
+
+.native-integration-header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.native-integration-header h3 {
+    margin: 0 0 10px 0;
+    color: white;
+}
+
+.integration-controls {
+    margin: 15px 0;
+}
+
+.integration-controls button {
+    margin-right: 10px;
+}
+
+.integration-status {
+    display: flex;
+    gap: 20px;
+    margin-top: 15px;
+    font-size: 14px;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-indicator {
+    font-weight: bold;
 }
 </style>
 
