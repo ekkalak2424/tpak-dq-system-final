@@ -8,53 +8,37 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Enqueue necessary scripts and styles
+// Force remove ALL conflicting scripts before any other scripts load
+function tpak_remove_conflicting_scripts() {
+    global $wp_scripts;
+    
+    // List of scripts to remove
+    $scripts_to_remove = array(
+        'jquery-ui-datepicker',
+        'jquery-ui-core', 
+        'jquery-migrate',
+        'jquery-ui',
+        'jqueryui'
+    );
+    
+    foreach ($scripts_to_remove as $script) {
+        wp_deregister_script($script);
+        wp_dequeue_script($script);
+    }
+}
+
+add_action('wp_enqueue_scripts', 'tpak_remove_conflicting_scripts', 1);
+add_action('admin_enqueue_scripts', 'tpak_remove_conflicting_scripts', 1);
+
+// Enqueue only jQuery core
 wp_enqueue_script('jquery');
 
-// Dequeue ALL conflicting scripts that might interfere
-wp_dequeue_script('jquery-ui-datepicker');
-wp_dequeue_script('jquery-ui-core');
-wp_dequeue_script('jquery-migrate');
-
-// Remove conflicting jQuery plugins entirely
-add_action('wp_print_scripts', function() {
-    wp_dequeue_script('jquery-ui-datepicker');
-    wp_dequeue_script('jquery-migrate');
-}, 100);
-
-// Only enqueue our scripts if they exist
-if (file_exists(TPAK_DQ_SYSTEM_PLUGIN_DIR . 'assets/js/admin-script.js')) {
-    wp_enqueue_script(
-        'tpak-dq-admin-script',
-        TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/admin-script.js',
-        array('jquery'),
-        TPAK_DQ_SYSTEM_VERSION,
-        true
-    );
-}
-
-if (file_exists(TPAK_DQ_SYSTEM_PLUGIN_DIR . 'assets/js/response-detail.js')) {
-    wp_enqueue_script(
-        'tpak-dq-response-detail',
-        TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/js/response-detail.js',
-        array('jquery'),
-        TPAK_DQ_SYSTEM_VERSION,
-        true
-    );
-}
+// Skip loading external JS files to avoid conflicts - use inline JS only
 
 wp_enqueue_style('tpak-dq-admin', TPAK_DQ_SYSTEM_PLUGIN_URL . 'assets/css/admin-style.css', array(), TPAK_DQ_SYSTEM_VERSION);
 
-// Localize script with AJAX data
-wp_localize_script('tpak-dq-response-detail', 'tpak_dq_ajax', array(
-    'ajax_url' => admin_url('admin-ajax.php'),
-    'nonce' => wp_create_nonce('tpak_workflow_nonce')
-));
-
-// Also add as global variables for backward compatibility
-wp_add_inline_script('tpak-dq-response-detail', '
-    window.ajaxurl = "' . admin_url('admin-ajax.php') . '";
-', 'before');
+// Set AJAX URL directly in page
+echo '<script>window.ajaxurl = "' . admin_url('admin-ajax.php') . '";</script>';
 
 // Check user permissions first
 if (!current_user_can('edit_posts')) {
@@ -2025,191 +2009,135 @@ $question_labels = array(); // Keep for backward compatibility
 
 <script>
 // Ensure global variables are available
-if (typeof window.ajaxurl === 'undefined') {
-    window.ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
-}
+window.ajaxurl = '<?php echo admin_url('admin-ajax.php'); ?>';
 
-// Prevent conflicts with other jQuery plugins
-(function($) {
+// Use jQuery.noConflict to avoid all conflicts
+var $j = jQuery.noConflict(true);
+
+// Remove ALL jQuery UI components that might conflict
+(function() {
     'use strict';
     
-    // Completely remove conflicting jQuery plugins
-    if (typeof $.fn.datepicker !== 'undefined') {
-        delete $.fn.datepicker;
-    }
-    if (typeof $.datepicker !== 'undefined') {
-        delete $.datepicker;
-    }
-    
-    console.log('=== TPAK TAB SYSTEM STARTING ===');
-    console.log('jQuery available:', typeof $ !== 'undefined');
-    
-    $(document).ready(function() {
-        console.log('=== TPAK DQ System Tab Initialization ===');
-        console.log('jQuery version:', $.fn.jquery);
-        console.log('Document ready state:', document.readyState);
-        console.log('Available tabs:', $('.nav-tab').length);
-        console.log('Tab wrapper found:', $('.nav-tab-wrapper').length);
+        console.log('=== TPAK CLEAN TAB SYSTEM ===');
+        console.log('jQuery noConflict version:', $j.fn.jquery);
+        console.log('Available tabs:', $j('.nav-tab').length);
+        console.log('Tab wrapper found:', $j('.nav-tab-wrapper').length);
         
-        // Wait for complete load to avoid conflicts
-        setTimeout(function() {
-            console.log('=== Starting tab initialization after timeout ===');
-            initTabSwitching();
-            initNativeSurvey();
-        }, 1000);
+        // Initialize tab system immediately
+        initTabSwitching();
+        initNativeSurvey();
     });
     
     function initTabSwitching() {
-        console.log('=== Tab Switching Init ===');
-        console.log('Number of tabs found:', $('.nav-tab').length);
-        console.log('Tab contents found:', $('.tab-content').length);
+        console.log('=== Tab Switching Init (Clean) ===');
+        console.log('Number of tabs found:', $j('.nav-tab').length);
+        console.log('Tab contents found:', $j('.tab-content').length);
         
         // Debug each tab
-        $('.nav-tab').each(function(index) {
-            var $tab = $(this);
+        $j('.nav-tab').each(function(index) {
+            var $tab = $j(this);
             var tabId = $tab.data('tab');
             var href = $tab.attr('href');
-            console.log('Tab ' + index + ': data-tab="' + tabId + '" href="' + href + '" visible=' + $tab.is(':visible'));
+            console.log('Tab ' + index + ': data-tab="' + tabId + '" href="' + href + '"');
         });
         
-        // Debug each content
-        $('.tab-content').each(function(index) {
-            var $content = $(this);
-            var contentId = $content.attr('id');
-            console.log('Content ' + index + ': id="' + contentId + '" visible=' + $content.is(':visible'));
-        });
-        
-        // Remove all existing event handlers to prevent conflicts
-        $('.nav-tab').off();
-        
-        // Use event delegation for maximum compatibility
-        $(document).off('click.tpak-tabs').on('click.tpak-tabs', '.nav-tab', function(e) {
+        // Simple direct click handler - no conflicts
+        $j('.nav-tab').off('click.tpak').on('click.tpak', function(e) {
             e.preventDefault();
             e.stopPropagation();
             
-            console.log('=== Tab Clicked (Event Delegation) ===');
+            console.log('=== TAB CLICKED ===');
             
-            var $clickedTab = $(this);
+            var $clickedTab = $j(this);
             var tabId = $clickedTab.data('tab');
             
-            console.log('Clicked tab element:', $clickedTab[0]);
-            console.log('Clicked tab ID:', tabId);
-            console.log('Tab classes:', $clickedTab.attr('class'));
+            console.log('Tab clicked:', tabId);
             
             if (!tabId) {
-                // Try getting from href as fallback
                 var href = $clickedTab.attr('href');
                 if (href && href.indexOf('#tab-') === 0) {
                     tabId = href.replace('#tab-', '');
-                    console.log('Tab ID extracted from href:', tabId);
-                } else {
-                    console.log('ERROR: No tab ID found! href=' + href);
-                    return false;
                 }
             }
             
-            // Switch tab appearance
-            $('.nav-tab').removeClass('nav-tab-active');
-            $clickedTab.addClass('nav-tab-active');
-            console.log('Tab appearance updated');
-            
-            // Switch content
-            $('.tab-content').hide().removeClass('active');
-            var $targetContent = $('#tab-' + tabId);
-            console.log('Target content element:', $targetContent.length ? $targetContent[0] : 'NOT FOUND');
-            
-            if ($targetContent.length > 0) {
-                $targetContent.show().addClass('active');
-                console.log('Content switched to:', tabId);
-                console.log('Target content now visible:', $targetContent.is(':visible'));
-            } else {
-                console.log('ERROR: Target content not found for tab:', tabId);
+            if (tabId) {
+                // Update tab appearance
+                $j('.nav-tab').removeClass('nav-tab-active');
+                $clickedTab.addClass('nav-tab-active');
+                
+                // Update content
+                $j('.tab-content').hide().removeClass('active');
+                var $target = $j('#tab-' + tabId);
+                $target.show().addClass('active');
+                
+                console.log('Switched to tab:', tabId);
+                console.log('Target visible:', $target.is(':visible'));
             }
             
             return false;
         });
         
-        console.log('Tab switching initialized successfully with event delegation');
-        
-        // Test manual tab click after 2 seconds
-        setTimeout(function() {
-            console.log('=== Testing manual tab click ===');
-            var $nativeTab = $('a[data-tab="native"]');
-            console.log('Native tab found:', $nativeTab.length);
-            if ($nativeTab.length > 0) {
-                console.log('Triggering click on native tab...');
-                $nativeTab.trigger('click.tpak-tabs');
-            }
-        }, 2000);
+        console.log('Tab system ready');
     }
     
     function initNativeSurvey() {
-        // Native Survey Integration
+        // Native Survey Integration using clean jQuery
         var surveyId = '<?php echo esc_js($lime_survey_id); ?>';
         var responseId = '<?php echo esc_js($response_id); ?>';
         
-        // Debug log
-        console.log('Native Survey initialized');
-        console.log('jQuery version:', $.fn.jquery);
-        console.log('Number of tabs found:', $('.nav-tab').length);
+        console.log('Native Survey initialized (clean)');
         console.log('Survey ID:', surveyId);
         console.log('Response ID:', responseId);
         
         // Activate native button
-        $('#activate-native').on('click', function() {
-        var button = $(this);
-        button.prop('disabled', true).text('🔄 กำลังโหลด...');
-        
-        $.ajax({
-            url: ajaxurl,
-            type: 'POST',
-            data: {
-                action: 'load_native_view',
-                survey_id: surveyId,
-                response_id: responseId,
-                post_id: responseId,
-                nonce: '<?php echo wp_create_nonce('native_view_nonce'); ?>'
-            },
-            success: function(response) {
-                if (response.success) {
-                    $('#native-survey-container').html(response.data.html).show();
-                    $('.native-status').html('✅ โหลดแล้ว').removeClass('loading').addClass('loaded');
-                    button.text('✅ Native Mode เปิดใช้งานแล้ว').addClass('button-secondary').removeClass('button-primary');
-                } else {
-                    alert('เกิดข้อผิดพลาด: ' + (response.data || 'ไม่สามารถโหลด Native view ได้'));
+        $j('#activate-native').on('click', function() {
+            var button = $j(this);
+            button.prop('disabled', true).text('🔄 กำลังโหลด...');
+            
+            $j.ajax({
+                url: window.ajaxurl,
+                type: 'POST',
+                data: {
+                    action: 'load_native_view',
+                    survey_id: surveyId,
+                    response_id: responseId,
+                    post_id: responseId,
+                    nonce: '<?php echo wp_create_nonce('native_view_nonce'); ?>'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        $j('#native-survey-container').html(response.data.html).show();
+                        $j('.native-status').html('✅ โหลดแล้ว').removeClass('loading').addClass('loaded');
+                        button.text('✅ Native Mode เปิดใช้งานแล้ว').addClass('button-secondary').removeClass('button-primary');
+                    } else {
+                        alert('เกิดข้อผิดพลาด: ' + (response.data || 'ไม่สามารถโหลด Native view ได้'));
+                        button.prop('disabled', false).text('🚀 เปิดใช้งาน Native Mode');
+                    }
+                },
+                error: function() {
+                    alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
                     button.prop('disabled', false).text('🚀 เปิดใช้งาน Native Mode');
                 }
-            },
-            error: function() {
-                alert('เกิดข้อผิดพลาดในการเชื่อมต่อ');
-                button.prop('disabled', false).text('🚀 เปิดใช้งาน Native Mode');
-            }
+            });
         });
-    });
-    
-    // Toggle question sections
-    $('.toggle-section, .question-header').on('click', function(e) {
-        e.preventDefault();
-        var section = $(this).closest('.question-section');
-        section.toggleClass('collapsed');
         
-        var expanded = !section.hasClass('collapsed');
-        section.find('.toggle-section').attr('aria-expanded', expanded);
-    });
-    
-    // Expand all
-    $('.expand-all').on('click', function() {
-        $('.question-section').removeClass('collapsed');
-        $('.toggle-section').attr('aria-expanded', 'true');
-    });
-    
-    // Collapse all
-    $('.collapse-all').on('click', function() {
-        $('.question-section').addClass('collapsed');
-        $('.toggle-section').attr('aria-expanded', 'false');
-    });
-    
-    // Search functionality
+        // Basic page interactions with clean jQuery
+        $j('.toggle-section, .question-header').on('click', function(e) {
+            e.preventDefault();
+            var section = $j(this).closest('.question-section');
+            section.toggleClass('collapsed');
+        });
+        
+        console.log('Native Survey handlers ready');
+    }
+})(); // End clean tab system
+</script>
+
+<!-- Legacy search and navigation (disabled to prevent conflicts) -->
+<script>
+// Legacy jQuery functionality - commented out to prevent conflicts
+/*
+$(document).ready(function() {
     $('#question-search').on('keyup', function() {
         var searchTerm = $(this).val().toLowerCase();
         
@@ -2659,22 +2587,9 @@ jQuery(document).ready(function($) {
             return;
         }
         
-        $('.question-section').each(function() {
-            var section = $(this);
-            var text = section.text().toLowerCase();
-            
-            if (text.indexOf(searchTerm) > -1) {
-                section.removeClass('filtered-out');
-                // Highlight matching text
-                highlightText(section, searchTerm);
-            } else {
-                section.addClass('filtered-out');
-            }
-        });
-    }
-    
-    // Close initNativeSurvey function
-    }
-    
-})(jQuery);
+*/
 </script>
+
+<?php
+// End of response-detail.php
+?>
