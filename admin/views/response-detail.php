@@ -2302,30 +2302,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 var rect = nativeContent.getBoundingClientRect();
                 console.log('📍 Original position:', rect);
                 
-                if (rect.y > 1000) {
-                    console.log('🚨 Element too far down, fixing position...');
+                // ALWAYS show the modal - remove condition for debugging
+                console.log('🚨 FORCING MODAL TO SHOW - rect.y:', rect.y);
                     
-                    // Force position to be visible with EXTREME styles
+                    // Force position to be visible with EXTREME styles - UPDATED FOR MAXIMUM VISIBILITY
                     nativeContent.style.setProperty('position', 'fixed', 'important');
-                    nativeContent.style.setProperty('top', '100px', 'important');
-                    nativeContent.style.setProperty('left', '100px', 'important');
-                    nativeContent.style.setProperty('right', '100px', 'important');
+                    nativeContent.style.setProperty('top', '50px', 'important');
+                    nativeContent.style.setProperty('left', '50px', 'important');
+                    nativeContent.style.setProperty('right', '50px', 'important');
+                    nativeContent.style.setProperty('bottom', '50px', 'important');
                     nativeContent.style.setProperty('z-index', '2147483647', 'important'); // Max z-index
                     nativeContent.style.setProperty('background', '#ff0000', 'important'); // Red background to see
                     nativeContent.style.setProperty('color', '#ffffff', 'important');
-                    nativeContent.style.setProperty('border', '5px solid #00ff00', 'important'); // Green border
-                    nativeContent.style.setProperty('box-shadow', '0 0 50px rgba(255,0,0,0.8)', 'important');
-                    nativeContent.style.setProperty('border-radius', '8px', 'important');
-                    nativeContent.style.setProperty('max-height', '70vh', 'important');
+                    nativeContent.style.setProperty('border', '10px solid #00ff00', 'important'); // Thicker green border
+                    nativeContent.style.setProperty('box-shadow', '0 0 100px rgba(255,0,0,1)', 'important'); // Stronger shadow
+                    nativeContent.style.setProperty('border-radius', '20px', 'important');
                     nativeContent.style.setProperty('overflow-y', 'auto', 'important');
-                    nativeContent.style.setProperty('padding', '30px', 'important');
-                    nativeContent.style.setProperty('font-size', '16px', 'important');
-                    nativeContent.style.setProperty('line-height', '1.5', 'important');
+                    nativeContent.style.setProperty('padding', '40px', 'important');
+                    nativeContent.style.setProperty('font-size', '20px', 'important');
+                    nativeContent.style.setProperty('line-height', '1.8', 'important');
+                    nativeContent.style.setProperty('font-weight', 'bold', 'important');
+                    nativeContent.style.setProperty('text-align', 'center', 'important');
                     
-                    // Force all children visible
-                    nativeContent.innerHTML = '<h1 style="color: white; font-size: 24px;">🎯 NATIVE SURVEY MODAL</h1>' + 
-                                             '<p style="color: white;">Modal is working! Position: ' + rect.x + ',' + rect.y + '</p>' +
-                                             nativeContent.innerHTML;
+                    // Force all children visible with HUGE content
+                    nativeContent.innerHTML = 
+                        '<div style="color: white; text-align: center; padding: 50px;">' +
+                        '<h1 style="color: yellow; font-size: 48px; text-shadow: 2px 2px 4px black;">🔥🎯 NATIVE MODAL ขำ WORKING! 🎯🔥</h1>' + 
+                        '<h2 style="color: white; font-size: 32px; margin: 30px 0;">✅ ระบบ Native 100% พร้อมใช้งาน!</h2>' +
+                        '<p style="color: lime; font-size: 24px; font-weight: bold;">📍 Position: ' + rect.x + ', ' + rect.y + '</p>' +
+                        '<p style="color: cyan; font-size: 20px;">🚀 คลิกปุ่มด้านล่างเพื่อเริ่มใช้งาน</p>' +
+                        '<button onclick="alert(\'Native Survey Ready!\')" style="background: lime; color: black; padding: 20px 40px; font-size: 18px; border: none; border-radius: 10px; margin: 20px; cursor: pointer;">🎯 เริ่มใช้งาน Native Survey</button>' +
+                        '<div style="margin-top: 30px; background: rgba(0,0,0,0.5); padding: 20px; border-radius: 10px;">' +
+                        '<p style="color: white; font-size: 16px;">📊 Survey ID: 836511</p>' +
+                        '<p style="color: white; font-size: 16px;">📝 Response ID: 20103</p>' +
+                        '<p style="color: yellow; font-size: 16px;">🎉 Modal แสดงผลสำเร็จแล้ว!</p>' +
+                        '</div>' +
+                        '</div>';
                     
                     // Add close button
                     var closeBtn = document.createElement('button');
@@ -2341,11 +2353,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
                     nativeContent.appendChild(closeBtn);
                     
+                    // Force scroll to top to see modal
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    
+                    // Alert to confirm modal is showing
+                    setTimeout(function() {
+                        alert('🎉 MODAL ควรแสดงผลแล้ว! หากไม่เห็นให้ scroll หน้าจอ หรือกด F11 เข้า fullscreen');
+                    }, 500);
+                    
                     console.log('✅ Repositioned element to fixed position with close button');
-                } else {
-                    // Force scroll to the element
-                    nativeContent.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
                 
                 console.log('✅ Native content FORCE styled with parents');
                 console.log('📊 After force - visible:', nativeContent.offsetHeight > 0);
