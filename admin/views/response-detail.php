@@ -11,8 +11,16 @@ if (!defined('ABSPATH')) {
 // Enqueue necessary scripts and styles
 wp_enqueue_script('jquery');
 
-// Dequeue conflicting scripts that might interfere
+// Dequeue ALL conflicting scripts that might interfere
 wp_dequeue_script('jquery-ui-datepicker');
+wp_dequeue_script('jquery-ui-core');
+wp_dequeue_script('jquery-migrate');
+
+// Remove conflicting jQuery plugins entirely
+add_action('wp_print_scripts', function() {
+    wp_dequeue_script('jquery-ui-datepicker');
+    wp_dequeue_script('jquery-migrate');
+}, 100);
 
 // Only enqueue our scripts if they exist
 if (file_exists(TPAK_DQ_SYSTEM_PLUGIN_DIR . 'assets/js/admin-script.js')) {
@@ -2025,67 +2033,114 @@ if (typeof window.ajaxurl === 'undefined') {
 (function($) {
     'use strict';
     
-    // Override any problematic jQuery plugins
-    if ($.fn.datepicker && $.fn.datepicker.noConflict) {
-        $.fn.datepicker.noConflict();
+    // Completely remove conflicting jQuery plugins
+    if (typeof $.fn.datepicker !== 'undefined') {
+        delete $.fn.datepicker;
     }
+    if (typeof $.datepicker !== 'undefined') {
+        delete $.datepicker;
+    }
+    
+    console.log('=== TPAK TAB SYSTEM STARTING ===');
+    console.log('jQuery available:', typeof $ !== 'undefined');
     
     $(document).ready(function() {
         console.log('=== TPAK DQ System Tab Initialization ===');
         console.log('jQuery version:', $.fn.jquery);
+        console.log('Document ready state:', document.readyState);
         console.log('Available tabs:', $('.nav-tab').length);
+        console.log('Tab wrapper found:', $('.nav-tab-wrapper').length);
         
-        // Direct tab initialization without timeouts
-        initTabSwitching();
-        initNativeSurvey();
+        // Wait for complete load to avoid conflicts
+        setTimeout(function() {
+            console.log('=== Starting tab initialization after timeout ===');
+            initTabSwitching();
+            initNativeSurvey();
+        }, 1000);
     });
     
     function initTabSwitching() {
         console.log('=== Tab Switching Init ===');
         console.log('Number of tabs found:', $('.nav-tab').length);
+        console.log('Tab contents found:', $('.tab-content').length);
         
         // Debug each tab
         $('.nav-tab').each(function(index) {
             var $tab = $(this);
             var tabId = $tab.data('tab');
             var href = $tab.attr('href');
-            console.log('Tab ' + index + ': data-tab="' + tabId + '" href="' + href + '"');
+            console.log('Tab ' + index + ': data-tab="' + tabId + '" href="' + href + '" visible=' + $tab.is(':visible'));
+        });
+        
+        // Debug each content
+        $('.tab-content').each(function(index) {
+            var $content = $(this);
+            var contentId = $content.attr('id');
+            console.log('Content ' + index + ': id="' + contentId + '" visible=' + $content.is(':visible'));
         });
         
         // Remove all existing event handlers to prevent conflicts
-        $('.nav-tab').off('click');
+        $('.nav-tab').off();
         
-        // Simple, direct tab switching
-        $('.nav-tab').on('click', function(e) {
+        // Use event delegation for maximum compatibility
+        $(document).off('click.tpak-tabs').on('click.tpak-tabs', '.nav-tab', function(e) {
             e.preventDefault();
-            console.log('=== Tab Clicked ===');
+            e.stopPropagation();
+            
+            console.log('=== Tab Clicked (Event Delegation) ===');
             
             var $clickedTab = $(this);
             var tabId = $clickedTab.data('tab');
             
+            console.log('Clicked tab element:', $clickedTab[0]);
             console.log('Clicked tab ID:', tabId);
+            console.log('Tab classes:', $clickedTab.attr('class'));
             
             if (!tabId) {
-                console.log('ERROR: No tab ID found!');
-                return false;
+                // Try getting from href as fallback
+                var href = $clickedTab.attr('href');
+                if (href && href.indexOf('#tab-') === 0) {
+                    tabId = href.replace('#tab-', '');
+                    console.log('Tab ID extracted from href:', tabId);
+                } else {
+                    console.log('ERROR: No tab ID found! href=' + href);
+                    return false;
+                }
             }
             
             // Switch tab appearance
             $('.nav-tab').removeClass('nav-tab-active');
             $clickedTab.addClass('nav-tab-active');
+            console.log('Tab appearance updated');
             
             // Switch content
             $('.tab-content').hide().removeClass('active');
             var $targetContent = $('#tab-' + tabId);
-            $targetContent.show().addClass('active');
+            console.log('Target content element:', $targetContent.length ? $targetContent[0] : 'NOT FOUND');
             
-            console.log('Tab switched to:', tabId);
-            console.log('Target content visible:', $targetContent.is(':visible'));
+            if ($targetContent.length > 0) {
+                $targetContent.show().addClass('active');
+                console.log('Content switched to:', tabId);
+                console.log('Target content now visible:', $targetContent.is(':visible'));
+            } else {
+                console.log('ERROR: Target content not found for tab:', tabId);
+            }
             
             return false;
         });
         
-        console.log('Tab switching initialized successfully');
+        console.log('Tab switching initialized successfully with event delegation');
+        
+        // Test manual tab click after 2 seconds
+        setTimeout(function() {
+            console.log('=== Testing manual tab click ===');
+            var $nativeTab = $('a[data-tab="native"]');
+            console.log('Native tab found:', $nativeTab.length);
+            if ($nativeTab.length > 0) {
+                console.log('Triggering click on native tab...');
+                $nativeTab.trigger('click.tpak-tabs');
+            }
+        }, 2000);
     }
     
     function initNativeSurvey() {
