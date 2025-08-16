@@ -100,4 +100,711 @@ class TPAK_Survey_Export_Manager {
             // สร้าง Excel
             $excel_url = $this->generate_excel($survey_data, array(
                 'include_analysis' => $include_analysis,
-                'format' => $format\n            ));\n            \n            // บันทึก log\n            $this->log_export($response_id, 'excel', $excel_url);\n            \n            wp_send_json_success(array(\n                'file_url' => $excel_url,\n                'message' => 'Export Excel เรียบร้อย',\n                'file_name' => basename($excel_url)\n            ));\n            \n        } catch (Exception $e) {\n            wp_send_json_error('เกิดข้อผิดพลาด: ' . $e->getMessage());\n        }\n    }\n    \n    /**\n     * Export แบบสอบถามเป็น JSON\n     */\n    public function export_json() {\n        check_ajax_referer('export_json_nonce', 'nonce');\n        \n        if (!current_user_can('export_survey_responses')) {\n            wp_send_json_error('ไม่มีสิทธิ์ในการ Export');\n        }\n        \n        $response_id = sanitize_text_field($_POST['response_id']);\n        $pretty_print = isset($_POST['pretty_print']) && $_POST['pretty_print'] === 'true';\n        $include_metadata = isset($_POST['include_metadata']) && $_POST['include_metadata'] === 'true';\n        \n        try {\n            // ดึงข้อมูลสมบูรณ์\n            $survey_data = $this->get_complete_survey_data($response_id);\n            if (!$survey_data) {\n                wp_send_json_error('ไม่พบข้อมูลแบบสอบถาม');\n            }\n            \n            // สร้าง JSON\n            $json_url = $this->generate_json($survey_data, array(\n                'pretty_print' => $pretty_print,\n                'include_metadata' => $include_metadata\n            ));\n            \n            // บันทึก log\n            $this->log_export($response_id, 'json', $json_url);\n            \n            wp_send_json_success(array(\n                'file_url' => $json_url,\n                'message' => 'Export JSON เรียบร้อย',\n                'file_name' => basename($json_url)\n            ));\n            \n        } catch (Exception $e) {\n            wp_send_json_error('เกิดข้อผิดพลาด: ' . $e->getMessage());\n        }\n    }\n    \n    /**\n     * ส่งแบบสอบถามทาง Email\n     */\n    public function send_email() {\n        check_ajax_referer('send_email_nonce', 'nonce');\n        \n        if (!current_user_can('forward_survey_responses')) {\n            wp_send_json_error('ไม่มีสิทธิ์ในการส่ง Email');\n        }\n        \n        $response_id = sanitize_text_field($_POST['response_id']);\n        $recipients = array_map('sanitize_email', $_POST['recipients']);\n        $subject = sanitize_text_field($_POST['subject']);\n        $message = sanitize_textarea_field($_POST['message']);\n        $attach_pdf = isset($_POST['attach_pdf']) && $_POST['attach_pdf'] === 'true';\n        $attach_excel = isset($_POST['attach_excel']) && $_POST['attach_excel'] === 'true';\n        \n        try {\n            // ดึงข้อมูลสมบูรณ์\n            $survey_data = $this->get_complete_survey_data($response_id);\n            if (!$survey_data) {\n                wp_send_json_error('ไม่พบข้อมูลแบบสอบถาม');\n            }\n            \n            // เตรียม attachments\n            $attachments = array();\n            \n            if ($attach_pdf) {\n                $pdf_path = $this->generate_pdf($survey_data, array('template' => 'email'));\n                $attachments[] = str_replace(wp_upload_dir()['baseurl'], wp_upload_dir()['basedir'], $pdf_path);\n            }\n            \n            if ($attach_excel) {\n                $excel_path = $this->generate_excel($survey_data, array('format' => 'xlsx'));\n                $attachments[] = str_replace(wp_upload_dir()['baseurl'], wp_upload_dir()['basedir'], $excel_path);\n            }\n            \n            // ส่ง Email\n            $sent_count = 0;\n            $errors = array();\n            \n            foreach ($recipients as $email) {\n                if (empty($email)) continue;\n                \n                $personalized_message = $this->personalize_email_message($message, $email, $survey_data);\n                \n                $result = wp_mail(\n                    $email,\n                    $subject,\n                    $personalized_message,\n                    array('Content-Type: text/html; charset=UTF-8'),\n                    $attachments\n                );\n                \n                if ($result) {\n                    $sent_count++;\n                } else {\n                    $errors[] = $email;\n                }\n            }\n            \n            // บันทึก log\n            $this->log_export($response_id, 'email', array(\n                'recipients' => $recipients,\n                'sent_count' => $sent_count,\n                'errors' => $errors\n            ));\n            \n            wp_send_json_success(array(\n                'sent_count' => $sent_count,\n                'total_recipients' => count($recipients),\n                'errors' => $errors,\n                'message' => \"ส่ง Email สำเร็จ $sent_count จาก \" . count($recipients) . \" ผู้รับ\"\n            ));\n            \n        } catch (Exception $e) {\n            wp_send_json_error('เกิดข้อผิดพลาด: ' . $e->getMessage());\n        }\n    }\n    \n    /**\n     * Bulk export หลายแบบสอบถาม\n     */\n    public function bulk_export() {\n        check_ajax_referer('bulk_export_nonce', 'nonce');\n        \n        if (!current_user_can('export_survey_responses')) {\n            wp_send_json_error('ไม่มีสิทธิ์ในการ Export');\n        }\n        \n        $response_ids = array_map('sanitize_text_field', $_POST['response_ids']);\n        $export_format = sanitize_text_field($_POST['export_format']);\n        $merge_files = isset($_POST['merge_files']) && $_POST['merge_files'] === 'true';\n        \n        try {\n            $exported_files = array();\n            $errors = array();\n            \n            if ($merge_files) {\n                // รวมไฟล์เป็นไฟล์เดียว\n                $merged_data = array();\n                \n                foreach ($response_ids as $response_id) {\n                    $survey_data = $this->get_complete_survey_data($response_id);\n                    if ($survey_data) {\n                        $merged_data[] = $survey_data;\n                    } else {\n                        $errors[] = $response_id;\n                    }\n                }\n                \n                if (!empty($merged_data)) {\n                    $file_url = $this->generate_merged_export($merged_data, $export_format);\n                    $exported_files[] = $file_url;\n                }\n                \n            } else {\n                // Export แยกไฟล์\n                foreach ($response_ids as $response_id) {\n                    $survey_data = $this->get_complete_survey_data($response_id);\n                    \n                    if ($survey_data) {\n                        switch ($export_format) {\n                            case 'pdf':\n                                $file_url = $this->generate_pdf($survey_data);\n                                break;\n                            case 'excel':\n                                $file_url = $this->generate_excel($survey_data);\n                                break;\n                            case 'json':\n                                $file_url = $this->generate_json($survey_data);\n                                break;\n                            default:\n                                throw new Exception('รูปแบบไฟล์ไม่ถูกต้อง');\n                        }\n                        \n                        $exported_files[] = $file_url;\n                        \n                    } else {\n                        $errors[] = $response_id;\n                    }\n                }\n            }\n            \n            // สร้าง ZIP ถ้ามีหลายไฟล์\n            if (count($exported_files) > 1) {\n                $zip_url = $this->create_zip_archive($exported_files, 'bulk_export_' . time());\n                $exported_files = array($zip_url);\n            }\n            \n            // บันทึก log\n            $this->log_export('bulk_' . implode(',', $response_ids), $export_format, $exported_files);\n            \n            wp_send_json_success(array(\n                'exported_files' => $exported_files,\n                'total_processed' => count($response_ids),\n                'successful' => count($exported_files),\n                'errors' => $errors,\n                'message' => 'Bulk Export เรียบร้อย'\n            ));\n            \n        } catch (Exception $e) {\n            wp_send_json_error('เกิดข้อผิดพลาด: ' . $e->getMessage());\n        }\n    }\n    \n    /**\n     * สร้าง PDF จากข้อมูลแบบสอบถาม\n     */\n    private function generate_pdf($survey_data, $options = array()) {\n        // ใช้ TCPDF หรือ mPDF\n        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'libs/tcpdf/tcpdf.php';\n        \n        $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);\n        \n        // ตั้งค่า PDF\n        $pdf->SetCreator('TPAK DQ System');\n        $pdf->SetAuthor('TPAK Survey System');\n        $pdf->SetTitle('Survey Report - ' . $survey_data['response_id']);\n        \n        // กำหนด font สำหรับภาษาไทย\n        $pdf->SetFont('thsarabunnew', '', 14);\n        \n        // Header และ Footer\n        $pdf->SetHeaderData('', 0, 'รายงานแบบสอบถาม', 'Response ID: ' . $survey_data['response_id']);\n        $pdf->setFooterData();\n        \n        // เพิ่มหน้า\n        $pdf->AddPage();\n        \n        // เนื้อหา PDF\n        $html = $this->generate_pdf_content($survey_data, $options);\n        $pdf->writeHTML($html, true, false, true, false, '');\n        \n        // สร้างไฟล์\n        $upload_dir = wp_upload_dir();\n        $file_name = 'survey_' . $survey_data['response_id'] . '_' . time() . '.pdf';\n        $file_path = $upload_dir['basedir'] . '/tpak-exports/' . $file_name;\n        \n        // สร้างโฟลเดอร์ถ้ายังไม่มี\n        wp_mkdir_p($upload_dir['basedir'] . '/tpak-exports/');\n        \n        // บันทึกไฟล์\n        $pdf->Output($file_path, 'F');\n        \n        return $upload_dir['baseurl'] . '/tpak-exports/' . $file_name;\n    }\n    \n    /**\n     * สร้าง Excel จากข้อมูลแบบสอบถาม\n     */\n    private function generate_excel($survey_data, $options = array()) {\n        // ใช้ PHPSpreadsheet\n        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'libs/phpspreadsheet/vendor/autoload.php';\n        \n        use PhpOffice\\PhpSpreadsheet\\Spreadsheet;\n        use PhpOffice\\PhpSpreadsheet\\Writer\\Xlsx;\n        use PhpOffice\\PhpSpreadsheet\\Style\\Color;\n        use PhpOffice\\PhpSpreadsheet\\Style\\Fill;\n        \n        $spreadsheet = new Spreadsheet();\n        $sheet = $spreadsheet->getActiveSheet();\n        \n        // หัวข้อ\n        $sheet->setTitle('Survey Response');\n        $sheet->setCellValue('A1', 'รายงานแบบสอบถาม');\n        $sheet->setCellValue('A2', 'Response ID: ' . $survey_data['response_id']);\n        $sheet->setCellValue('A3', 'วันที่: ' . date('Y-m-d H:i:s'));\n        \n        // จัดรูปแบบหัวข้อ\n        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);\n        $sheet->getStyle('A2:A3')->getFont()->setSize(12);\n        \n        // ข้อมูลแบบสอบถาม\n        $row = 5;\n        $response_data = json_decode($survey_data['response_data'], true);\n        $responses = $response_data['responses'] ?? array();\n        \n        // หัวตาราง\n        $sheet->setCellValue('A' . $row, 'คำถาม');\n        $sheet->setCellValue('B' . $row, 'คำตอบ');\n        $sheet->setCellValue('C' . $row, 'ประเภท');\n        \n        // จัดรูปแบบหัวตาราง\n        $headerStyle = [\n            'font' => ['bold' => true],\n            'fill' => [\n                'fillType' => Fill::FILL_SOLID,\n                'startColor' => ['rgb' => 'E2EFDA']\n            ]\n        ];\n        $sheet->getStyle('A' . $row . ':C' . $row)->applyFromArray($headerStyle);\n        \n        $row++;\n        \n        // ข้อมูลคำตอบ\n        foreach ($responses as $field => $value) {\n            $question_text = $this->get_question_text($field, $survey_data);\n            $formatted_value = $this->format_answer_for_export($value);\n            $question_type = $this->get_question_type($field);\n            \n            $sheet->setCellValue('A' . $row, $question_text);\n            $sheet->setCellValue('B' . $row, $formatted_value);\n            $sheet->setCellValue('C' . $row, $question_type);\n            \n            $row++;\n        }\n        \n        // ปรับขนาดคอลัมน์\n        $sheet->getColumnDimension('A')->setWidth(50);\n        $sheet->getColumnDimension('B')->setWidth(30);\n        $sheet->getColumnDimension('C')->setWidth(15);\n        \n        // เพิ่ม sheet วิเคราะห์ถ้าต้องการ\n        if (isset($options['include_analysis']) && $options['include_analysis']) {\n            $this->add_analysis_sheet($spreadsheet, $survey_data);\n        }\n        \n        // บันทึกไฟล์\n        $upload_dir = wp_upload_dir();\n        $file_name = 'survey_' . $survey_data['response_id'] . '_' . time() . '.xlsx';\n        $file_path = $upload_dir['basedir'] . '/tpak-exports/' . $file_name;\n        \n        wp_mkdir_p($upload_dir['basedir'] . '/tpak-exports/');\n        \n        $writer = new Xlsx($spreadsheet);\n        $writer->save($file_path);\n        \n        return $upload_dir['baseurl'] . '/tpak-exports/' . $file_name;\n    }\n    \n    /**\n     * สร้าง JSON จากข้อมูลแบบสอบถาม\n     */\n    private function generate_json($survey_data, $options = array()) {\n        $export_data = $survey_data;\n        \n        // เพิ่ม metadata ถ้าต้องการ\n        if (isset($options['include_metadata']) && $options['include_metadata']) {\n            $export_data['export_metadata'] = array(\n                'exported_at' => current_time('mysql'),\n                'exported_by' => get_current_user_id(),\n                'export_version' => '1.0',\n                'system_info' => array(\n                    'plugin_version' => TPAK_DQ_SYSTEM_VERSION,\n                    'wordpress_version' => get_bloginfo('version'),\n                    'php_version' => PHP_VERSION\n                )\n            );\n        }\n        \n        // กำหนดรูปแบบ JSON\n        $json_flags = JSON_UNESCAPED_UNICODE;\n        if (isset($options['pretty_print']) && $options['pretty_print']) {\n            $json_flags |= JSON_PRETTY_PRINT;\n        }\n        \n        // บันทึกไฟล์\n        $upload_dir = wp_upload_dir();\n        $file_name = 'survey_' . $survey_data['response_id'] . '_' . time() . '.json';\n        $file_path = $upload_dir['basedir'] . '/tpak-exports/' . $file_name;\n        \n        wp_mkdir_p($upload_dir['basedir'] . '/tpak-exports/');\n        \n        file_put_contents($file_path, json_encode($export_data, $json_flags));\n        \n        return $upload_dir['baseurl'] . '/tpak-exports/' . $file_name;\n    }\n    \n    /**\n     * สร้าง ZIP archive\n     */\n    private function create_zip_archive($file_urls, $zip_name) {\n        $upload_dir = wp_upload_dir();\n        $zip_file_name = $zip_name . '.zip';\n        $zip_file_path = $upload_dir['basedir'] . '/tpak-exports/' . $zip_file_name;\n        \n        $zip = new ZipArchive();\n        \n        if ($zip->open($zip_file_path, ZipArchive::CREATE) === TRUE) {\n            foreach ($file_urls as $url) {\n                $file_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $url);\n                if (file_exists($file_path)) {\n                    $zip->addFile($file_path, basename($file_path));\n                }\n            }\n            $zip->close();\n            \n            return $upload_dir['baseurl'] . '/tpak-exports/' . $zip_file_name;\n        }\n        \n        throw new Exception('ไม่สามารถสร้างไฟล์ ZIP ได้');\n    }\n    \n    /**\n     * ดึงข้อมูลแบบสอบถามสมบูรณ์\n     */\n    private function get_complete_survey_data($response_id) {\n        global $wpdb;\n        $table_name = $wpdb->prefix . 'tpak_survey_responses';\n        \n        $data = $wpdb->get_row($wpdb->prepare(\n            \"SELECT * FROM $table_name WHERE response_id = %s\",\n            $response_id\n        ), ARRAY_A);\n        \n        if ($data) {\n            // เพิ่มข้อมูล survey structure\n            $response_data = json_decode($data['response_data'], true);\n            $survey_id = $data['survey_id'];\n            \n            // ดึง LSS structure\n            $lss_structure = get_option('tpak_lss_structure_' . $survey_id, false);\n            if ($lss_structure) {\n                $data['survey_structure'] = $lss_structure;\n            }\n            \n            // ดึง audit trail\n            $data['audit_trail'] = $this->get_audit_trail($response_id);\n            \n            return $data;\n        }\n        \n        return null;\n    }\n    \n    /**\n     * ดึง audit trail\n     */\n    private function get_audit_trail($response_id) {\n        global $wpdb;\n        $audit_table = $wpdb->prefix . 'tpak_survey_audit';\n        \n        return $wpdb->get_results($wpdb->prepare(\n            \"SELECT * FROM $audit_table \n             WHERE response_id = %s \n             ORDER BY created_at DESC\",\n            $response_id\n        ), ARRAY_A);\n    }\n    \n    /**\n     * สร้างเนื้อหา PDF\n     */\n    private function generate_pdf_content($survey_data, $options = array()) {\n        $html = '<style>\n            body { font-family: \"TH Sarabun New\", sans-serif; }\n            .header { text-align: center; margin-bottom: 20px; }\n            .question { margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; }\n            .question-title { font-weight: bold; color: #333; }\n            .answer { color: #666; margin-top: 5px; }\n            .modified { background-color: #fff3cd; }\n        </style>';\n        \n        $html .= '<div class=\"header\">';\n        $html .= '<h1>รายงานแบบสอบถาม</h1>';\n        $html .= '<p>Response ID: ' . esc_html($survey_data['response_id']) . '</p>';\n        $html .= '<p>วันที่สร้าง: ' . esc_html($survey_data['created_at']) . '</p>';\n        $html .= '</div>';\n        \n        $response_data = json_decode($survey_data['response_data'], true);\n        $responses = $response_data['responses'] ?? array();\n        $modifications = $response_data['modifications'] ?? array();\n        \n        $html .= '<div class=\"content\">';\n        \n        foreach ($responses as $field => $value) {\n            $question_text = $this->get_question_text($field, $survey_data);\n            $formatted_value = $this->format_answer_for_export($value);\n            $is_modified = $this->is_field_modified($field, $modifications);\n            \n            $html .= '<div class=\"question' . ($is_modified ? ' modified' : '') . '\">';\n            $html .= '<div class=\"question-title\">' . esc_html($question_text) . '</div>';\n            $html .= '<div class=\"answer\">' . esc_html($formatted_value) . '</div>';\n            \n            if ($is_modified) {\n                $html .= '<div class=\"modification-note\">* ข้อมูลนี้ได้รับการแก้ไข</div>';\n            }\n            \n            $html .= '</div>';\n        }\n        \n        $html .= '</div>';\n        \n        // เพิ่มประวัติการแก้ไขถ้าต้องการ\n        if (isset($options['include_history']) && $options['include_history'] && !empty($survey_data['audit_trail'])) {\n            $html .= '<div class=\"history\">';\n            $html .= '<h2>ประวัติการแก้ไข</h2>';\n            \n            foreach ($survey_data['audit_trail'] as $entry) {\n                $html .= '<div class=\"history-item\">';\n                $html .= '<strong>' . esc_html($entry['created_at']) . '</strong> - ';\n                $html .= esc_html($entry['action']) . ' โดย ' . esc_html($entry['user_name']);\n                $html .= '</div>';\n            }\n            \n            $html .= '</div>';\n        }\n        \n        return $html;\n    }\n    \n    /**\n     * เพิ่ม analysis sheet ใน Excel\n     */\n    private function add_analysis_sheet($spreadsheet, $survey_data) {\n        $analysisSheet = $spreadsheet->createSheet();\n        $analysisSheet->setTitle('Analysis');\n        \n        // TODO: เพิ่มการวิเคราะห์ข้อมูล\n        $analysisSheet->setCellValue('A1', 'การวิเคราะห์ข้อมูล');\n        $analysisSheet->setCellValue('A2', 'จำนวนคำถามทั้งหมด: ');\n        $analysisSheet->setCellValue('A3', 'จำนวนคำตอบที่กรอก: ');\n        $analysisSheet->setCellValue('A4', 'เปอร์เซ็นต์ความสมบูรณ์: ');\n    }\n    \n    /**\n     * Personalize email message\n     */\n    private function personalize_email_message($message, $email, $survey_data) {\n        $user = get_user_by('email', $email);\n        $display_name = $user ? $user->display_name : $email;\n        \n        $placeholders = array(\n            '{{name}}' => $display_name,\n            '{{response_id}}' => $survey_data['response_id'],\n            '{{survey_id}}' => $survey_data['survey_id'],\n            '{{date}}' => date('Y-m-d H:i:s')\n        );\n        \n        return str_replace(array_keys($placeholders), array_values($placeholders), $message);\n    }\n    \n    /**\n     * ดึงข้อความคำถาม\n     */\n    private function get_question_text($field, $survey_data) {\n        // ลองดึงจาก survey structure\n        if (isset($survey_data['survey_structure'])) {\n            $structure = $survey_data['survey_structure'];\n            $qid = str_replace('question_', '', $field);\n            \n            if (isset($structure['question_texts'][$qid])) {\n                return $structure['question_texts'][$qid]['question'];\n            }\n        }\n        \n        return $field;\n    }\n    \n    /**\n     * Format คำตอบสำหรับ export\n     */\n    private function format_answer_for_export($value) {\n        if (is_array($value)) {\n            return implode(', ', $value);\n        }\n        \n        // ใช้ Question Dictionary\n        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-question-dictionary.php';\n        $dictionary = TPAK_Question_Dictionary::getInstance();\n        \n        $formatted = $dictionary->getAnswerText($value);\n        return $formatted !== $value ? $formatted : $value;\n    }\n    \n    /**\n     * ดึงประเภทคำถาม\n     */\n    private function get_question_type($field) {\n        // TODO: ดึงจาก survey structure\n        return 'text';\n    }\n    \n    /**\n     * ตรวจสอบว่าฟิลด์ถูกแก้ไขหรือไม่\n     */\n    private function is_field_modified($field, $modifications) {\n        foreach ($modifications as $mod) {\n            if ($mod['field'] === $field) {\n                return true;\n            }\n        }\n        return false;\n    }\n    \n    /**\n     * สร้าง merged export\n     */\n    private function generate_merged_export($merged_data, $format) {\n        switch ($format) {\n            case 'excel':\n                return $this->generate_merged_excel($merged_data);\n            case 'json':\n                return $this->generate_merged_json($merged_data);\n            default:\n                throw new Exception('รูปแบบ Merged Export ไม่ถูกต้อง');\n        }\n    }\n    \n    /**\n     * สร้าง merged Excel\n     */\n    private function generate_merged_excel($merged_data) {\n        // TODO: Implement merged Excel generation\n        return $this->generate_excel($merged_data[0]); // ตัวอย่าง\n    }\n    \n    /**\n     * สร้าง merged JSON\n     */\n    private function generate_merged_json($merged_data) {\n        $upload_dir = wp_upload_dir();\n        $file_name = 'merged_survey_' . time() . '.json';\n        $file_path = $upload_dir['basedir'] . '/tpak-exports/' . $file_name;\n        \n        wp_mkdir_p($upload_dir['basedir'] . '/tpak-exports/');\n        \n        file_put_contents($file_path, json_encode($merged_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));\n        \n        return $upload_dir['baseurl'] . '/tpak-exports/' . $file_name;\n    }\n    \n    /**\n     * บันทึก export log\n     */\n    private function log_export($response_id, $format, $result) {\n        global $wpdb;\n        $current_user = wp_get_current_user();\n        \n        $wpdb->insert(\n            $wpdb->prefix . 'tpak_survey_audit',\n            array(\n                'response_id' => $response_id,\n                'action' => 'exported',\n                'action_data' => json_encode(array(\n                    'format' => $format,\n                    'result' => $result\n                )),\n                'user_id' => $current_user->ID,\n                'user_name' => $current_user->display_name,\n                'ip_address' => $_SERVER['REMOTE_ADDR'],\n                'user_agent' => $_SERVER['HTTP_USER_AGENT'],\n                'created_at' => current_time('mysql')\n            )\n        );\n    }\n    \n    /**\n     * Schedule export\n     */\n    public function schedule_export($response_id, $format, $schedule_time) {\n        wp_schedule_single_event(\n            $schedule_time,\n            'tpak_scheduled_export',\n            array($response_id, $format)\n        );\n    }\n    \n    /**\n     * Handle scheduled export\n     */\n    public function handle_scheduled_export($response_id, $format) {\n        $survey_data = $this->get_complete_survey_data($response_id);\n        \n        if ($survey_data) {\n            switch ($format) {\n                case 'pdf':\n                    $this->generate_pdf($survey_data);\n                    break;\n                case 'excel':\n                    $this->generate_excel($survey_data);\n                    break;\n                case 'json':\n                    $this->generate_json($survey_data);\n                    break;\n            }\n            \n            // ส่ง notification\n            $this->send_export_notification($response_id, $format);\n        }\n    }\n    \n    /**\n     * ส่ง export notification\n     */\n    private function send_export_notification($response_id, $format) {\n        // TODO: ส่ง email แจ้งเตือนเมื่อ export เสร็จ\n    }\n}
+                'format' => $format
+            ));
+            
+            // บันทึก log
+            $this->log_export($response_id, 'excel', $excel_url);
+            
+            wp_send_json_success(array(
+                'file_url' => $excel_url,
+                'message' => 'Export Excel เรียบร้อย',
+                'file_name' => basename($excel_url)
+            ));
+            
+        } catch (Exception $e) {
+            wp_send_json_error('เกิดข้อผิดพลาด: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Export แบบสอบถามเป็น JSON
+     */
+    public function export_json() {
+        check_ajax_referer('export_json_nonce', 'nonce');
+        
+        if (!current_user_can('export_survey_responses')) {
+            wp_send_json_error('ไม่มีสิทธิ์ในการ Export');
+        }
+        
+        $response_id = sanitize_text_field($_POST['response_id']);
+        $pretty_print = isset($_POST['pretty_print']) && $_POST['pretty_print'] === 'true';
+        $include_metadata = isset($_POST['include_metadata']) && $_POST['include_metadata'] === 'true';
+        
+        try {
+            // ดึงข้อมูลสมบูรณ์
+            $survey_data = $this->get_complete_survey_data($response_id);
+            if (!$survey_data) {
+                wp_send_json_error('ไม่พบข้อมูลแบบสอบถาม');
+            }
+            
+            // สร้าง JSON
+            $json_url = $this->generate_json($survey_data, array(
+                'pretty_print' => $pretty_print,
+                'include_metadata' => $include_metadata
+            ));
+            
+            // บันทึก log
+            $this->log_export($response_id, 'json', $json_url);
+            
+            wp_send_json_success(array(
+                'file_url' => $json_url,
+                'message' => 'Export JSON เรียบร้อย',
+                'file_name' => basename($json_url)
+            ));
+            
+        } catch (Exception $e) {
+            wp_send_json_error('เกิดข้อผิดพลาด: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * ส่งแบบสอบถามทาง Email
+     */
+    public function send_email() {
+        check_ajax_referer('send_email_nonce', 'nonce');
+        
+        if (!current_user_can('forward_survey_responses')) {
+            wp_send_json_error('ไม่มีสิทธิ์ในการส่ง Email');
+        }
+        
+        $response_id = sanitize_text_field($_POST['response_id']);
+        $recipients = array_map('sanitize_email', $_POST['recipients']);
+        $subject = sanitize_text_field($_POST['subject']);
+        $message = sanitize_textarea_field($_POST['message']);
+        $attach_pdf = isset($_POST['attach_pdf']) && $_POST['attach_pdf'] === 'true';
+        $attach_excel = isset($_POST['attach_excel']) && $_POST['attach_excel'] === 'true';
+        
+        try {
+            // ดึงข้อมูลสมบูรณ์
+            $survey_data = $this->get_complete_survey_data($response_id);
+            if (!$survey_data) {
+                wp_send_json_error('ไม่พบข้อมูลแบบสอบถาม');
+            }
+            
+            // เตรียม attachments
+            $attachments = array();
+            
+            if ($attach_pdf) {
+                $pdf_path = $this->generate_pdf($survey_data, array('template' => 'email'));
+                $attachments[] = str_replace(wp_upload_dir()['baseurl'], wp_upload_dir()['basedir'], $pdf_path);
+            }
+            
+            if ($attach_excel) {
+                $excel_path = $this->generate_excel($survey_data, array('format' => 'xlsx'));
+                $attachments[] = str_replace(wp_upload_dir()['baseurl'], wp_upload_dir()['basedir'], $excel_path);
+            }
+            
+            // ส่ง Email
+            $sent_count = 0;
+            $errors = array();
+            
+            foreach ($recipients as $email) {
+                if (empty($email)) continue;
+                
+                $personalized_message = $this->personalize_email_message($message, $email, $survey_data);
+                
+                $result = wp_mail(
+                    $email,
+                    $subject,
+                    $personalized_message,
+                    array('Content-Type: text/html; charset=UTF-8'),
+                    $attachments
+                );
+                
+                if ($result) {
+                    $sent_count++;
+                } else {
+                    $errors[] = $email;
+                }
+            }
+            
+            // บันทึก log
+            $this->log_export($response_id, 'email', array(
+                'recipients' => $recipients,
+                'sent_count' => $sent_count,
+                'errors' => $errors
+            ));
+            
+            wp_send_json_success(array(
+                'sent_count' => $sent_count,
+                'total_recipients' => count($recipients),
+                'errors' => $errors,
+                'message' => "ส่ง Email สำเร็จ $sent_count จาก " . count($recipients) . " ผู้รับ"
+            ));
+            
+        } catch (Exception $e) {
+            wp_send_json_error('เกิดข้อผิดพลาด: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * Bulk export หลายแบบสอบถาม
+     */
+    public function bulk_export() {
+        check_ajax_referer('bulk_export_nonce', 'nonce');
+        
+        if (!current_user_can('export_survey_responses')) {
+            wp_send_json_error('ไม่มีสิทธิ์ในการ Export');
+        }
+        
+        $response_ids = array_map('sanitize_text_field', $_POST['response_ids']);
+        $export_format = sanitize_text_field($_POST['export_format']);
+        $merge_files = isset($_POST['merge_files']) && $_POST['merge_files'] === 'true';
+        
+        try {
+            $exported_files = array();
+            $errors = array();
+            
+            if ($merge_files) {
+                // รวมไฟล์เป็นไฟล์เดียว
+                $merged_data = array();
+                
+                foreach ($response_ids as $response_id) {
+                    $survey_data = $this->get_complete_survey_data($response_id);
+                    if ($survey_data) {
+                        $merged_data[] = $survey_data;
+                    } else {
+                        $errors[] = $response_id;
+                    }
+                }
+                
+                if (!empty($merged_data)) {
+                    $file_url = $this->generate_merged_export($merged_data, $export_format);
+                    $exported_files[] = $file_url;
+                }
+                
+            } else {
+                // Export แยกไฟล์
+                foreach ($response_ids as $response_id) {
+                    $survey_data = $this->get_complete_survey_data($response_id);
+                    
+                    if ($survey_data) {
+                        switch ($export_format) {
+                            case 'pdf':
+                                $file_url = $this->generate_pdf($survey_data);
+                                break;
+                            case 'excel':
+                                $file_url = $this->generate_excel($survey_data);
+                                break;
+                            case 'json':
+                                $file_url = $this->generate_json($survey_data);
+                                break;
+                            default:
+                                throw new Exception('รูปแบบไฟล์ไม่ถูกต้อง');
+                        }
+                        
+                        $exported_files[] = $file_url;
+                        
+                    } else {
+                        $errors[] = $response_id;
+                    }
+                }
+            }
+            
+            // สร้าง ZIP ถ้ามีหลายไฟล์
+            if (count($exported_files) > 1) {
+                $zip_url = $this->create_zip_archive($exported_files, 'bulk_export_' . time());
+                $exported_files = array($zip_url);
+            }
+            
+            // บันทึก log
+            $this->log_export('bulk_' . implode(',', $response_ids), $export_format, $exported_files);
+            
+            wp_send_json_success(array(
+                'exported_files' => $exported_files,
+                'total_processed' => count($response_ids),
+                'successful' => count($exported_files),
+                'errors' => $errors,
+                'message' => 'Bulk Export เรียบร้อย'
+            ));
+            
+        } catch (Exception $e) {
+            wp_send_json_error('เกิดข้อผิดพลาด: ' . $e->getMessage());
+        }
+    }
+    
+    /**
+     * สร้าง PDF จากข้อมูลแบบสอบถาม
+     */
+    private function generate_pdf($survey_data, $options = array()) {
+        // ใช้ TCPDF หรือ mPDF
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'libs/tcpdf/tcpdf.php';
+        
+        $pdf = new TCPDF('P', 'mm', 'A4', true, 'UTF-8', false);
+        
+        // ตั้งค่า PDF
+        $pdf->SetCreator('TPAK DQ System');
+        $pdf->SetAuthor('TPAK Survey System');
+        $pdf->SetTitle('Survey Report - ' . $survey_data['response_id']);
+        
+        // กำหนด font สำหรับภาษาไทย
+        $pdf->SetFont('thsarabunnew', '', 14);
+        
+        // Header และ Footer
+        $pdf->SetHeaderData('', 0, 'รายงานแบบสอบถาม', 'Response ID: ' . $survey_data['response_id']);
+        $pdf->setFooterData();
+        
+        // เพิ่มหน้า
+        $pdf->AddPage();
+        
+        // เนื้อหา PDF
+        $html = $this->generate_pdf_content($survey_data, $options);
+        $pdf->writeHTML($html, true, false, true, false, '');
+        
+        // สร้างไฟล์
+        $upload_dir = wp_upload_dir();
+        $file_name = 'survey_' . $survey_data['response_id'] . '_' . time() . '.pdf';
+        $file_path = $upload_dir['basedir'] . '/tpak-exports/' . $file_name;
+        
+        // สร้างโฟลเดอร์ถ้ายังไม่มี
+        wp_mkdir_p($upload_dir['basedir'] . '/tpak-exports/');
+        
+        // บันทึกไฟล์
+        $pdf->Output($file_path, 'F');
+        
+        return $upload_dir['baseurl'] . '/tpak-exports/' . $file_name;
+    }
+    
+    /**
+     * สร้าง Excel จากข้อมูลแบบสอบถาม
+     */
+    private function generate_excel($survey_data, $options = array()) {
+        // ใช้ PHPSpreadsheet
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'libs/phpspreadsheet/vendor/autoload.php';
+        
+        use PhpOffice\PhpSpreadsheet\Spreadsheet;
+        use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
+        use PhpOffice\PhpSpreadsheet\Style\Color;
+        use PhpOffice\PhpSpreadsheet\Style\Fill;
+        
+        $spreadsheet = new Spreadsheet();
+        $sheet = $spreadsheet->getActiveSheet();
+        
+        // หัวข้อ
+        $sheet->setTitle('Survey Response');
+        $sheet->setCellValue('A1', 'รายงานแบบสอบถาม');
+        $sheet->setCellValue('A2', 'Response ID: ' . $survey_data['response_id']);
+        $sheet->setCellValue('A3', 'วันที่: ' . date('Y-m-d H:i:s'));
+        
+        // จัดรูปแบบหัวข้อ
+        $sheet->getStyle('A1')->getFont()->setBold(true)->setSize(16);
+        $sheet->getStyle('A2:A3')->getFont()->setSize(12);
+        
+        // ข้อมูลแบบสอบถาม
+        $row = 5;
+        $response_data = json_decode($survey_data['response_data'], true);
+        $responses = $response_data['responses'] ?? array();
+        
+        // หัวตาราง
+        $sheet->setCellValue('A' . $row, 'คำถาม');
+        $sheet->setCellValue('B' . $row, 'คำตอบ');
+        $sheet->setCellValue('C' . $row, 'ประเภท');
+        
+        // จัดรูปแบบหัวตาราง
+        $headerStyle = [
+            'font' => ['bold' => true],
+            'fill' => [
+                'fillType' => Fill::FILL_SOLID,
+                'startColor' => ['rgb' => 'E2EFDA']
+            ]
+        ];
+        $sheet->getStyle('A' . $row . ':C' . $row)->applyFromArray($headerStyle);
+        
+        $row++;
+        
+        // ข้อมูลคำตอบ
+        foreach ($responses as $field => $value) {
+            $question_text = $this->get_question_text($field, $survey_data);
+            $formatted_value = $this->format_answer_for_export($value);
+            $question_type = $this->get_question_type($field);
+            
+            $sheet->setCellValue('A' . $row, $question_text);
+            $sheet->setCellValue('B' . $row, $formatted_value);
+            $sheet->setCellValue('C' . $row, $question_type);
+            
+            $row++;
+        }
+        
+        // ปรับขนาดคอลัมน์
+        $sheet->getColumnDimension('A')->setWidth(50);
+        $sheet->getColumnDimension('B')->setWidth(30);
+        $sheet->getColumnDimension('C')->setWidth(15);
+        
+        // เพิ่ม sheet วิเคราะห์ถ้าต้องการ
+        if (isset($options['include_analysis']) && $options['include_analysis']) {
+            $this->add_analysis_sheet($spreadsheet, $survey_data);
+        }
+        
+        // บันทึกไฟล์
+        $upload_dir = wp_upload_dir();
+        $file_name = 'survey_' . $survey_data['response_id'] . '_' . time() . '.xlsx';
+        $file_path = $upload_dir['basedir'] . '/tpak-exports/' . $file_name;
+        
+        wp_mkdir_p($upload_dir['basedir'] . '/tpak-exports/');
+        
+        $writer = new Xlsx($spreadsheet);
+        $writer->save($file_path);
+        
+        return $upload_dir['baseurl'] . '/tpak-exports/' . $file_name;
+    }
+    
+    /**
+     * สร้าง JSON จากข้อมูลแบบสอบถาม
+     */
+    private function generate_json($survey_data, $options = array()) {
+        $export_data = $survey_data;
+        
+        // เพิ่ม metadata ถ้าต้องการ
+        if (isset($options['include_metadata']) && $options['include_metadata']) {
+            $export_data['export_metadata'] = array(
+                'exported_at' => current_time('mysql'),
+                'exported_by' => get_current_user_id(),
+                'export_version' => '1.0',
+                'system_info' => array(
+                    'plugin_version' => TPAK_DQ_SYSTEM_VERSION,
+                    'wordpress_version' => get_bloginfo('version'),
+                    'php_version' => PHP_VERSION
+                )
+            );
+        }
+        
+        // กำหนดรูปแบบ JSON
+        $json_flags = JSON_UNESCAPED_UNICODE;
+        if (isset($options['pretty_print']) && $options['pretty_print']) {
+            $json_flags |= JSON_PRETTY_PRINT;
+        }
+        
+        // บันทึกไฟล์
+        $upload_dir = wp_upload_dir();
+        $file_name = 'survey_' . $survey_data['response_id'] . '_' . time() . '.json';
+        $file_path = $upload_dir['basedir'] . '/tpak-exports/' . $file_name;
+        
+        wp_mkdir_p($upload_dir['basedir'] . '/tpak-exports/');
+        
+        file_put_contents($file_path, json_encode($export_data, $json_flags));
+        
+        return $upload_dir['baseurl'] . '/tpak-exports/' . $file_name;
+    }
+    
+    /**
+     * สร้าง ZIP archive
+     */
+    private function create_zip_archive($file_urls, $zip_name) {
+        $upload_dir = wp_upload_dir();
+        $zip_file_name = $zip_name . '.zip';
+        $zip_file_path = $upload_dir['basedir'] . '/tpak-exports/' . $zip_file_name;
+        
+        $zip = new ZipArchive();
+        
+        if ($zip->open($zip_file_path, ZipArchive::CREATE) === TRUE) {
+            foreach ($file_urls as $url) {
+                $file_path = str_replace($upload_dir['baseurl'], $upload_dir['basedir'], $url);
+                if (file_exists($file_path)) {
+                    $zip->addFile($file_path, basename($file_path));
+                }
+            }
+            $zip->close();
+            
+            return $upload_dir['baseurl'] . '/tpak-exports/' . $zip_file_name;
+        }
+        
+        throw new Exception('ไม่สามารถสร้างไฟล์ ZIP ได้');
+    }
+    
+    /**
+     * ดึงข้อมูลแบบสอบถามสมบูรณ์
+     */
+    private function get_complete_survey_data($response_id) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'tpak_survey_responses';
+        
+        $data = $wpdb->get_row($wpdb->prepare(
+            "SELECT * FROM $table_name WHERE response_id = %s",
+            $response_id
+        ), ARRAY_A);
+        
+        if ($data) {
+            // เพิ่มข้อมูล survey structure
+            $response_data = json_decode($data['response_data'], true);
+            $survey_id = $data['survey_id'];
+            
+            // ดึง LSS structure
+            $lss_structure = get_option('tpak_lss_structure_' . $survey_id, false);
+            if ($lss_structure) {
+                $data['survey_structure'] = $lss_structure;
+            }
+            
+            // ดึง audit trail
+            $data['audit_trail'] = $this->get_audit_trail($response_id);
+            
+            return $data;
+        }
+        
+        return null;
+    }
+    
+    /**
+     * ดึง audit trail
+     */
+    private function get_audit_trail($response_id) {
+        global $wpdb;
+        $audit_table = $wpdb->prefix . 'tpak_survey_audit';
+        
+        return $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $audit_table 
+             WHERE response_id = %s 
+             ORDER BY created_at DESC",
+            $response_id
+        ), ARRAY_A);
+    }
+    
+    /**
+     * สร้างเนื้อหา PDF
+     */
+    private function generate_pdf_content($survey_data, $options = array()) {
+        $html = '<style>
+            body { font-family: "TH Sarabun New", sans-serif; }
+            .header { text-align: center; margin-bottom: 20px; }
+            .question { margin-bottom: 15px; padding: 10px; border: 1px solid #ddd; }
+            .question-title { font-weight: bold; color: #333; }
+            .answer { color: #666; margin-top: 5px; }
+            .modified { background-color: #fff3cd; }
+        </style>';
+        
+        $html .= '<div class="header">';
+        $html .= '<h1>รายงานแบบสอบถาม</h1>';
+        $html .= '<p>Response ID: ' . esc_html($survey_data['response_id']) . '</p>';
+        $html .= '<p>วันที่สร้าง: ' . esc_html($survey_data['created_at']) . '</p>';
+        $html .= '</div>';
+        
+        $response_data = json_decode($survey_data['response_data'], true);
+        $responses = $response_data['responses'] ?? array();
+        $modifications = $response_data['modifications'] ?? array();
+        
+        $html .= '<div class="content">';
+        
+        foreach ($responses as $field => $value) {
+            $question_text = $this->get_question_text($field, $survey_data);
+            $formatted_value = $this->format_answer_for_export($value);
+            $is_modified = $this->is_field_modified($field, $modifications);
+            
+            $html .= '<div class="question' . ($is_modified ? ' modified' : '') . '">';
+            $html .= '<div class="question-title">' . esc_html($question_text) . '</div>';
+            $html .= '<div class="answer">' . esc_html($formatted_value) . '</div>';
+            
+            if ($is_modified) {
+                $html .= '<div class="modification-note">* ข้อมูลนี้ได้รับการแก้ไข</div>';
+            }
+            
+            $html .= '</div>';
+        }
+        
+        $html .= '</div>';
+        
+        // เพิ่มประวัติการแก้ไขถ้าต้องการ
+        if (isset($options['include_history']) && $options['include_history'] && !empty($survey_data['audit_trail'])) {
+            $html .= '<div class="history">';
+            $html .= '<h2>ประวัติการแก้ไข</h2>';
+            
+            foreach ($survey_data['audit_trail'] as $entry) {
+                $html .= '<div class="history-item">';
+                $html .= '<strong>' . esc_html($entry['created_at']) . '</strong> - ';
+                $html .= esc_html($entry['action']) . ' โดย ' . esc_html($entry['user_name']);
+                $html .= '</div>';
+            }
+            
+            $html .= '</div>';
+        }
+        
+        return $html;
+    }
+    
+    /**
+     * เพิ่ม analysis sheet ใน Excel
+     */
+    private function add_analysis_sheet($spreadsheet, $survey_data) {
+        $analysisSheet = $spreadsheet->createSheet();
+        $analysisSheet->setTitle('Analysis');
+        
+        // TODO: เพิ่มการวิเคราะห์ข้อมูล
+        $analysisSheet->setCellValue('A1', 'การวิเคราะห์ข้อมูล');
+        $analysisSheet->setCellValue('A2', 'จำนวนคำถามทั้งหมด: ');
+        $analysisSheet->setCellValue('A3', 'จำนวนคำตอบที่กรอก: ');
+        $analysisSheet->setCellValue('A4', 'เปอร์เซ็นต์ความสมบูรณ์: ');
+    }
+    
+    /**
+     * Personalize email message
+     */
+    private function personalize_email_message($message, $email, $survey_data) {
+        $user = get_user_by('email', $email);
+        $display_name = $user ? $user->display_name : $email;
+        
+        $placeholders = array(
+            '{{name}}' => $display_name,
+            '{{response_id}}' => $survey_data['response_id'],
+            '{{survey_id}}' => $survey_data['survey_id'],
+            '{{date}}' => date('Y-m-d H:i:s')
+        );
+        
+        return str_replace(array_keys($placeholders), array_values($placeholders), $message);
+    }
+    
+    /**
+     * ดึงข้อความคำถาม
+     */
+    private function get_question_text($field, $survey_data) {
+        // ลองดึงจาก survey structure
+        if (isset($survey_data['survey_structure'])) {
+            $structure = $survey_data['survey_structure'];
+            $qid = str_replace('question_', '', $field);
+            
+            if (isset($structure['question_texts'][$qid])) {
+                return $structure['question_texts'][$qid]['question'];
+            }
+        }
+        
+        return $field;
+    }
+    
+    /**
+     * Format คำตอบสำหรับ export
+     */
+    private function format_answer_for_export($value) {
+        if (is_array($value)) {
+            return implode(', ', $value);
+        }
+        
+        // ใช้ Question Dictionary
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-question-dictionary.php';
+        $dictionary = TPAK_Question_Dictionary::getInstance();
+        
+        $formatted = $dictionary->getAnswerText($value);
+        return $formatted !== $value ? $formatted : $value;
+    }
+    
+    /**
+     * ดึงประเภทคำถาม
+     */
+    private function get_question_type($field) {
+        // TODO: ดึงจาก survey structure
+        return 'text';
+    }
+    
+    /**
+     * ตรวจสอบว่าฟิลด์ถูกแก้ไขหรือไม่
+     */
+    private function is_field_modified($field, $modifications) {
+        foreach ($modifications as $mod) {
+            if ($mod['field'] === $field) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * สร้าง merged export
+     */
+    private function generate_merged_export($merged_data, $format) {
+        switch ($format) {
+            case 'excel':
+                return $this->generate_merged_excel($merged_data);
+            case 'json':
+                return $this->generate_merged_json($merged_data);
+            default:
+                throw new Exception('รูปแบบ Merged Export ไม่ถูกต้อง');
+        }
+    }
+    
+    /**
+     * สร้าง merged Excel
+     */
+    private function generate_merged_excel($merged_data) {
+        // TODO: Implement merged Excel generation
+        return $this->generate_excel($merged_data[0]); // ตัวอย่าง
+    }
+    
+    /**
+     * สร้าง merged JSON
+     */
+    private function generate_merged_json($merged_data) {
+        $upload_dir = wp_upload_dir();
+        $file_name = 'merged_survey_' . time() . '.json';
+        $file_path = $upload_dir['basedir'] . '/tpak-exports/' . $file_name;
+        
+        wp_mkdir_p($upload_dir['basedir'] . '/tpak-exports/');
+        
+        file_put_contents($file_path, json_encode($merged_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        
+        return $upload_dir['baseurl'] . '/tpak-exports/' . $file_name;
+    }
+    
+    /**
+     * บันทึก export log
+     */
+    private function log_export($response_id, $format, $result) {
+        global $wpdb;
+        $current_user = wp_get_current_user();
+        
+        $wpdb->insert(
+            $wpdb->prefix . 'tpak_survey_audit',
+            array(
+                'response_id' => $response_id,
+                'action' => 'exported',
+                'action_data' => json_encode(array(
+                    'format' => $format,
+                    'result' => $result
+                )),
+                'user_id' => $current_user->ID,
+                'user_name' => $current_user->display_name,
+                'ip_address' => $_SERVER['REMOTE_ADDR'],
+                'user_agent' => $_SERVER['HTTP_USER_AGENT'],
+                'created_at' => current_time('mysql')
+            )
+        );
+    }
+    
+    /**
+     * Schedule export
+     */
+    public function schedule_export($response_id, $format, $schedule_time) {
+        wp_schedule_single_event(
+            $schedule_time,
+            'tpak_scheduled_export',
+            array($response_id, $format)
+        );
+    }
+    
+    /**
+     * Handle scheduled export
+     */
+    public function handle_scheduled_export($response_id, $format) {
+        $survey_data = $this->get_complete_survey_data($response_id);
+        
+        if ($survey_data) {
+            switch ($format) {
+                case 'pdf':
+                    $this->generate_pdf($survey_data);
+                    break;
+                case 'excel':
+                    $this->generate_excel($survey_data);
+                    break;
+                case 'json':
+                    $this->generate_json($survey_data);
+                    break;
+            }
+            
+            // ส่ง notification
+            $this->send_export_notification($response_id, $format);
+        }
+    }
+    
+    /**
+     * ส่ง export notification
+     */
+    private function send_export_notification($response_id, $format) {
+        // TODO: ส่ง email แจ้งเตือนเมื่อ export เสร็จ
+    }
+}
