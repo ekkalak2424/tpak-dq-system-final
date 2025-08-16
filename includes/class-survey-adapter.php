@@ -163,18 +163,31 @@ class TPAK_LimeSurvey_Adapter extends TPAK_Survey_Adapter_Base {
             'confidence' => 0.9
         );
         
-        // Get survey structure for better mapping
-        $api_handler = new TPAK_DQ_API_Handler();
-        $survey_structure = $api_handler->get_survey_structure($survey_id);
+        // Get survey structure from multiple sources (LSS first, then API)
         $question_map = array();
         $groups = array();
+        $structure_source = 'none';
         
-        if ($survey_structure && isset($survey_structure['questions'])) {
-            $question_map = $survey_structure['questions'];
-        }
-        
-        if ($survey_structure && isset($survey_structure['groups'])) {
-            $groups = $survey_structure['groups'];
+        // First try LSS structure (highest priority)
+        $lss_structure = get_option('tpak_lss_structure_' . $survey_id, false);
+        if ($lss_structure) {
+            $question_map = $this->process_lss_questions($lss_structure);
+            $groups = isset($lss_structure['groups']) ? $lss_structure['groups'] : array();
+            $structure_source = 'lss';
+            error_log('TPAK DQ System: Using LSS structure for Survey ID: ' . $survey_id . ' with ' . count($question_map) . ' questions');
+        } else {
+            // Fallback to API
+            $api_handler = new TPAK_DQ_API_Handler();
+            $survey_structure = $api_handler->get_survey_structure($survey_id);
+            
+            if ($survey_structure && isset($survey_structure['questions'])) {
+                $question_map = $survey_structure['questions'];
+                $structure_source = 'api';
+            }
+            
+            if ($survey_structure && isset($survey_structure['groups'])) {
+                $groups = $survey_structure['groups'];
+            }
         }
         
         foreach ($response_data as $key => $value) {
@@ -192,12 +205,12 @@ class TPAK_LimeSurvey_Adapter extends TPAK_Survey_Adapter_Base {
             $type = 'text';
             $confidence = 0.5;
             
-            // 1. Try from API structure
+            // 1. Try from survey structure (LSS or API)
             if (isset($question_map[$main_key])) {
                 $question_data = $question_map[$main_key];
                 $question_text = strip_tags($question_data['question']);
                 $type = $question_data['type'] ?? 'text';
-                $confidence = 0.95;
+                $confidence = ($structure_source === 'lss') ? 0.98 : 0.95;
                 
                 // Add sub-question information
                 if ($sub_key && isset($question_data['sub_questions'][$sub_key])) {
@@ -206,7 +219,27 @@ class TPAK_LimeSurvey_Adapter extends TPAK_Survey_Adapter_Base {
                     $question_text .= ' [' . $sub_key . ']';
                 }
             }
-            // 2. Try question dictionary
+            // 2. Try exact field matching in LSS (for complex keys)
+            elseif ($structure_source === 'lss' && $lss_structure) {
+                $lss_match = $this->find_lss_question_by_field($key, $lss_structure);
+                if ($lss_match) {
+                    $question_text = $lss_match['question'];
+                    $type = $lss_match['type'];
+                    $confidence = 0.95;
+                } else {
+                    $question_text = $this->dictionary->getQuestionText($main_key);
+                    if ($sub_key) {
+                        $sub_text = $this->dictionary->getQuestionText($sub_key);
+                        if ($sub_text !== $sub_key) {
+                            $question_text .= ' - ' . $sub_text;
+                        } else {
+                            $question_text .= ' [' . $sub_key . ']';
+                        }
+                    }
+                    $confidence = 0.8;
+                }
+            }
+            // 3. Try question dictionary
             else {
                 $question_text = $this->dictionary->getQuestionText($main_key);
                 if ($sub_key) {
@@ -330,6 +363,95 @@ class TPAK_LimeSurvey_Adapter extends TPAK_Survey_Adapter_Base {
         
         // Fallback to basic formatting
         return $this->format_value($value, $type);
+    }
+    
+    /**
+     * Process LSS questions into format compatible with Survey Adapter
+     */
+    private function process_lss_questions($lss_structure) {
+        $processed_questions = array();
+        
+        if (!isset($lss_structure['questions']) || !is_array($lss_structure['questions'])) {
+            return $processed_questions;
+        }
+        
+        foreach ($lss_structure['questions'] as $qid => $question_data) {
+            $title = isset($question_data['title']) ? $question_data['title'] : $qid;
+            
+            // Get question text from question_texts
+            $question_text = $title;
+            if (isset($lss_structure['question_texts'][$qid]['question'])) {
+                $question_text = $lss_structure['question_texts'][$qid]['question'];
+            }
+            
+            $processed_questions[$title] = array(
+                'qid' => $qid,
+                'title' => $title,
+                'question' => $question_text,
+                'type' => isset($question_data['type']) ? $question_data['type'] : 'text',
+                'help' => '',
+                'mandatory' => isset($question_data['mandatory']) ? $question_data['mandatory'] : 'N',
+                'other' => isset($question_data['other']) ? $question_data['other'] : 'N',
+                'group_id' => isset($question_data['gid']) ? $question_data['gid'] : null,
+                'group_name' => '',
+                'sub_questions' => array()
+            );
+        }
+        
+        return $processed_questions;
+    }
+    
+    /**
+     * Find LSS question by field key (advanced matching)
+     */
+    private function find_lss_question_by_field($field_key, $lss_structure) {
+        if (!isset($lss_structure['questions']) || !isset($lss_structure['question_texts'])) {
+            return null;
+        }
+        
+        // Try exact title match first
+        foreach ($lss_structure['questions'] as $qid => $question_data) {
+            if (isset($question_data['title']) && $question_data['title'] === $field_key) {
+                $question_text = isset($lss_structure['question_texts'][$qid]['question']) 
+                    ? $lss_structure['question_texts'][$qid]['question'] 
+                    : $question_data['title'];
+                    
+                return array(
+                    'question' => $question_text,
+                    'type' => $question_data['type'] ?? 'text'
+                );
+            }
+        }
+        
+        // Try pattern matching for complex keys
+        $parsed = $this->parse_field_key($field_key);
+        $main_key = $parsed['main'];
+        $sub_key = $parsed['sub'];
+        
+        foreach ($lss_structure['questions'] as $qid => $question_data) {
+            if (isset($question_data['title'])) {
+                $title = $question_data['title'];
+                
+                // Check if main key matches
+                if ($title === $main_key || strpos($title, $main_key) !== false) {
+                    $question_text = isset($lss_structure['question_texts'][$qid]['question']) 
+                        ? $lss_structure['question_texts'][$qid]['question'] 
+                        : $title;
+                    
+                    // Add sub-question info if exists
+                    if ($sub_key) {
+                        $question_text .= ' [' . $sub_key . ']';
+                    }
+                    
+                    return array(
+                        'question' => $question_text,
+                        'type' => $question_data['type'] ?? 'text'
+                    );
+                }
+            }
+        }
+        
+        return null;
     }
     
     private function should_skip_field($key, $value) {

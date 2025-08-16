@@ -440,14 +440,26 @@ class TPAK_Advanced_Question_Mapper {
     }
     
     /**
-     * Get question from database or API
+     * Get question from database, LSS structure, or API
      */
     private function getQuestionFromDatabase($field_key, $survey_id) {
         if (!$survey_id) {
             return null;
         }
         
-        // Try to get survey structure from API handler
+        // First, try to get from LSS structure (highest priority)
+        $lss_data = $this->getQuestionFromLSS($field_key, $survey_id);
+        if ($lss_data) {
+            return $lss_data;
+        }
+        
+        // Second, try Question Dictionary mappings
+        $dict_data = $this->getQuestionFromDictionary($field_key, $survey_id);
+        if ($dict_data) {
+            return $dict_data;
+        }
+        
+        // Finally, try to get survey structure from API handler
         $api_handler = new TPAK_DQ_API_Handler();
         $survey_structure = $api_handler->get_survey_structure($survey_id);
         
@@ -461,6 +473,143 @@ class TPAK_Advanced_Question_Mapper {
                 'help' => $question_data['help'] ?? '',
                 'mandatory' => ($question_data['mandatory'] === 'Y')
             ];
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Get question from LSS imported data
+     */
+    private function getQuestionFromLSS($field_key, $survey_id) {
+        // Check if LSS structure exists for this survey
+        $lss_structure = get_option('tpak_lss_structure_' . $survey_id, false);
+        if (!$lss_structure) {
+            return null;
+        }
+        
+        // Try to find exact match by field key/title
+        if (isset($lss_structure['questions'][$field_key])) {
+            $question_data = $lss_structure['questions'][$field_key];
+            
+            // Get question text from question_texts
+            $question_text = $field_key;
+            if (isset($lss_structure['question_texts'][$question_data['qid']]['question'])) {
+                $question_text = $lss_structure['question_texts'][$question_data['qid']]['question'];
+            } elseif (isset($question_data['question'])) {
+                $question_text = $question_data['question'];
+            }
+            
+            return [
+                'display_name' => $question_text,
+                'category' => $this->guessCategory($question_text),
+                'type' => $this->mapLimesurveyType($question_data['type'] ?? 'text'),
+                'help' => '',
+                'mandatory' => ($question_data['mandatory'] ?? 'N') === 'Y'
+            ];
+        }
+        
+        // Try to find by QID if field_key looks like a question ID
+        foreach ($lss_structure['questions'] as $title => $question_data) {
+            if ($question_data['qid'] == $field_key || $title == $field_key) {
+                // Get question text
+                $question_text = $title;
+                if (isset($lss_structure['question_texts'][$question_data['qid']]['question'])) {
+                    $question_text = $lss_structure['question_texts'][$question_data['qid']]['question'];
+                }
+                
+                return [
+                    'display_name' => $question_text,
+                    'category' => $this->guessCategory($question_text),
+                    'type' => $this->mapLimesurveyType($question_data['type'] ?? 'text'),
+                    'help' => '',
+                    'mandatory' => ($question_data['mandatory'] ?? 'N') === 'Y'
+                ];
+            }
+        }
+        
+        // Try pattern matching for complex field keys like PA1TT2[1]
+        return $this->getQuestionFromLSSPattern($field_key, $lss_structure);
+    }
+    
+    /**
+     * Get question from LSS using pattern matching
+     */
+    private function getQuestionFromLSSPattern($field_key, $lss_structure) {
+        // Parse complex field keys like PA1TT2[1]
+        $main_key = $field_key;
+        $sub_key = null;
+        
+        // Pattern 1: Field[index] format
+        if (preg_match('/^([^\[]+)\[(\d+)\]$/', $field_key, $matches)) {
+            $main_key = $matches[1];
+            $sub_key = $matches[2];
+        }
+        // Pattern 2: Field_SubField format
+        elseif (preg_match('/^([^_]+)_(.+)$/', $field_key, $matches)) {
+            $main_key = $matches[1];
+            $sub_key = $matches[2];
+        }
+        
+        // Search for main key in LSS structure
+        foreach ($lss_structure['questions'] as $title => $question_data) {
+            if ($title == $main_key || strpos($title, $main_key) !== false) {
+                // Get question text
+                $question_text = $title;
+                if (isset($lss_structure['question_texts'][$question_data['qid']]['question'])) {
+                    $question_text = $lss_structure['question_texts'][$question_data['qid']]['question'];
+                }
+                
+                // Add sub-question information if available
+                if ($sub_key) {
+                    $question_text .= ' [' . $sub_key . ']';
+                }
+                
+                return [
+                    'display_name' => $question_text,
+                    'category' => $this->guessCategory($question_text),
+                    'type' => $this->mapLimesurveyType($question_data['type'] ?? 'text'),
+                    'help' => '',
+                    'mandatory' => ($question_data['mandatory'] ?? 'N') === 'Y'
+                ];
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Get question from Question Dictionary mappings
+     */
+    private function getQuestionFromDictionary($field_key, $survey_id) {
+        // Check if dictionary mappings exist for this survey
+        $mappings = get_option('tpak_question_mappings_' . $survey_id, false);
+        if (!$mappings || !isset($mappings['questions'])) {
+            return null;
+        }
+        
+        // Try exact match
+        if (isset($mappings['questions'][$field_key])) {
+            return [
+                'display_name' => $mappings['questions'][$field_key],
+                'category' => $this->guessCategory($mappings['questions'][$field_key]),
+                'type' => 'text',
+                'help' => '',
+                'mandatory' => false
+            ];
+        }
+        
+        // Try pattern matching
+        foreach ($mappings['questions'] as $pattern => $text) {
+            if (strpos($field_key, $pattern) !== false) {
+                return [
+                    'display_name' => $text,
+                    'category' => $this->guessCategory($text),
+                    'type' => 'text',
+                    'help' => '',
+                    'mandatory' => false
+                ];
+            }
         }
         
         return null;

@@ -364,6 +364,9 @@ class TPAK_LSS_Parser {
         // Convert to dictionary format
         $dictionary_data = $this->convert_to_question_dictionary($parsed_data);
         
+        // Clear any existing cache for this survey
+        delete_transient('survey_structure_' . $survey_id);
+        
         // Save as WordPress option
         $option_name = 'tpak_question_mappings_' . $survey_id;
         $saved = update_option($option_name, $dictionary_data);
@@ -371,6 +374,8 @@ class TPAK_LSS_Parser {
         // Also save full parsed data for reference
         $full_option_name = 'tpak_lss_structure_' . $survey_id;
         update_option($full_option_name, $parsed_data);
+        
+        error_log('TPAK DQ System: Saved LSS structure for Survey ID ' . $survey_id . ' with ' . count($dictionary_data['questions']) . ' questions');
         
         return $saved;
     }
