@@ -1,9 +1,9 @@
 <?php
 /**
- * TPAK DQ System - Survey User Management & Permissions
+ * TPAK DQ System - Survey User Manager
  * 
- * ระบบจัดการผู้ใช้และสิทธิ์สำหรับแบบสอบถาม
- * รองรับการกำหนดสิทธิ์แบบละเอียด, การส่งต่อแบบปลอดภัย
+ * ระบบจัดการผู้ใช้สำหรับแบบสอบถาม
+ * รองรับการสร้างผู้ใช้ การมอบหมายสิทธิ์ และการควบคุมการเข้าถึง
  */
 
 if (!defined('ABSPATH')) {
@@ -22,26 +22,23 @@ class TPAK_Survey_User_Manager {
     }
     
     public function __construct() {
-        // Register custom roles และ capabilities
-        add_action('init', array($this, 'register_custom_roles'));
-        add_action('init', array($this, 'register_custom_capabilities'));
-        
-        // User management pages
-        add_action('admin_menu', array($this, 'add_user_management_pages'));
+        // Admin menu hooks
+        add_action('admin_menu', array($this, 'add_user_management_pages'), 20);
         
         // AJAX handlers
         add_action('wp_ajax_create_survey_user', array($this, 'create_survey_user'));
         add_action('wp_ajax_update_user_permissions', array($this, 'update_user_permissions'));
-        add_action('wp_ajax_bulk_assign_permissions', array($this, 'bulk_assign_permissions'));
         add_action('wp_ajax_get_user_activity', array($this, 'get_user_activity'));
         add_action('wp_ajax_generate_access_link', array($this, 'generate_access_link'));
         add_action('wp_ajax_revoke_user_access', array($this, 'revoke_user_access'));
         
-        // Access control
-        add_action('wp', array($this, 'check_survey_access'));
+        // Capability filtering
         add_filter('user_has_cap', array($this, 'dynamic_capability_check'), 10, 4);
         
-        // User notifications
+        // Access control
+        add_action('init', array($this, 'check_survey_access'));
+        
+        // Notifications
         add_action('tpak_user_assigned', array($this, 'send_assignment_notification'), 10, 3);
         add_action('tpak_user_permissions_changed', array($this, 'send_permission_notification'), 10, 2);
     }
@@ -49,4 +46,922 @@ class TPAK_Survey_User_Manager {
     /**
      * สร้าง custom roles สำหรับระบบ
      */
-    public function register_custom_roles() {\n        // Survey Editor - แก้ไขแบบสอบถามได้\n        if (!get_role('survey_editor')) {\n            add_role('survey_editor', 'Survey Editor', array(\n                'read' => true,\n                'edit_posts' => true,\n                'edit_survey_responses' => true,\n                'view_survey_responses' => true,\n                'create_survey_drafts' => true\n            ));\n        }\n        \n        // Survey Reviewer - ตรวจสอบแบบสอบถาม\n        if (!get_role('survey_reviewer')) {\n            add_role('survey_reviewer', 'Survey Reviewer', array(\n                'read' => true,\n                'view_survey_responses' => true,\n                'review_survey_responses' => true,\n                'add_review_notes' => true,\n                'view_audit_logs' => true\n            ));\n        }\n        \n        // Survey Approver - อนุมัติแบบสอบถาม\n        if (!get_role('survey_approver')) {\n            add_role('survey_approver', 'Survey Approver', array(\n                'read' => true,\n                'view_survey_responses' => true,\n                'review_survey_responses' => true,\n                'approve_survey_responses' => true,\n                'reject_survey_responses' => true,\n                'forward_survey_responses' => true,\n                'view_audit_logs' => true\n            ));\n        }\n        \n        // Survey Manager - จัดการระบบ\n        if (!get_role('survey_manager')) {\n            add_role('survey_manager', 'Survey Manager', array(\n                'read' => true,\n                'edit_posts' => true,\n                'view_survey_responses' => true,\n                'edit_survey_responses' => true,\n                'review_survey_responses' => true,\n                'approve_survey_responses' => true,\n                'export_survey_responses' => true,\n                'forward_survey_responses' => true,\n                'manage_survey_users' => true,\n                'view_audit_logs' => true,\n                'export_audit_logs' => true,\n                'configure_survey_settings' => true\n            ));\n        }\n        \n        // Survey Viewer - ดูแบบสอบถามอย่างเดียว\n        if (!get_role('survey_viewer')) {\n            add_role('survey_viewer', 'Survey Viewer', array(\n                'read' => true,\n                'view_survey_responses' => true\n            ));\n        }\n    }\n    \n    /**\n     * ลงทะเบียน custom capabilities\n     */\n    public function register_custom_capabilities() {\n        $admin = get_role('administrator');\n        if ($admin) {\n            $capabilities = array(\n                'view_survey_responses',\n                'edit_survey_responses',\n                'review_survey_responses',\n                'approve_survey_responses',\n                'reject_survey_responses',\n                'export_survey_responses',\n                'forward_survey_responses',\n                'manage_survey_users',\n                'view_audit_logs',\n                'export_audit_logs',\n                'configure_survey_settings',\n                'create_survey_drafts',\n                'add_review_notes',\n                'restore_survey_versions',\n                'delete_survey_responses',\n                'bulk_process_surveys',\n                'schedule_survey_exports',\n                'manage_survey_templates'\n            );\n            \n            foreach ($capabilities as $cap) {\n                $admin->add_cap($cap);\n            }\n        }\n    }\n    \n    /**\n     * เพิ่มหน้าจัดการผู้ใช้\n     */\n    public function add_user_management_pages() {\n        if (current_user_can('manage_survey_users')) {\n            add_submenu_page(\n                'tpak-dq-system',\n                'จัดการผู้ใช้แบบสอบถาม',\n                'จัดการผู้ใช้',\n                'manage_survey_users',\n                'tpak-survey-users',\n                array($this, 'render_user_management_page')\n            );\n            \n            add_submenu_page(\n                'tpak-dq-system',\n                'สิทธิ์และการเข้าถึง',\n                'สิทธิ์และการเข้าถึง',\n                'manage_survey_users',\n                'tpak-survey-permissions',\n                array($this, 'render_permissions_page')\n            );\n        }\n    }\n    \n    /**\n     * Render หน้าจัดการผู้ใช้\n     */\n    public function render_user_management_page() {\n        $users = $this->get_survey_users();\n        $roles = $this->get_survey_roles();\n        \n        ?>\n        <div class=\"wrap\">\n            <h1>จัดการผู้ใช้แบบสอบถาม</h1>\n            \n            <!-- สร้างผู้ใช้ใหม่ -->\n            <div class=\"card\">\n                <h2>เพิ่มผู้ใช้ใหม่</h2>\n                <form id=\"create-user-form\">\n                    <?php wp_nonce_field('create_survey_user', 'create_user_nonce'); ?>\n                    \n                    <table class=\"form-table\">\n                        <tr>\n                            <th><label for=\"username\">ชื่อผู้ใช้</label></th>\n                            <td><input type=\"text\" id=\"username\" name=\"username\" class=\"regular-text\" required></td>\n                        </tr>\n                        <tr>\n                            <th><label for=\"email\">อีเมล</label></th>\n                            <td><input type=\"email\" id=\"email\" name=\"email\" class=\"regular-text\" required></td>\n                        </tr>\n                        <tr>\n                            <th><label for=\"first_name\">ชื่อ</label></th>\n                            <td><input type=\"text\" id=\"first_name\" name=\"first_name\" class=\"regular-text\"></td>\n                        </tr>\n                        <tr>\n                            <th><label for=\"last_name\">นามสกุล</label></th>\n                            <td><input type=\"text\" id=\"last_name\" name=\"last_name\" class=\"regular-text\"></td>\n                        </tr>\n                        <tr>\n                            <th><label for=\"role\">บทบาท</label></th>\n                            <td>\n                                <select id=\"role\" name=\"role\" required>\n                                    <option value=\"\">-- เลือกบทบาท --</option>\n                                    <?php foreach ($roles as $role_key => $role_name): ?>\n                                        <option value=\"<?php echo esc_attr($role_key); ?>\"><?php echo esc_html($role_name); ?></option>\n                                    <?php endforeach; ?>\n                                </select>\n                            </td>\n                        </tr>\n                        <tr>\n                            <th><label for=\"send_credentials\">ส่งข้อมูลการเข้าสู่ระบบ</label></th>\n                            <td>\n                                <label>\n                                    <input type=\"checkbox\" id=\"send_credentials\" name=\"send_credentials\" checked>\n                                    ส่งชื่อผู้ใช้และรหัสผ่านทาง Email\n                                </label>\n                            </td>\n                        </tr>\n                    </table>\n                    \n                    <p class=\"submit\">\n                        <input type=\"submit\" class=\"button-primary\" value=\"สร้างผู้ใช้\">\n                    </p>\n                </form>\n            </div>\n            \n            <!-- รายการผู้ใช้ -->\n            <div class=\"card\">\n                <h2>รายการผู้ใช้ในระบบ</h2>\n                \n                <div class=\"user-filters\">\n                    <select id=\"filter-role\">\n                        <option value=\"\">ทุกบทบาท</option>\n                        <?php foreach ($roles as $role_key => $role_name): ?>\n                            <option value=\"<?php echo esc_attr($role_key); ?>\"><?php echo esc_html($role_name); ?></option>\n                        <?php endforeach; ?>\n                    </select>\n                    \n                    <select id=\"filter-status\">\n                        <option value=\"\">ทุกสถานะ</option>\n                        <option value=\"active\">ใช้งานอยู่</option>\n                        <option value=\"inactive\">ไม่ได้ใช้งาน</option>\n                    </select>\n                    \n                    <button type=\"button\" id=\"apply-filters\" class=\"button\">กรอง</button>\n                </div>\n                \n                <table class=\"widefat fixed striped\" id=\"users-table\">\n                    <thead>\n                        <tr>\n                            <th width=\"5%\"><input type=\"checkbox\" id=\"select-all-users\"></th>\n                            <th width=\"15%\">ชื่อผู้ใช้</th>\n                            <th width=\"20%\">ชื่อ-นามสกุล</th>\n                            <th width=\"25%\">อีเมล</th>\n                            <th width=\"15%\">บทบาท</th>\n                            <th width=\"10%\">สถานะ</th>\n                            <th width=\"10%\">การจัดการ</th>\n                        </tr>\n                    </thead>\n                    <tbody>\n                        <?php foreach ($users as $user): ?>\n                            <tr data-user-id=\"<?php echo esc_attr($user->ID); ?>\">\n                                <td><input type=\"checkbox\" class=\"user-checkbox\" value=\"<?php echo esc_attr($user->ID); ?>\"></td>\n                                <td>\n                                    <strong><?php echo esc_html($user->user_login); ?></strong>\n                                    <div class=\"user-meta\">\n                                        <small>ลงทะเบียน: <?php echo date('Y-m-d', strtotime($user->user_registered)); ?></small>\n                                    </div>\n                                </td>\n                                <td><?php echo esc_html($user->first_name . ' ' . $user->last_name); ?></td>\n                                <td><?php echo esc_html($user->user_email); ?></td>\n                                <td>\n                                    <?php \n                                    $user_roles = $user->roles;\n                                    foreach ($user_roles as $role) {\n                                        $role_obj = get_role($role);\n                                        if ($role_obj && isset($roles[$role])) {\n                                            echo '<span class=\"role-badge\">' . esc_html($roles[$role]) . '</span>';\n                                        }\n                                    }\n                                    ?>\n                                </td>\n                                <td>\n                                    <?php \n                                    $last_login = get_user_meta($user->ID, 'last_login', true);\n                                    $is_active = $last_login && (time() - strtotime($last_login)) < (30 * 24 * 60 * 60); // 30 วัน\n                                    ?>\n                                    <span class=\"status-badge <?php echo $is_active ? 'active' : 'inactive'; ?>\">\n                                        <?php echo $is_active ? 'ใช้งานอยู่' : 'ไม่ได้ใช้งาน'; ?>\n                                    </span>\n                                </td>\n                                <td>\n                                    <div class=\"user-actions\">\n                                        <button class=\"button button-small edit-user\" data-user-id=\"<?php echo esc_attr($user->ID); ?>\">แก้ไข</button>\n                                        <button class=\"button button-small view-activity\" data-user-id=\"<?php echo esc_attr($user->ID); ?>\">กิจกรรม</button>\n                                    </div>\n                                </td>\n                            </tr>\n                        <?php endforeach; ?>\n                    </tbody>\n                </table>\n                \n                <!-- Bulk Actions -->\n                <div class=\"bulk-actions\">\n                    <select id=\"bulk-action\">\n                        <option value=\"\">-- การดำเนินการแบบกลุ่ม --</option>\n                        <option value=\"change_role\">เปลี่ยนบทบาท</option>\n                        <option value=\"send_notification\">ส่งการแจ้งเตือน</option>\n                        <option value=\"generate_access_links\">สร้างลิงค์เข้าถึง</option>\n                        <option value=\"revoke_access\">ยกเลิกการเข้าถึง</option>\n                    </select>\n                    \n                    <div id=\"bulk-action-options\" style=\"display: none;\">\n                        <select id=\"new-role\" style=\"display: none;\">\n                            <?php foreach ($roles as $role_key => $role_name): ?>\n                                <option value=\"<?php echo esc_attr($role_key); ?>\"><?php echo esc_html($role_name); ?></option>\n                            <?php endforeach; ?>\n                        </select>\n                        \n                        <textarea id=\"notification-message\" style=\"display: none;\" rows=\"3\" placeholder=\"ข้อความแจ้งเตือน...\"></textarea>\n                    </div>\n                    \n                    <button type=\"button\" id=\"apply-bulk-action\" class=\"button\">ดำเนินการ</button>\n                </div>\n            </div>\n        </div>\n        \n        <!-- User Edit Modal -->\n        <div id=\"user-edit-modal\" class=\"modal\" style=\"display: none;\">\n            <div class=\"modal-content\">\n                <span class=\"close\">&times;</span>\n                <h2>แก้ไขข้อมูลผู้ใช้</h2>\n                <form id=\"edit-user-form\">\n                    <div id=\"edit-user-content\"></div>\n                </form>\n            </div>\n        </div>\n        \n        <!-- User Activity Modal -->\n        <div id=\"user-activity-modal\" class=\"modal\" style=\"display: none;\">\n            <div class=\"modal-content\">\n                <span class=\"close\">&times;</span>\n                <h2>กิจกรรมผู้ใช้</h2>\n                <div id=\"user-activity-content\"></div>\n            </div>\n        </div>\n        \n        <style>\n        .role-badge {\n            background: #e1f5fe;\n            color: #0277bd;\n            padding: 2px 8px;\n            border-radius: 4px;\n            font-size: 12px;\n            margin-right: 5px;\n        }\n        \n        .status-badge {\n            padding: 2px 8px;\n            border-radius: 4px;\n            font-size: 12px;\n            font-weight: bold;\n        }\n        \n        .status-badge.active {\n            background: #c8e6c9;\n            color: #2e7d32;\n        }\n        \n        .status-badge.inactive {\n            background: #ffcdd2;\n            color: #c62828;\n        }\n        \n        .user-filters {\n            margin-bottom: 15px;\n        }\n        \n        .user-filters select {\n            margin-right: 10px;\n        }\n        \n        .user-actions button {\n            margin-right: 5px;\n        }\n        \n        .bulk-actions {\n            margin-top: 15px;\n            padding: 15px;\n            background: #f9f9f9;\n            border: 1px solid #ddd;\n        }\n        \n        .modal {\n            position: fixed;\n            z-index: 1000;\n            left: 0;\n            top: 0;\n            width: 100%;\n            height: 100%;\n            background-color: rgba(0,0,0,0.4);\n        }\n        \n        .modal-content {\n            background-color: #fefefe;\n            margin: 5% auto;\n            padding: 20px;\n            border: 1px solid #888;\n            width: 80%;\n            max-width: 600px;\n            border-radius: 8px;\n        }\n        \n        .close {\n            color: #aaa;\n            float: right;\n            font-size: 28px;\n            font-weight: bold;\n            cursor: pointer;\n        }\n        \n        .close:hover {\n            color: black;\n        }\n        </style>\n        \n        <script>\n        jQuery(document).ready(function($) {\n            // สร้างผู้ใช้ใหม่\n            $('#create-user-form').on('submit', function(e) {\n                e.preventDefault();\n                \n                $.ajax({\n                    url: ajaxurl,\n                    type: 'POST',\n                    data: $(this).serialize() + '&action=create_survey_user',\n                    success: function(response) {\n                        if (response.success) {\n                            alert('สร้างผู้ใช้เรียบร้อย');\n                            location.reload();\n                        } else {\n                            alert('เกิดข้อผิดพลาด: ' + response.data);\n                        }\n                    }\n                });\n            });\n            \n            // แก้ไขผู้ใช้\n            $('.edit-user').on('click', function() {\n                var userId = $(this).data('user-id');\n                // TODO: โหลดข้อมูลผู้ใช้และแสดงใน modal\n                $('#user-edit-modal').show();\n            });\n            \n            // ดูกิจกรรมผู้ใช้\n            $('.view-activity').on('click', function() {\n                var userId = $(this).data('user-id');\n                \n                $.ajax({\n                    url: ajaxurl,\n                    type: 'POST',\n                    data: {\n                        action: 'get_user_activity',\n                        user_id: userId,\n                        nonce: '<?php echo wp_create_nonce('user_activity_nonce'); ?>'\n                    },\n                    success: function(response) {\n                        if (response.success) {\n                            $('#user-activity-content').html(response.data.html);\n                            $('#user-activity-modal').show();\n                        }\n                    }\n                });\n            });\n            \n            // ปิด modal\n            $('.close').on('click', function() {\n                $(this).closest('.modal').hide();\n            });\n            \n            // Bulk actions\n            $('#bulk-action').on('change', function() {\n                var action = $(this).val();\n                $('#bulk-action-options').toggle(action !== '');\n                \n                $('#new-role, #notification-message').hide();\n                \n                if (action === 'change_role') {\n                    $('#new-role').show();\n                } else if (action === 'send_notification') {\n                    $('#notification-message').show();\n                }\n            });\n            \n            $('#apply-bulk-action').on('click', function() {\n                var selectedUsers = $('.user-checkbox:checked').map(function() {\n                    return $(this).val();\n                }).get();\n                \n                if (selectedUsers.length === 0) {\n                    alert('กรุณาเลือกผู้ใช้');\n                    return;\n                }\n                \n                var action = $('#bulk-action').val();\n                if (!action) {\n                    alert('กรุณาเลือกการดำเนินการ');\n                    return;\n                }\n                \n                // TODO: ส่งข้อมูลไป AJAX handler\n                console.log('Bulk action:', action, 'Users:', selectedUsers);\n            });\n            \n            // Select all checkbox\n            $('#select-all-users').on('change', function() {\n                $('.user-checkbox').prop('checked', $(this).is(':checked'));\n            });\n        });\n        </script>\n        <?php\n    }\n    \n    /**\n     * Render หน้าจัดการสิทธิ์\n     */\n    public function render_permissions_page() {\n        $roles = $this->get_survey_roles();\n        $capabilities = $this->get_survey_capabilities();\n        \n        ?>\n        <div class=\"wrap\">\n            <h1>สิทธิ์และการเข้าถึง</h1>\n            \n            <div class=\"card\">\n                <h2>จัดการสิทธิ์ตามบทบาท</h2>\n                \n                <table class=\"widefat fixed striped\">\n                    <thead>\n                        <tr>\n                            <th width=\"20%\">บทบาท</th>\n                            <th width=\"80%\">สิทธิ์</th>\n                        </tr>\n                    </thead>\n                    <tbody>\n                        <?php foreach ($roles as $role_key => $role_name): ?>\n                            <?php $role = get_role($role_key); ?>\n                            <tr>\n                                <td>\n                                    <strong><?php echo esc_html($role_name); ?></strong>\n                                    <br><small><?php echo esc_html($role_key); ?></small>\n                                </td>\n                                <td>\n                                    <div class=\"capabilities-grid\">\n                                        <?php foreach ($capabilities as $cap_key => $cap_name): ?>\n                                            <label class=\"capability-item\">\n                                                <input type=\"checkbox\" \n                                                       name=\"capabilities[<?php echo esc_attr($role_key); ?>][<?php echo esc_attr($cap_key); ?>]\"\n                                                       value=\"1\"\n                                                       <?php checked($role && $role->has_cap($cap_key)); ?>\n                                                       data-role=\"<?php echo esc_attr($role_key); ?>\"\n                                                       data-capability=\"<?php echo esc_attr($cap_key); ?>\">\n                                                <?php echo esc_html($cap_name); ?>\n                                            </label>\n                                        <?php endforeach; ?>\n                                    </div>\n                                </td>\n                            </tr>\n                        <?php endforeach; ?>\n                    </tbody>\n                </table>\n                \n                <p class=\"submit\">\n                    <button type=\"button\" id=\"save-permissions\" class=\"button-primary\">บันทึกการเปลี่ยนแปลง</button>\n                    <button type=\"button\" id=\"reset-permissions\" class=\"button\">รีเซ็ตเป็นค่าเริ่มต้น</button>\n                </p>\n            </div>\n            \n            <!-- Access Links -->\n            <div class=\"card\">\n                <h2>ลิงค์เข้าถึงพิเศษ</h2>\n                <p>สร้างลิงค์เข้าถึงแบบสอบถามสำหรับผู้ใช้ภายนอกที่ไม่มีบัญชีในระบบ</p>\n                \n                <form id=\"generate-access-link-form\">\n                    <?php wp_nonce_field('generate_access_link', 'access_link_nonce'); ?>\n                    \n                    <table class=\"form-table\">\n                        <tr>\n                            <th><label for=\"response_id\">Response ID</label></th>\n                            <td><input type=\"text\" id=\"response_id\" name=\"response_id\" class=\"regular-text\" required></td>\n                        </tr>\n                        <tr>\n                            <th><label for=\"access_level\">ระดับการเข้าถึง</label></th>\n                            <td>\n                                <select id=\"access_level\" name=\"access_level\">\n                                    <option value=\"view\">ดูอย่างเดียว</option>\n                                    <option value=\"comment\">ดูและแสดงความคิดเห็น</option>\n                                    <option value=\"edit\">แก้ไขได้</option>\n                                </select>\n                            </td>\n                        </tr>\n                        <tr>\n                            <th><label for=\"expires_in\">หมดอายุใน</label></th>\n                            <td>\n                                <select id=\"expires_in\" name=\"expires_in\">\n                                    <option value=\"1\">1 วัน</option>\n                                    <option value=\"7\">7 วัน</option>\n                                    <option value=\"30\">30 วัน</option>\n                                    <option value=\"0\">ไม่หมดอายุ</option>\n                                </select>\n                            </td>\n                        </tr>\n                        <tr>\n                            <th><label for=\"max_uses\">จำนวนการใช้งานสูงสุด</label></th>\n                            <td>\n                                <input type=\"number\" id=\"max_uses\" name=\"max_uses\" value=\"1\" min=\"1\">\n                                <p class=\"description\">ใส่ 0 หากไม่จำกัด</p>\n                            </td>\n                        </tr>\n                    </table>\n                    \n                    <p class=\"submit\">\n                        <input type=\"submit\" class=\"button-primary\" value=\"สร้างลิงค์\">\n                    </p>\n                </form>\n                \n                <div id=\"generated-links\" style=\"display: none;\">\n                    <h3>ลิงค์ที่สร้างแล้ว</h3>\n                    <div id=\"links-list\"></div>\n                </div>\n            </div>\n        </div>\n        \n        <style>\n        .capabilities-grid {\n            display: grid;\n            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));\n            gap: 10px;\n        }\n        \n        .capability-item {\n            display: flex;\n            align-items: center;\n            padding: 5px;\n            border: 1px solid #ddd;\n            border-radius: 4px;\n            background: #f9f9f9;\n        }\n        \n        .capability-item input {\n            margin-right: 8px;\n        }\n        </style>\n        \n        <script>\n        jQuery(document).ready(function($) {\n            // บันทึกสิทธิ์\n            $('#save-permissions').on('click', function() {\n                var permissions = {};\n                \n                $('input[name^=\"capabilities\"]:checked').each(function() {\n                    var role = $(this).data('role');\n                    var capability = $(this).data('capability');\n                    \n                    if (!permissions[role]) {\n                        permissions[role] = [];\n                    }\n                    permissions[role].push(capability);\n                });\n                \n                $.ajax({\n                    url: ajaxurl,\n                    type: 'POST',\n                    data: {\n                        action: 'update_user_permissions',\n                        permissions: permissions,\n                        nonce: '<?php echo wp_create_nonce('update_permissions_nonce'); ?>'\n                    },\n                    success: function(response) {\n                        if (response.success) {\n                            alert('บันทึกสิทธิ์เรียบร้อย');\n                        } else {\n                            alert('เกิดข้อผิดพลาด: ' + response.data);\n                        }\n                    }\n                });\n            });\n            \n            // สร้างลิงค์เข้าถึง\n            $('#generate-access-link-form').on('submit', function(e) {\n                e.preventDefault();\n                \n                $.ajax({\n                    url: ajaxurl,\n                    type: 'POST',\n                    data: $(this).serialize() + '&action=generate_access_link',\n                    success: function(response) {\n                        if (response.success) {\n                            $('#links-list').html('<div class=\"access-link\"><strong>ลิงค์:</strong> <a href=\"' + response.data.url + '\" target=\"_blank\">' + response.data.url + '</a><br><strong>Token:</strong> ' + response.data.token + '</div>');\n                            $('#generated-links').show();\n                        } else {\n                            alert('เกิดข้อผิดพลาด: ' + response.data);\n                        }\n                    }\n                });\n            });\n        });\n        </script>\n        <?php\n    }\n    \n    /**\n     * สร้างผู้ใช้ใหม่\n     */\n    public function create_survey_user() {\n        check_ajax_referer('create_survey_user', 'create_user_nonce');\n        \n        if (!current_user_can('manage_survey_users')) {\n            wp_send_json_error('ไม่มีสิทธิ์ในการสร้างผู้ใช้');\n        }\n        \n        $username = sanitize_text_field($_POST['username']);\n        $email = sanitize_email($_POST['email']);\n        $first_name = sanitize_text_field($_POST['first_name']);\n        $last_name = sanitize_text_field($_POST['last_name']);\n        $role = sanitize_text_field($_POST['role']);\n        $send_credentials = isset($_POST['send_credentials']);\n        \n        // ตรวจสอบข้อมูล\n        if (username_exists($username) || email_exists($email)) {\n            wp_send_json_error('ชื่อผู้ใช้หรืออีเมลนี้ถูกใช้แล้ว');\n        }\n        \n        // สร้างรหัสผ่านสุ่ม\n        $password = wp_generate_password(12, false);\n        \n        // สร้างผู้ใช้\n        $user_id = wp_create_user($username, $password, $email);\n        \n        if (is_wp_error($user_id)) {\n            wp_send_json_error($user_id->get_error_message());\n        }\n        \n        // อัปเดตข้อมูลเพิ่มเติม\n        wp_update_user(array(\n            'ID' => $user_id,\n            'first_name' => $first_name,\n            'last_name' => $last_name,\n            'role' => $role\n        ));\n        \n        // บันทึก metadata\n        update_user_meta($user_id, 'created_by', get_current_user_id());\n        update_user_meta($user_id, 'created_for_surveys', true);\n        \n        // ส่งข้อมูลการเข้าสู่ระบบ\n        if ($send_credentials) {\n            $this->send_user_credentials($user_id, $username, $password);\n        }\n        \n        // บันทึก audit log\n        $this->log_user_action('user_created', array(\n            'user_id' => $user_id,\n            'username' => $username,\n            'role' => $role\n        ));\n        \n        wp_send_json_success(array(\n            'message' => 'สร้างผู้ใช้เรียบร้อย',\n            'user_id' => $user_id\n        ));\n    }\n    \n    /**\n     * อัปเดตสิทธิ์ผู้ใช้\n     */\n    public function update_user_permissions() {\n        check_ajax_referer('update_permissions_nonce', 'nonce');\n        \n        if (!current_user_can('manage_survey_users')) {\n            wp_send_json_error('ไม่มีสิทธิ์ในการจัดการสิทธิ์');\n        }\n        \n        $permissions = $_POST['permissions'];\n        \n        foreach ($permissions as $role_key => $capabilities) {\n            $role = get_role($role_key);\n            if (!$role) continue;\n            \n            // ลบสิทธิ์เดิมทั้งหมด\n            $survey_caps = $this->get_survey_capabilities();\n            foreach (array_keys($survey_caps) as $cap) {\n                $role->remove_cap($cap);\n            }\n            \n            // เพิ่มสิทธิ์ใหม่\n            foreach ($capabilities as $cap) {\n                $role->add_cap($cap);\n            }\n        }\n        \n        // บันทึก audit log\n        $this->log_user_action('permissions_updated', array(\n            'updated_roles' => array_keys($permissions)\n        ));\n        \n        wp_send_json_success('อัปเดตสิทธิ์เรียบร้อย');\n    }\n    \n    /**\n     * ดึงกิจกรรมผู้ใช้\n     */\n    public function get_user_activity() {\n        check_ajax_referer('user_activity_nonce', 'nonce');\n        \n        if (!current_user_can('view_audit_logs')) {\n            wp_send_json_error('ไม่มีสิทธิ์ในการดูกิจกรรม');\n        }\n        \n        $user_id = intval($_POST['user_id']);\n        \n        global $wpdb;\n        $audit_table = $wpdb->prefix . 'tpak_survey_audit';\n        \n        $activities = $wpdb->get_results($wpdb->prepare(\n            \"SELECT * FROM $audit_table \n             WHERE user_id = %d \n             ORDER BY created_at DESC \n             LIMIT 50\",\n            $user_id\n        ), ARRAY_A);\n        \n        $html = '<div class=\"user-activity-list\">';\n        \n        if ($activities) {\n            foreach ($activities as $activity) {\n                $html .= '<div class=\"activity-item\">';\n                $html .= '<div class=\"activity-header\">';\n                $html .= '<strong>' . esc_html($activity['action']) . '</strong>';\n                $html .= '<span class=\"activity-date\">' . esc_html($activity['created_at']) . '</span>';\n                $html .= '</div>';\n                \n                if ($activity['response_id']) {\n                    $html .= '<div class=\"activity-detail\">Response ID: ' . esc_html($activity['response_id']) . '</div>';\n                }\n                \n                $html .= '</div>';\n            }\n        } else {\n            $html .= '<p>ไม่มีกิจกรรม</p>';\n        }\n        \n        $html .= '</div>';\n        \n        wp_send_json_success(array('html' => $html));\n    }\n    \n    /**\n     * สร้างลิงค์เข้าถึงพิเศษ\n     */\n    public function generate_access_link() {\n        check_ajax_referer('generate_access_link', 'access_link_nonce');\n        \n        if (!current_user_can('forward_survey_responses')) {\n            wp_send_json_error('ไม่มีสิทธิ์ในการสร้างลิงค์เข้าถึง');\n        }\n        \n        $response_id = sanitize_text_field($_POST['response_id']);\n        $access_level = sanitize_text_field($_POST['access_level']);\n        $expires_in = intval($_POST['expires_in']);\n        $max_uses = intval($_POST['max_uses']);\n        \n        // สร้าง token\n        $token = wp_generate_password(32, false);\n        \n        // คำนวณวันหมดอายุ\n        $expires_at = null;\n        if ($expires_in > 0) {\n            $expires_at = date('Y-m-d H:i:s', time() + ($expires_in * 24 * 60 * 60));\n        }\n        \n        // บันทึกลงฐานข้อมูล\n        global $wpdb;\n        $table_name = $wpdb->prefix . 'tpak_access_tokens';\n        \n        // สร้างตารางถ้ายังไม่มี\n        $this->ensure_access_tokens_table();\n        \n        $result = $wpdb->insert(\n            $table_name,\n            array(\n                'token' => $token,\n                'response_id' => $response_id,\n                'access_level' => $access_level,\n                'created_by' => get_current_user_id(),\n                'expires_at' => $expires_at,\n                'max_uses' => $max_uses ?: null,\n                'uses_count' => 0,\n                'is_active' => 1,\n                'created_at' => current_time('mysql')\n            )\n        );\n        \n        if ($result) {\n            $url = home_url('/survey-access/' . $token);\n            \n            // บันทึก audit log\n            $this->log_user_action('access_link_created', array(\n                'response_id' => $response_id,\n                'token' => $token,\n                'access_level' => $access_level\n            ));\n            \n            wp_send_json_success(array(\n                'url' => $url,\n                'token' => $token,\n                'expires_at' => $expires_at\n            ));\n        } else {\n            wp_send_json_error('ไม่สามารถสร้างลิงค์ได้');\n        }\n    }\n    \n    /**\n     * ยกเลิกการเข้าถึงผู้ใช้\n     */\n    public function revoke_user_access() {\n        check_ajax_referer('revoke_access_nonce', 'nonce');\n        \n        if (!current_user_can('manage_survey_users')) {\n            wp_send_json_error('ไม่มีสิทธิ์ในการยกเลิกการเข้าถึง');\n        }\n        \n        $user_id = intval($_POST['user_id']);\n        $reason = sanitize_textarea_field($_POST['reason']);\n        \n        // ปิดการใช้งานบัญชี\n        $user = new WP_User($user_id);\n        $user->set_role(''); // ลบ role\n        \n        // ยกเลิก access tokens\n        global $wpdb;\n        $tokens_table = $wpdb->prefix . 'tpak_access_tokens';\n        \n        $wpdb->update(\n            $tokens_table,\n            array('is_active' => 0),\n            array('created_by' => $user_id)\n        );\n        \n        // บันทึก audit log\n        $this->log_user_action('access_revoked', array(\n            'revoked_user_id' => $user_id,\n            'reason' => $reason\n        ));\n        \n        wp_send_json_success('ยกเลิกการเข้าถึงเรียบร้อย');\n    }\n    \n    /**\n     * ตรวจสอบการเข้าถึงแบบสอบถาม\n     */\n    public function check_survey_access() {\n        global $wp;\n        \n        // ตรวจสอบ URL pattern\n        if (isset($wp->query_vars['pagename']) && strpos($wp->query_vars['pagename'], 'survey-access/') === 0) {\n            $token = str_replace('survey-access/', '', $wp->query_vars['pagename']);\n            $this->handle_token_access($token);\n        }\n    }\n    \n    /**\n     * จัดการการเข้าถึงผ่าน token\n     */\n    private function handle_token_access($token) {\n        global $wpdb;\n        $table_name = $wpdb->prefix . 'tpak_access_tokens';\n        \n        // ตรวจสอบ token\n        $access_token = $wpdb->get_row($wpdb->prepare(\n            \"SELECT * FROM $table_name WHERE token = %s AND is_active = 1\",\n            $token\n        ), ARRAY_A);\n        \n        if (!$access_token) {\n            wp_die('Token ไม่ถูกต้องหรือหมดอายุแล้ว');\n        }\n        \n        // ตรวจสอบการหมดอายุ\n        if ($access_token['expires_at'] && strtotime($access_token['expires_at']) < time()) {\n            wp_die('Token หมดอายุแล้ว');\n        }\n        \n        // ตรวจสอบจำนวนการใช้งาน\n        if ($access_token['max_uses'] && $access_token['uses_count'] >= $access_token['max_uses']) {\n            wp_die('Token ถูกใช้งานครบตามจำนวนที่กำหนดแล้ว');\n        }\n        \n        // อัปเดตจำนวนการใช้งาน\n        $wpdb->update(\n            $table_name,\n            array(\n                'uses_count' => $access_token['uses_count'] + 1,\n                'last_used_at' => current_time('mysql')\n            ),\n            array('id' => $access_token['id'])\n        );\n        \n        // Redirect ไปยังหน้าแบบสอบถาม\n        $redirect_url = admin_url('admin.php?page=tpak-dq-response-view&response_id=' . $access_token['response_id'] . '&access_level=' . $access_token['access_level']);\n        wp_redirect($redirect_url);\n        exit;\n    }\n    \n    /**\n     * Dynamic capability check\n     */\n    public function dynamic_capability_check($allcaps, $caps, $args, $user) {\n        // ตรวจสอบสิทธิ์แบบ dynamic ตาม context\n        $capability = $args[0] ?? '';\n        \n        // ตรวจสอบสิทธิ์เฉพาะ response\n        if (strpos($capability, 'edit_survey_response_') === 0) {\n            $response_id = str_replace('edit_survey_response_', '', $capability);\n            \n            // ตรวจสอบว่าผู้ใช้เป็นเจ้าของ response หรือไม่\n            if ($this->is_response_owner($user->ID, $response_id)) {\n                $allcaps[$capability] = true;\n            }\n        }\n        \n        return $allcaps;\n    }\n    \n    /**\n     * ตรวจสอบว่าผู้ใช้เป็นเจ้าของ response\n     */\n    private function is_response_owner($user_id, $response_id) {\n        global $wpdb;\n        $table_name = $wpdb->prefix . 'tpak_survey_responses';\n        \n        $owner = $wpdb->get_var($wpdb->prepare(\n            \"SELECT created_by FROM $table_name WHERE response_id = %s\",\n            $response_id\n        ));\n        \n        return $owner == $user_id;\n    }\n    \n    /**\n     * ส่งข้อมูลการเข้าสู่ระบบ\n     */\n    private function send_user_credentials($user_id, $username, $password) {\n        $user = get_userdata($user_id);\n        \n        $subject = 'ข้อมูลการเข้าสู่ระบบแบบสอบถาม';\n        $message = sprintf(\n            \"สวัสดี %s,\\n\\nบัญชีของคุณถูกสร้างเรียบร้อยแล้ว:\\n\\nชื่อผู้ใช้: %s\\nรหัสผ่าน: %s\\n\\nเข้าสู่ระบบได้ที่: %s\\n\\nกรุณาเปลี่ยนรหัสผ่านหลังจากเข้าสู่ระบบครั้งแรก\",\n            $user->display_name ?: $user->user_login,\n            $username,\n            $password,\n            wp_login_url()\n        );\n        \n        wp_mail($user->user_email, $subject, $message);\n    }\n    \n    /**\n     * ส่งการแจ้งเตือนการมอบหมาย\n     */\n    public function send_assignment_notification($user_id, $response_id, $role) {\n        $user = get_userdata($user_id);\n        if (!$user) return;\n        \n        $subject = 'คุณได้รับมอบหมายให้ดูแลแบบสอบถาม';\n        $message = sprintf(\n            \"สวัสดี %s,\\n\\nคุณได้รับมอบหมายให้ดูแลแบบสอบถาม ID: %s\\nบทบาท: %s\\n\\nเข้าสู่ระบบเพื่อดูรายละเอียด: %s\",\n            $user->display_name,\n            $response_id,\n            $role,\n            admin_url('admin.php?page=tpak-dq-response-view&response_id=' . $response_id)\n        );\n        \n        wp_mail($user->user_email, $subject, $message);\n    }\n    \n    /**\n     * ส่งการแจ้งเตือนการเปลี่ยนสิทธิ์\n     */\n    public function send_permission_notification($user_id, $changes) {\n        $user = get_userdata($user_id);\n        if (!$user) return;\n        \n        $subject = 'สิทธิ์การเข้าถึงของคุณมีการเปลี่ยนแปลง';\n        $message = sprintf(\n            \"สวัสดี %s,\\n\\nสิทธิ์การเข้าถึงระบบของคุณมีการเปลี่ยนแปลง\\n\\nรายละเอียด: %s\",\n            $user->display_name,\n            json_encode($changes, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)\n        );\n        \n        wp_mail($user->user_email, $subject, $message);\n    }\n    \n    /**\n     * ดึงรายการผู้ใช้ในระบบ survey\n     */\n    private function get_survey_users() {\n        $users = get_users(array(\n            'meta_key' => 'created_for_surveys',\n            'meta_value' => true,\n            'orderby' => 'registered',\n            'order' => 'DESC'\n        ));\n        \n        // รวมผู้ใช้ที่มี survey roles\n        $survey_roles = array_keys($this->get_survey_roles());\n        $role_users = get_users(array(\n            'role__in' => $survey_roles\n        ));\n        \n        // รวมและลบ duplicate\n        $all_users = array_merge($users, $role_users);\n        $unique_users = array();\n        $seen_ids = array();\n        \n        foreach ($all_users as $user) {\n            if (!in_array($user->ID, $seen_ids)) {\n                $unique_users[] = $user;\n                $seen_ids[] = $user->ID;\n            }\n        }\n        \n        return $unique_users;\n    }\n    \n    /**\n     * ดึง survey roles\n     */\n    private function get_survey_roles() {\n        return array(\n            'survey_editor' => 'Survey Editor',\n            'survey_reviewer' => 'Survey Reviewer', \n            'survey_approver' => 'Survey Approver',\n            'survey_manager' => 'Survey Manager',\n            'survey_viewer' => 'Survey Viewer'\n        );\n    }\n    \n    /**\n     * ดึง survey capabilities\n     */\n    private function get_survey_capabilities() {\n        return array(\n            'view_survey_responses' => 'ดูแบบสอบถาม',\n            'edit_survey_responses' => 'แก้ไขแบบสอบถาม',\n            'review_survey_responses' => 'ตรวจสอบแบบสอบถาม',\n            'approve_survey_responses' => 'อนุมัติแบบสอบถาม',\n            'reject_survey_responses' => 'ส่งกลับแก้ไข',\n            'export_survey_responses' => 'ส่งออกข้อมูล',\n            'forward_survey_responses' => 'ส่งต่อแบบสอบถาม',\n            'manage_survey_users' => 'จัดการผู้ใช้',\n            'view_audit_logs' => 'ดู Audit Log',\n            'export_audit_logs' => 'ส่งออก Audit Log',\n            'configure_survey_settings' => 'ตั้งค่าระบบ',\n            'create_survey_drafts' => 'สร้างฉบับร่าง',\n            'add_review_notes' => 'เพิ่มหมายเหตุ',\n            'restore_survey_versions' => 'คืนค่าเวอร์ชัน',\n            'delete_survey_responses' => 'ลบแบบสอบถาม',\n            'bulk_process_surveys' => 'ประมวลผลแบบกลุ่ม',\n            'schedule_survey_exports' => 'กำหนดเวลาส่งออก',\n            'manage_survey_templates' => 'จัดการเทมเพลต'\n        );\n    }\n    \n    /**\n     * สร้างตาราง access tokens\n     */\n    private function ensure_access_tokens_table() {\n        global $wpdb;\n        $charset_collate = $wpdb->get_charset_collate();\n        \n        $table_name = $wpdb->prefix . 'tpak_access_tokens';\n        $sql = \"CREATE TABLE IF NOT EXISTS $table_name (\n            id bigint(20) NOT NULL AUTO_INCREMENT,\n            token varchar(100) NOT NULL,\n            response_id varchar(100) NOT NULL,\n            access_level enum('view', 'comment', 'edit') DEFAULT 'view',\n            created_by bigint(20) NOT NULL,\n            expires_at datetime,\n            max_uses int,\n            uses_count int DEFAULT 0,\n            last_used_at datetime,\n            is_active tinyint(1) DEFAULT 1,\n            created_at datetime DEFAULT CURRENT_TIMESTAMP,\n            PRIMARY KEY (id),\n            UNIQUE KEY token (token),\n            KEY response_id (response_id),\n            KEY created_by (created_by),\n            KEY is_active (is_active)\n        ) $charset_collate;\";\n        \n        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');\n        dbDelta($sql);\n    }\n    \n    /**\n     * บันทึก user action log\n     */\n    private function log_user_action($action, $data = array()) {\n        // ใช้ Survey Audit Manager\n        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-survey-audit-manager.php';\n        $audit_manager = TPAK_Survey_Audit_Manager::getInstance();\n        \n        $audit_manager->log_audit('user_management', $action, $data);\n    }\n}
+    public function register_custom_roles() {
+        // Survey Editor - แก้ไขแบบสอบถามได้
+        if (!get_role('survey_editor')) {
+            add_role('survey_editor', 'Survey Editor', array(
+                'read' => true,
+                'edit_posts' => true,
+                'edit_survey_responses' => true,
+                'view_survey_responses' => true,
+                'create_survey_drafts' => true
+            ));
+        }
+        
+        // Survey Reviewer - ตรวจสอบแบบสอบถาม
+        if (!get_role('survey_reviewer')) {
+            add_role('survey_reviewer', 'Survey Reviewer', array(
+                'read' => true,
+                'view_survey_responses' => true,
+                'review_survey_responses' => true,
+                'add_review_notes' => true,
+                'view_audit_logs' => true
+            ));
+        }
+        
+        // Survey Approver - อนุมัติแบบสอบถาม
+        if (!get_role('survey_approver')) {
+            add_role('survey_approver', 'Survey Approver', array(
+                'read' => true,
+                'view_survey_responses' => true,
+                'review_survey_responses' => true,
+                'approve_survey_responses' => true,
+                'reject_survey_responses' => true,
+                'forward_survey_responses' => true,
+                'view_audit_logs' => true
+            ));
+        }
+        
+        // Survey Manager - จัดการระบบ
+        if (!get_role('survey_manager')) {
+            add_role('survey_manager', 'Survey Manager', array(
+                'read' => true,
+                'edit_posts' => true,
+                'view_survey_responses' => true,
+                'edit_survey_responses' => true,
+                'review_survey_responses' => true,
+                'approve_survey_responses' => true,
+                'export_survey_responses' => true,
+                'forward_survey_responses' => true,
+                'manage_survey_users' => true,
+                'view_audit_logs' => true,
+                'export_audit_logs' => true,
+                'configure_survey_settings' => true
+            ));
+        }
+        
+        // Survey Viewer - ดูแบบสอบถามอย่างเดียว
+        if (!get_role('survey_viewer')) {
+            add_role('survey_viewer', 'Survey Viewer', array(
+                'read' => true,
+                'view_survey_responses' => true
+            ));
+        }
+    }
+    
+    /**
+     * ลงทะเบียน custom capabilities
+     */
+    public function register_custom_capabilities() {
+        $admin = get_role('administrator');
+        if ($admin) {
+            $capabilities = array(
+                'view_survey_responses',
+                'edit_survey_responses',
+                'review_survey_responses',
+                'approve_survey_responses',
+                'reject_survey_responses',
+                'export_survey_responses',
+                'forward_survey_responses',
+                'manage_survey_users',
+                'view_audit_logs',
+                'export_audit_logs',
+                'configure_survey_settings',
+                'create_survey_drafts',
+                'add_review_notes',
+                'restore_survey_versions',
+                'delete_survey_responses',
+                'bulk_process_surveys',
+                'schedule_survey_exports',
+                'manage_survey_templates'
+            );
+            
+            foreach ($capabilities as $cap) {
+                $admin->add_cap($cap);
+            }
+        }
+    }
+    
+    /**
+     * เพิ่มหน้าจัดการผู้ใช้
+     */
+    public function add_user_management_pages() {
+        if (current_user_can('manage_survey_users')) {
+            add_submenu_page(
+                'tpak-dq-system',
+                'จัดการผู้ใช้แบบสอบถาม',
+                'จัดการผู้ใช้',
+                'manage_survey_users',
+                'tpak-survey-users',
+                array($this, 'render_user_management_page')
+            );
+            
+            add_submenu_page(
+                'tpak-dq-system',
+                'สิทธิ์และการเข้าถึง',
+                'สิทธิ์และการเข้าถึง',
+                'manage_survey_users',
+                'tpak-survey-permissions',
+                array($this, 'render_permissions_page')
+            );
+        }
+    }
+    
+    /**
+     * Render หน้าจัดการผู้ใช้
+     */
+    public function render_user_management_page() {
+        $users = $this->get_survey_users();
+        $roles = $this->get_survey_roles();
+        
+        ?>
+        <div class="wrap">
+            <h1>จัดการผู้ใช้แบบสอบถาม</h1>
+            
+            <!-- สร้างผู้ใช้ใหม่ -->
+            <div class="card">
+                <h2>เพิ่มผู้ใช้ใหม่</h2>
+                <form id="create-user-form">
+                    <?php wp_nonce_field('create_survey_user', 'create_user_nonce'); ?>
+                    
+                    <table class="form-table">
+                        <tr>
+                            <th><label for="username">ชื่อผู้ใช้</label></th>
+                            <td><input type="text" id="username" name="username" class="regular-text" required></td>
+                        </tr>
+                        <tr>
+                            <th><label for="email">อีเมล</label></th>
+                            <td><input type="email" id="email" name="email" class="regular-text" required></td>
+                        </tr>
+                        <tr>
+                            <th><label for="first_name">ชื่อ</label></th>
+                            <td><input type="text" id="first_name" name="first_name" class="regular-text"></td>
+                        </tr>
+                        <tr>
+                            <th><label for="last_name">นามสกุล</label></th>
+                            <td><input type="text" id="last_name" name="last_name" class="regular-text"></td>
+                        </tr>
+                        <tr>
+                            <th><label for="role">บทบาท</label></th>
+                            <td>
+                                <select id="role" name="role" required>
+                                    <option value="">-- เลือกบทบาท --</option>
+                                    <?php foreach ($roles as $role_key => $role_name): ?>
+                                        <option value="<?php echo esc_attr($role_key); ?>"><?php echo esc_html($role_name); ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </td>
+                        </tr>
+                        <tr>
+                            <th><label for="send_credentials">ส่งข้อมูลการเข้าสู่ระบบ</label></th>
+                            <td>
+                                <label>
+                                    <input type="checkbox" id="send_credentials" name="send_credentials" checked>
+                                    ส่งชื่อผู้ใช้และรหัสผ่านทาง Email
+                                </label>
+                            </td>
+                        </tr>
+                    </table>
+                    
+                    <p class="submit">
+                        <input type="submit" class="button-primary" value="สร้างผู้ใช้">
+                    </p>
+                </form>
+            </div>
+            
+            <!-- รายการผู้ใช้ -->
+            <div class="card">
+                <h2>รายการผู้ใช้ในระบบ</h2>
+                
+                <div class="user-filters">
+                    <select id="filter-role">
+                        <option value="">ทุกบทบาท</option>
+                        <?php foreach ($roles as $role_key => $role_name): ?>
+                            <option value="<?php echo esc_attr($role_key); ?>"><?php echo esc_html($role_name); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    
+                    <select id="filter-status">
+                        <option value="">ทุกสถานะ</option>
+                        <option value="active">ใช้งานอยู่</option>
+                        <option value="inactive">ไม่ได้ใช้งาน</option>
+                    </select>
+                    
+                    <button type="button" id="apply-filters" class="button">กรอง</button>
+                </div>
+                
+                <table class="widefat fixed striped" id="users-table">
+                    <thead>
+                        <tr>
+                            <th width="5%"><input type="checkbox" id="select-all-users"></th>
+                            <th width="15%">ชื่อผู้ใช้</th>
+                            <th width="20%">ชื่อ-นามสกุล</th>
+                            <th width="25%">อีเมล</th>
+                            <th width="15%">บทบาท</th>
+                            <th width="10%">สถานะ</th>
+                            <th width="10%">การจัดการ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($users as $user): ?>
+                            <tr data-user-id="<?php echo esc_attr($user->ID); ?>">
+                                <td><input type="checkbox" class="user-checkbox" value="<?php echo esc_attr($user->ID); ?>"></td>
+                                <td>
+                                    <strong><?php echo esc_html($user->user_login); ?></strong>
+                                    <div class="user-meta">
+                                        <small>ลงทะเบียน: <?php echo date('Y-m-d', strtotime($user->user_registered)); ?></small>
+                                    </div>
+                                </td>
+                                <td><?php echo esc_html($user->first_name . ' ' . $user->last_name); ?></td>
+                                <td><?php echo esc_html($user->user_email); ?></td>
+                                <td>
+                                    <?php 
+                                    $user_roles = $user->roles;
+                                    foreach ($user_roles as $role) {
+                                        $role_obj = get_role($role);
+                                        if ($role_obj && isset($roles[$role])) {
+                                            echo '<span class="role-badge">' . esc_html($roles[$role]) . '</span>';
+                                        }
+                                    }
+                                    ?>
+                                </td>
+                                <td>
+                                    <?php 
+                                    $last_login = get_user_meta($user->ID, 'last_login', true);
+                                    $is_active = $last_login && (time() - strtotime($last_login)) < (30 * 24 * 60 * 60); // 30 วัน
+                                    ?>
+                                    <span class="status-badge <?php echo $is_active ? 'active' : 'inactive'; ?>">
+                                        <?php echo $is_active ? 'ใช้งานอยู่' : 'ไม่ได้ใช้งาน'; ?>
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="user-actions">
+                                        <button class="button button-small edit-user" data-user-id="<?php echo esc_attr($user->ID); ?>">แก้ไข</button>
+                                        <button class="button button-small view-activity" data-user-id="<?php echo esc_attr($user->ID); ?>">กิจกรรม</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                
+                <!-- Bulk Actions -->
+                <div class="bulk-actions">
+                    <select id="bulk-action">
+                        <option value="">-- การดำเนินการแบบกลุ่ม --</option>
+                        <option value="change_role">เปลี่ยนบทบาท</option>
+                        <option value="send_notification">ส่งการแจ้งเตือน</option>
+                        <option value="generate_access_links">สร้างลิงค์เข้าถึง</option>
+                        <option value="revoke_access">ยกเลิกการเข้าถึง</option>
+                    </select>
+                    
+                    <div id="bulk-action-options" style="display: none;">
+                        <select id="new-role" style="display: none;">
+                            <?php foreach ($roles as $role_key => $role_name): ?>
+                                <option value="<?php echo esc_attr($role_key); ?>"><?php echo esc_html($role_name); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        
+                        <textarea id="notification-message" style="display: none;" rows="3" placeholder="ข้อความแจ้งเตือน..."></textarea>
+                    </div>
+                    
+                    <button type="button" id="apply-bulk-action" class="button">ดำเนินการ</button>
+                </div>
+            </div>
+        </div>
+        
+        <style>
+        .role-badge {
+            background: #e1f5fe;
+            color: #0277bd;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            margin-right: 5px;
+        }
+        
+        .status-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+        }
+        
+        .status-badge.active {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+        
+        .status-badge.inactive {
+            background: #ffcdd2;
+            color: #c62828;
+        }
+        
+        .user-filters {
+            margin-bottom: 15px;
+        }
+        
+        .user-filters select {
+            margin-right: 10px;
+        }
+        
+        .user-actions button {
+            margin-right: 5px;
+        }
+        
+        .bulk-actions {
+            margin-top: 15px;
+            padding: 15px;
+            background: #f9f9f9;
+            border: 1px solid #ddd;
+        }
+        </style>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            // สร้างผู้ใช้ใหม่
+            $('#create-user-form').on('submit', function(e) {
+                e.preventDefault();
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: $(this).serialize() + '&action=create_survey_user',
+                    success: function(response) {
+                        if (response.success) {
+                            alert('สร้างผู้ใช้เรียบร้อย');
+                            location.reload();
+                        } else {
+                            alert('เกิดข้อผิดพลาด: ' + response.data);
+                        }
+                    }
+                });
+            });
+            
+            // แก้ไขผู้ใช้
+            $('.edit-user').on('click', function() {
+                var userId = $(this).data('user-id');
+                // TODO: โหลดข้อมูลผู้ใช้และแสดงใน modal
+                alert('แก้ไขผู้ใช้ ID: ' + userId);
+            });
+            
+            // ดูกิจกรรมผู้ใช้
+            $('.view-activity').on('click', function() {
+                var userId = $(this).data('user-id');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'get_user_activity',
+                        user_id: userId,
+                        nonce: '<?php echo wp_create_nonce('user_activity_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            alert('กิจกรรมผู้ใช้: ' + JSON.stringify(response.data));
+                        }
+                    }
+                });
+            });
+            
+            // Bulk actions
+            $('#bulk-action').on('change', function() {
+                var action = $(this).val();
+                $('#bulk-action-options').toggle(action !== '');
+                
+                $('#new-role, #notification-message').hide();
+                
+                if (action === 'change_role') {
+                    $('#new-role').show();
+                } else if (action === 'send_notification') {
+                    $('#notification-message').show();
+                }
+            });
+            
+            $('#apply-bulk-action').on('click', function() {
+                var selectedUsers = $('.user-checkbox:checked').map(function() {
+                    return $(this).val();
+                }).get();
+                
+                if (selectedUsers.length === 0) {
+                    alert('กรุณาเลือกผู้ใช้');
+                    return;
+                }
+                
+                var action = $('#bulk-action').val();
+                if (!action) {
+                    alert('กรุณาเลือกการดำเนินการ');
+                    return;
+                }
+                
+                console.log('Bulk action:', action, 'Users:', selectedUsers);
+            });
+            
+            // Select all checkbox
+            $('#select-all-users').on('change', function() {
+                $('.user-checkbox').prop('checked', $(this).is(':checked'));
+            });
+        });
+        </script>
+        <?php
+    }
+    
+    /**
+     * Render หน้าจัดการสิทธิ์
+     */
+    public function render_permissions_page() {
+        $roles = $this->get_survey_roles();
+        $capabilities = $this->get_survey_capabilities();
+        
+        ?>
+        <div class="wrap">
+            <h1>สิทธิ์และการเข้าถึง</h1>
+            
+            <div class="card">
+                <h2>จัดการสิทธิ์ตามบทบาท</h2>
+                
+                <table class="widefat fixed striped">
+                    <thead>
+                        <tr>
+                            <th width="20%">บทบาท</th>
+                            <th width="80%">สิทธิ์</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($roles as $role_key => $role_name): ?>
+                            <?php $role = get_role($role_key); ?>
+                            <tr>
+                                <td>
+                                    <strong><?php echo esc_html($role_name); ?></strong>
+                                    <br><small><?php echo esc_html($role_key); ?></small>
+                                </td>
+                                <td>
+                                    <div class="capabilities-grid">
+                                        <?php foreach ($capabilities as $cap_key => $cap_name): ?>
+                                            <label class="capability-item">
+                                                <input type="checkbox" 
+                                                       name="capabilities[<?php echo esc_attr($role_key); ?>][<?php echo esc_attr($cap_key); ?>]"
+                                                       value="1"
+                                                       <?php checked($role && $role->has_cap($cap_key)); ?>
+                                                       data-role="<?php echo esc_attr($role_key); ?>"
+                                                       data-capability="<?php echo esc_attr($cap_key); ?>">
+                                                <?php echo esc_html($cap_name); ?>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                
+                <p class="submit">
+                    <button type="button" id="save-permissions" class="button-primary">บันทึกการเปลี่ยนแปลง</button>
+                    <button type="button" id="reset-permissions" class="button">รีเซ็ตเป็นค่าเริ่มต้น</button>
+                </p>
+            </div>
+        </div>
+        
+        <style>
+        .capabilities-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        
+        .capability-item {
+            display: flex;
+            align-items: center;
+            padding: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background: #f9f9f9;
+        }
+        
+        .capability-item input {
+            margin-right: 8px;
+        }
+        </style>
+        
+        <script>
+        jQuery(document).ready(function($) {
+            // บันทึกสิทธิ์
+            $('#save-permissions').on('click', function() {
+                var permissions = {};
+                
+                $('input[name^="capabilities"]:checked').each(function() {
+                    var role = $(this).data('role');
+                    var capability = $(this).data('capability');
+                    
+                    if (!permissions[role]) {
+                        permissions[role] = [];
+                    }
+                    permissions[role].push(capability);
+                });
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'update_user_permissions',
+                        permissions: permissions,
+                        nonce: '<?php echo wp_create_nonce('update_permissions_nonce'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            alert('บันทึกสิทธิ์เรียบร้อย');
+                        } else {
+                            alert('เกิดข้อผิดพลาด: ' + response.data);
+                        }
+                    }
+                });
+            });
+        });
+        </script>
+        <?php
+    }
+    
+    /**
+     * สร้างผู้ใช้ใหม่
+     */
+    public function create_survey_user() {
+        check_ajax_referer('create_survey_user', 'create_user_nonce');
+        
+        if (!current_user_can('manage_survey_users')) {
+            wp_send_json_error('ไม่มีสิทธิ์ในการสร้างผู้ใช้');
+        }
+        
+        $username = sanitize_text_field($_POST['username']);
+        $email = sanitize_email($_POST['email']);
+        $first_name = sanitize_text_field($_POST['first_name']);
+        $last_name = sanitize_text_field($_POST['last_name']);
+        $role = sanitize_text_field($_POST['role']);
+        $send_credentials = isset($_POST['send_credentials']);
+        
+        // ตรวจสอบข้อมูล
+        if (username_exists($username) || email_exists($email)) {
+            wp_send_json_error('ชื่อผู้ใช้หรืออีเมลนี้ถูกใช้แล้ว');
+        }
+        
+        // สร้างรหัสผ่านสุ่ม
+        $password = wp_generate_password(12, false);
+        
+        // สร้างผู้ใช้
+        $user_id = wp_create_user($username, $password, $email);
+        
+        if (is_wp_error($user_id)) {
+            wp_send_json_error($user_id->get_error_message());
+        }
+        
+        // อัปเดตข้อมูลเพิ่มเติม
+        wp_update_user(array(
+            'ID' => $user_id,
+            'first_name' => $first_name,
+            'last_name' => $last_name,
+            'role' => $role
+        ));
+        
+        // บันทึก metadata
+        update_user_meta($user_id, 'created_by', get_current_user_id());
+        update_user_meta($user_id, 'created_for_surveys', true);
+        
+        // ส่งข้อมูลการเข้าสู่ระบบ
+        if ($send_credentials) {
+            $this->send_user_credentials($user_id, $username, $password);
+        }
+        
+        // บันทึก audit log
+        $this->log_user_action('user_created', array(
+            'user_id' => $user_id,
+            'username' => $username,
+            'role' => $role
+        ));
+        
+        wp_send_json_success(array(
+            'message' => 'สร้างผู้ใช้เรียบร้อย',
+            'user_id' => $user_id
+        ));
+    }
+    
+    /**
+     * อัปเดตสิทธิ์ผู้ใช้
+     */
+    public function update_user_permissions() {
+        check_ajax_referer('update_permissions_nonce', 'nonce');
+        
+        if (!current_user_can('manage_survey_users')) {
+            wp_send_json_error('ไม่มีสิทธิ์ในการจัดการสิทธิ์');
+        }
+        
+        $permissions = $_POST['permissions'];
+        
+        foreach ($permissions as $role_key => $capabilities) {
+            $role = get_role($role_key);
+            if (!$role) continue;
+            
+            // ลบสิทธิ์เดิมทั้งหมด
+            $survey_caps = $this->get_survey_capabilities();
+            foreach (array_keys($survey_caps) as $cap) {
+                $role->remove_cap($cap);
+            }
+            
+            // เพิ่มสิทธิ์ใหม่
+            foreach ($capabilities as $cap) {
+                $role->add_cap($cap);
+            }
+        }
+        
+        // บันทึก audit log
+        $this->log_user_action('permissions_updated', array(
+            'updated_roles' => array_keys($permissions)
+        ));
+        
+        wp_send_json_success('อัปเดตสิทธิ์เรียบร้อย');
+    }
+    
+    /**
+     * ดึงกิจกรรมผู้ใช้
+     */
+    public function get_user_activity() {
+        check_ajax_referer('user_activity_nonce', 'nonce');
+        
+        if (!current_user_can('view_audit_logs')) {
+            wp_send_json_error('ไม่มีสิทธิ์ในการดูกิจกรรม');
+        }
+        
+        $user_id = intval($_POST['user_id']);
+        
+        global $wpdb;
+        $audit_table = $wpdb->prefix . 'tpak_survey_audit';
+        
+        $activities = $wpdb->get_results($wpdb->prepare(
+            "SELECT * FROM $audit_table 
+             WHERE user_id = %d 
+             ORDER BY created_at DESC 
+             LIMIT 50",
+            $user_id
+        ), ARRAY_A);
+        
+        wp_send_json_success(array('activities' => $activities));
+    }
+    
+    /**
+     * สร้างลิงค์เข้าถึงพิเศษ
+     */
+    public function generate_access_link() {
+        check_ajax_referer('generate_access_link', 'access_link_nonce');
+        
+        if (!current_user_can('forward_survey_responses')) {
+            wp_send_json_error('ไม่มีสิทธิ์ในการสร้างลิงค์เข้าถึง');
+        }
+        
+        $response_id = sanitize_text_field($_POST['response_id']);
+        $access_level = sanitize_text_field($_POST['access_level']);
+        $expires_in = intval($_POST['expires_in']);
+        $max_uses = intval($_POST['max_uses']);
+        
+        // สร้าง token
+        $token = wp_generate_password(32, false);
+        
+        // คำนวณวันหมดอายุ
+        $expires_at = null;
+        if ($expires_in > 0) {
+            $expires_at = date('Y-m-d H:i:s', time() + ($expires_in * 24 * 60 * 60));
+        }
+        
+        // บันทึกลงฐานข้อมูล
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'tpak_access_tokens';
+        
+        // สร้างตารางถ้ายังไม่มี
+        $this->ensure_access_tokens_table();
+        
+        $result = $wpdb->insert(
+            $table_name,
+            array(
+                'token' => $token,
+                'response_id' => $response_id,
+                'access_level' => $access_level,
+                'created_by' => get_current_user_id(),
+                'expires_at' => $expires_at,
+                'max_uses' => $max_uses ?: null,
+                'uses_count' => 0,
+                'is_active' => 1,
+                'created_at' => current_time('mysql')
+            )
+        );
+        
+        if ($result) {
+            $url = home_url('/survey-access/' . $token);
+            
+            wp_send_json_success(array(
+                'url' => $url,
+                'token' => $token,
+                'expires_at' => $expires_at
+            ));
+        } else {
+            wp_send_json_error('ไม่สามารถสร้างลิงค์ได้');
+        }
+    }
+    
+    /**
+     * ยกเลิกการเข้าถึงผู้ใช้
+     */
+    public function revoke_user_access() {
+        check_ajax_referer('revoke_access_nonce', 'nonce');
+        
+        if (!current_user_can('manage_survey_users')) {
+            wp_send_json_error('ไม่มีสิทธิ์ในการยกเลิกการเข้าถึง');
+        }
+        
+        $user_id = intval($_POST['user_id']);
+        $reason = sanitize_textarea_field($_POST['reason']);
+        
+        // ปิดการใช้งานบัญชี
+        $user = new WP_User($user_id);
+        $user->set_role(''); // ลบ role
+        
+        wp_send_json_success('ยกเลิกการเข้าถึงเรียบร้อย');
+    }
+    
+    /**
+     * ตรวจสอบการเข้าถึงแบบสอบถาม
+     */
+    public function check_survey_access() {
+        // TODO: Implement token-based access checking
+    }
+    
+    /**
+     * Dynamic capability check
+     */
+    public function dynamic_capability_check($allcaps, $caps, $args, $user) {
+        // TODO: Implement dynamic capability checking
+        return $allcaps;
+    }
+    
+    /**
+     * ส่งการแจ้งเตือนการมอบหมาย
+     */
+    public function send_assignment_notification($user_id, $response_id, $role) {
+        $user = get_userdata($user_id);
+        if (!$user) return;
+        
+        $subject = 'คุณได้รับมอบหมายให้ดูแลแบบสอบถาม';
+        $message = sprintf(
+            "สวัสดี %s,\n\nคุณได้รับมอบหมายให้ดูแลแบบสอบถาม ID: %s\nบทบาท: %s",
+            $user->display_name,
+            $response_id,
+            $role
+        );
+        
+        wp_mail($user->user_email, $subject, $message);
+    }
+    
+    /**
+     * ส่งการแจ้งเตือนการเปลี่ยนสิทธิ์
+     */
+    public function send_permission_notification($user_id, $changes) {
+        $user = get_userdata($user_id);
+        if (!$user) return;
+        
+        $subject = 'สิทธิ์การเข้าถึงของคุณมีการเปลี่ยนแปลง';
+        $message = sprintf(
+            "สวัสดี %s,\n\nสิทธิ์การเข้าถึงระบบของคุณมีการเปลี่ยนแปลง",
+            $user->display_name
+        );
+        
+        wp_mail($user->user_email, $subject, $message);
+    }
+    
+    /**
+     * ส่งข้อมูลการเข้าสู่ระบบ
+     */
+    private function send_user_credentials($user_id, $username, $password) {
+        $user = get_userdata($user_id);
+        
+        $subject = 'ข้อมูลการเข้าสู่ระบบแบบสอบถาม';
+        $message = sprintf(
+            "สวัสดี %s,\n\nบัญชีของคุณถูกสร้างเรียบร้อยแล้ว:\n\nชื่อผู้ใช้: %s\nรหัสผ่าน: %s\n\nเข้าสู่ระบบได้ที่: %s",
+            $user->display_name ?: $user->user_login,
+            $username,
+            $password,
+            wp_login_url()
+        );
+        
+        wp_mail($user->user_email, $subject, $message);
+    }
+    
+    /**
+     * ดึงรายการผู้ใช้ในระบบ survey
+     */
+    private function get_survey_users() {
+        $users = get_users(array(
+            'meta_key' => 'created_for_surveys',
+            'meta_value' => true,
+            'orderby' => 'registered',
+            'order' => 'DESC'
+        ));
+        
+        // รวมผู้ใช้ที่มี survey roles
+        $survey_roles = array_keys($this->get_survey_roles());
+        $role_users = get_users(array(
+            'role__in' => $survey_roles
+        ));
+        
+        // รวมและลบ duplicate
+        $all_users = array_merge($users, $role_users);
+        $unique_users = array();
+        $seen_ids = array();
+        
+        foreach ($all_users as $user) {
+            if (!in_array($user->ID, $seen_ids)) {
+                $unique_users[] = $user;
+                $seen_ids[] = $user->ID;
+            }
+        }
+        
+        return $unique_users;
+    }
+    
+    /**
+     * ดึง survey roles
+     */
+    private function get_survey_roles() {
+        return array(
+            'survey_editor' => 'Survey Editor',
+            'survey_reviewer' => 'Survey Reviewer', 
+            'survey_approver' => 'Survey Approver',
+            'survey_manager' => 'Survey Manager',
+            'survey_viewer' => 'Survey Viewer'
+        );
+    }
+    
+    /**
+     * ดึง survey capabilities
+     */
+    private function get_survey_capabilities() {
+        return array(
+            'view_survey_responses' => 'ดูแบบสอบถาม',
+            'edit_survey_responses' => 'แก้ไขแบบสอบถาม',
+            'review_survey_responses' => 'ตรวจสอบแบบสอบถาม',
+            'approve_survey_responses' => 'อนุมัติแบบสอบถาม',
+            'reject_survey_responses' => 'ส่งกลับแก้ไข',
+            'export_survey_responses' => 'ส่งออกข้อมูล',
+            'forward_survey_responses' => 'ส่งต่อแบบสอบถาม',
+            'manage_survey_users' => 'จัดการผู้ใช้',
+            'view_audit_logs' => 'ดู Audit Log',
+            'export_audit_logs' => 'ส่งออก Audit Log',
+            'configure_survey_settings' => 'ตั้งค่าระบบ',
+            'create_survey_drafts' => 'สร้างฉบับร่าง',
+            'add_review_notes' => 'เพิ่มหมายเหตุ',
+            'restore_survey_versions' => 'คืนค่าเวอร์ชัน',
+            'delete_survey_responses' => 'ลบแบบสอบถาม',
+            'bulk_process_surveys' => 'ประมวลผลแบบกลุ่ม',
+            'schedule_survey_exports' => 'กำหนดเวลาส่งออก',
+            'manage_survey_templates' => 'จัดการเทมเพลต'
+        );
+    }
+    
+    /**
+     * สร้างตาราง access tokens
+     */
+    private function ensure_access_tokens_table() {
+        global $wpdb;
+        $charset_collate = $wpdb->get_charset_collate();
+        
+        $table_name = $wpdb->prefix . 'tpak_access_tokens';
+        $sql = "CREATE TABLE IF NOT EXISTS $table_name (
+            id bigint(20) NOT NULL AUTO_INCREMENT,
+            token varchar(100) NOT NULL,
+            response_id varchar(100) NOT NULL,
+            access_level enum('view', 'comment', 'edit') DEFAULT 'view',
+            created_by bigint(20) NOT NULL,
+            expires_at datetime,
+            max_uses int,
+            uses_count int DEFAULT 0,
+            last_used_at datetime,
+            is_active tinyint(1) DEFAULT 1,
+            created_at datetime DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            UNIQUE KEY token (token),
+            KEY response_id (response_id),
+            KEY created_by (created_by),
+            KEY is_active (is_active)
+        ) $charset_collate;";
+        
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        dbDelta($sql);
+    }
+    
+    /**
+     * บันทึก user action log
+     */
+    private function log_user_action($action, $data = array()) {
+        // ใช้ Survey Audit Manager
+        if (class_exists('TPAK_Survey_Audit_Manager')) {
+            $audit_manager = TPAK_Survey_Audit_Manager::getInstance();
+            $audit_manager->log_audit('user_management', $action, $data);
+        }
+    }
+}
