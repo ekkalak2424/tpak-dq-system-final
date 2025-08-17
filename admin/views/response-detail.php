@@ -2457,46 +2457,222 @@ var surveyConfig = {
     iframeLoaded: false
 };
 
-// Initialize iframe system
+// IMMEDIATE DEBUG - Add big visible button for testing
 document.addEventListener('DOMContentLoaded', function() {
-    console.log('✅ LimeSurvey Iframe System Loading');
+    console.log('🔥 Adding emergency test button...');
     
-    // Initialize tab system
-    initTabSystem();
+    // Add big red test button to body
+    var testBtn = document.createElement('button');
+    testBtn.innerHTML = '🧪 TEST NATIVE TAB';
+    testBtn.style.cssText = `
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 999999;
+        background: #ff0000;
+        color: white;
+        padding: 15px 25px;
+        font-size: 16px;
+        font-weight: bold;
+        border: 3px solid #fff;
+        border-radius: 8px;
+        cursor: pointer;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    `;
     
-    // Initialize iframe functionality
-    initIframeSystem();
+    testBtn.onclick = function() {
+        console.log('🧪 Emergency test button clicked!');
+        forceActivateNativeTab();
+    };
+    
+    document.body.appendChild(testBtn);
+    console.log('✅ Emergency test button added');
 });
 
-// Simple tab system
-function initTabSystem() {
-    var tabs = document.querySelectorAll('.nav-tab');
-    var contents = document.querySelectorAll('.tab-content');
+// Force activate native tab function
+function forceActivateNativeTab() {
+    console.log('🚀 Force activating native tab...');
     
-    tabs.forEach(function(tab) {
-        tab.addEventListener('click', function(e) {
-            e.preventDefault();
+    try {
+        // Find native tab
+        var nativeTab = document.querySelector('a[data-tab="native"]');
+        var nativeContent = document.getElementById('tab-native');
+        
+        console.log('Native tab found:', !!nativeTab);
+        console.log('Native content found:', !!nativeContent);
+        
+        if (nativeTab && nativeContent) {
+            // Force tab active
+            document.querySelectorAll('.nav-tab').forEach(function(t) {
+                t.classList.remove('nav-tab-active');
+            });
+            nativeTab.classList.add('nav-tab-active');
             
-            var tabId = tab.getAttribute('data-tab');
-            console.log('Tab clicked:', tabId);
-            
-            // Update tabs
-            tabs.forEach(function(t) { t.classList.remove('nav-tab-active'); });
-            tab.classList.add('nav-tab-active');
-            
-            // Update content
-            contents.forEach(function(c) { 
+            // Force content visible
+            document.querySelectorAll('.tab-content').forEach(function(c) {
                 c.style.display = 'none';
                 c.classList.remove('active');
             });
             
-            var target = document.getElementById('tab-' + tabId);
-            if (target) {
-                target.style.display = 'block';
-                target.classList.add('active');
-            }
-        });
+            nativeContent.style.setProperty('display', 'block', 'important');
+            nativeContent.style.setProperty('visibility', 'visible', 'important');
+            nativeContent.style.setProperty('opacity', '1', 'important');
+            nativeContent.classList.add('active');
+            
+            console.log('✅ Native tab force activated');
+            alert('✅ Native tab is now active!');
+            
+        } else {
+            console.log('❌ Cannot find native tab elements');
+            alert('❌ Cannot find native tab elements');
+        }
+        
+    } catch (error) {
+        console.error('❌ Force activation error:', error);
+        alert('❌ Error: ' + error.message);
+    }
+}
+
+// Fix jQuery conflicts first
+if (typeof jQuery !== 'undefined') {
+    jQuery(document).ready(function($) {
+        // Remove problematic datepicker
+        if ($.fn.datepicker) {
+            delete $.fn.datepicker;
+        }
+        if ($.datepicker) {
+            delete $.datepicker;
+        }
+        console.log('✅ jQuery conflicts removed');
     });
+}
+
+// Initialize iframe system
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('✅ LimeSurvey Iframe System Loading');
+    
+    // Wait a bit for jQuery cleanup
+    setTimeout(function() {
+        // Initialize tab system
+        initTabSystem();
+        
+        // Initialize iframe functionality  
+        initIframeSystem();
+    }, 1000);
+});
+
+// Simple tab system with error handling
+function initTabSystem() {
+    try {
+        console.log('🔧 Initializing tab system...');
+        
+        var tabs = document.querySelectorAll('.nav-tab');
+        var contents = document.querySelectorAll('.tab-content');
+        
+        console.log('Found tabs:', tabs.length, 'Found contents:', contents.length);
+        
+        if (tabs.length === 0) {
+            console.log('❌ No tabs found!');
+            return;
+        }
+        
+        tabs.forEach(function(tab, index) {
+            console.log('Setting up tab', index, ':', tab.getAttribute('data-tab'));
+            
+            // Remove existing listeners first
+            tab.removeEventListener('click', handleTabClick);
+            
+            // Add new listener
+            tab.addEventListener('click', handleTabClick);
+        });
+        
+        console.log('✅ Tab system initialized successfully');
+        
+        // Add manual test button to console
+        console.log('🧪 Manual test available: testNativeTab()');
+        window.testNativeTab = function() {
+            console.log('🧪 Manual native tab test...');
+            var nativeTab = document.querySelector('a[data-tab="native"]');
+            if (nativeTab) {
+                console.log('Found native tab, clicking...');
+                nativeTab.click();
+            } else {
+                console.log('❌ Native tab not found');
+            }
+        };
+        
+    } catch (error) {
+        console.error('❌ Tab system error:', error);
+    }
+}
+
+// Separate tab click handler
+function handleTabClick(e) {
+    try {
+        e.preventDefault();
+        
+        var tab = e.currentTarget;
+        var tabId = tab.getAttribute('data-tab');
+        
+        console.log('🎯 Tab clicked:', tabId);
+        
+        if (!tabId) {
+            console.log('❌ No tab ID found');
+            return;
+        }
+        
+        // Update tab appearance
+        var allTabs = document.querySelectorAll('.nav-tab');
+        allTabs.forEach(function(t) { 
+            t.classList.remove('nav-tab-active'); 
+        });
+        tab.classList.add('nav-tab-active');
+        
+        // Update content visibility
+        var allContents = document.querySelectorAll('.tab-content');
+        allContents.forEach(function(c) { 
+            c.style.display = 'none';
+            c.classList.remove('active');
+        });
+        
+        var target = document.getElementById('tab-' + tabId);
+        if (target) {
+            target.style.display = 'block';
+            target.classList.add('active');
+            console.log('✅ Content switched to:', tabId);
+            
+            // Special handling for native tab
+            if (tabId === 'native') {
+                console.log('🎯 Native tab activated!');
+                showNativeContent();
+            }
+        } else {
+            console.log('❌ Target content not found for:', tabId);
+        }
+        
+    } catch (error) {
+        console.error('❌ Tab click error:', error);
+    }
+}
+
+// Show native content with force styling
+function showNativeContent() {
+    var nativeContent = document.getElementById('tab-native');
+    if (nativeContent) {
+        // Force visible styling
+        nativeContent.style.setProperty('display', 'block', 'important');
+        nativeContent.style.setProperty('visibility', 'visible', 'important');
+        nativeContent.style.setProperty('opacity', '1', 'important');
+        nativeContent.style.setProperty('height', 'auto', 'important');
+        nativeContent.style.setProperty('min-height', '400px', 'important');
+        
+        console.log('🎯 Native content forced visible');
+        
+        // Alert to confirm
+        setTimeout(function() {
+            alert('🎉 Native tab is now active! Tab system working!');
+        }, 500);
+    }
 }
 
 // Iframe system functions

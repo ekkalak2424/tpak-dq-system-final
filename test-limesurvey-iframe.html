@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ทดสอบ LimeSurvey Iframe</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: #2c3e50;
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+        
+        .control-panel {
+            background: #f8f9fa;
+            padding: 20px;
+            border-bottom: 2px solid #dee2e6;
+        }
+        
+        .control-panel h3 {
+            margin-bottom: 15px;
+            color: #333;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .form-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        .button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .button-primary {
+            background: #0073aa;
+            color: white;
+        }
+        
+        .button-primary:hover {
+            background: #005a87;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+        }
+        
+        .button-success {
+            background: #28a745;
+            color: white;
+        }
+        
+        .button-success:hover {
+            background: #218838;
+        }
+        
+        .button-warning {
+            background: #ffc107;
+            color: #333;
+        }
+        
+        .button-warning:hover {
+            background: #e0a800;
+        }
+        
+        .button-danger {
+            background: #dc3545;
+            color: white;
+        }
+        
+        .button-danger:hover {
+            background: #c82333;
+        }
+        
+        .iframe-container {
+            padding: 20px;
+            background: #f9f9f9;
+            min-height: 600px;
+            display: none;
+        }
+        
+        .iframe-container.active {
+            display: block;
+        }
+        
+        .iframe-wrapper {
+            background: white;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        iframe {
+            width: 100%;
+            height: 800px;
+            border: none;
+        }
+        
+        .status-bar {
+            background: #e9ecef;
+            padding: 15px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 14px;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #6c757d;
+        }
+        
+        .status-indicator.success {
+            background: #28a745;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-indicator.loading {
+            background: #ffc107;
+            animation: pulse 1s infinite;
+        }
+        
+        .status-indicator.error {
+            background: #dc3545;
+        }
+        
+        @keyframes pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0.7);
+            }
+            70% {
+                box-shadow: 0 0 0 10px rgba(40, 167, 69, 0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(40, 167, 69, 0);
+            }
+        }
+        
+        .test-section {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px;
+        }
+        
+        .test-section h4 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+        
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+        }
+        
+        .message-box {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px;
+            display: none;
+        }
+        
+        .message-box.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+        
+        .message-box.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+        
+        .message-box.info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+            display: block;
+        }
+        
+        .log-area {
+            background: #2b2b2b;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin: 20px;
+        }
+        
+        .log-entry {
+            margin-bottom: 5px;
+        }
+        
+        .log-time {
+            color: #888;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🧪 ทดสอบ LimeSurvey Iframe Integration</h1>
+            <p>ทดสอบการแสดงผลและการทำงานของ iframe จาก LimeSurvey</p>
+        </div>
+        
+        <div class="control-panel">
+            <h3>⚙️ ตั้งค่า LimeSurvey</h3>
+            
+            <div class="form-group">
+                <label for="base-url">🌐 LimeSurvey Base URL:</label>
+                <input type="text" id="base-url" value="https://survey.tpak.or.th" placeholder="https://survey.tpak.or.th">
+            </div>
+            
+            <div class="form-group">
+                <label for="survey-id">📊 Survey ID:</label>
+                <input type="text" id="survey-id" value="836511" placeholder="836511">
+            </div>
+            
+            <div class="form-group">
+                <label for="token">🔑 Token (ถ้ามี):</label>
+                <input type="text" id="token" placeholder="Optional: Response token">
+            </div>
+            
+            <div class="form-group">
+                <label for="lang">🌍 ภาษา:</label>
+                <input type="text" id="lang" value="th" placeholder="th">
+            </div>
+        </div>
+        
+        <div class="test-section">
+            <h4>🎯 ทดสอบการโหลด Iframe</h4>
+            <div class="test-grid">
+                <button class="button button-primary" onclick="loadBasicIframe()">
+                    📱 โหลด Basic Iframe
+                </button>
+                <button class="button button-success" onclick="loadWithToken()">
+                    🔐 โหลดพร้อม Token
+                </button>
+                <button class="button button-warning" onclick="loadPreview()">
+                    👁️ โหลดแบบ Preview
+                </button>
+                <button class="button button-danger" onclick="clearIframe()">
+                    ❌ ล้าง Iframe
+                </button>
+            </div>
+            
+            <div class="button-group" style="margin-top: 15px;">
+                <button class="button button-primary" onclick="testDirectLink()">
+                    🔗 เปิด Direct Link
+                </button>
+                <button class="button button-success" onclick="testCORS()">
+                    🔒 ทดสอบ CORS
+                </button>
+                <button class="button button-warning" onclick="extractData()">
+                    📥 ดึงข้อมูลจาก Iframe
+                </button>
+                <button class="button button-primary" onclick="showLogs()">
+                    📝 แสดง Logs
+                </button>
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <span class="status-indicator" id="status-dot"></span>
+                <span id="status-text">⏳ รอการโหลด</span>
+            </div>
+            <div class="status-item">
+                <strong>URL:</strong>
+                <span id="current-url">-</span>
+            </div>
+            <div class="status-item">
+                <strong>เวลาโหลด:</strong>
+                <span id="load-time">-</span>
+            </div>
+        </div>
+        
+        <div id="message-container"></div>
+        
+        <div class="iframe-container" id="iframe-container">
+            <div class="iframe-wrapper">
+                <iframe id="limesurvey-iframe" name="limesurvey-iframe"></iframe>
+            </div>
+        </div>
+        
+        <div class="log-area" id="log-area" style="display: none;">
+            <div><strong>📝 Console Logs:</strong></div>
+            <div id="log-content"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Global variables
+        let startTime = null;
+        let iframeLoaded = false;
+        let logs = [];
+        
+        // Logging function
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const entry = { time, message, type };
+            logs.push(entry);
+            console.log(`[${time}] ${message}`);
+            updateLogDisplay();
+        }
+        
+        function updateLogDisplay() {
+            const logContent = document.getElementById('log-content');
+            if (logContent) {
+                logContent.innerHTML = logs.map(log => 
+                    `<div class="log-entry">
+                        <span class="log-time">${log.time}</span>
+                        <span style="color: ${getLogColor(log.type)}">${log.message}</span>
+                    </div>`
+                ).join('');
+                logContent.scrollTop = logContent.scrollHeight;
+            }
+        }
+        
+        function getLogColor(type) {
+            switch(type) {
+                case 'success': return '#0f0';
+                case 'error': return '#f00';
+                case 'warning': return '#ff0';
+                default: return '#0ff';
+            }
+        }
+        
+        // Show/hide logs
+        function showLogs() {
+            const logArea = document.getElementById('log-area');
+            logArea.style.display = logArea.style.display === 'none' ? 'block' : 'none';
+        }
+        
+        // Update status
+        function updateStatus(status, message) {
+            const statusDot = document.getElementById('status-dot');
+            const statusText = document.getElementById('status-text');
+            
+            statusDot.className = 'status-indicator ' + status;
+            statusText.textContent = message;
+            log(message, status);
+        }
+        
+        // Show message
+        function showMessage(message, type = 'info') {
+            const container = document.getElementById('message-container');
+            const messageBox = document.createElement('div');
+            messageBox.className = 'message-box ' + type;
+            messageBox.innerHTML = message;
+            container.innerHTML = '';
+            container.appendChild(messageBox);
+            
+            setTimeout(() => {
+                messageBox.style.display = 'none';
+            }, 5000);
+        }
+        
+        // Load basic iframe
+        function loadBasicIframe() {
+            log('🚀 Loading basic iframe...', 'info');
+            startTime = Date.now();
+            
+            const baseUrl = document.getElementById('base-url').value;
+            const surveyId = document.getElementById('survey-id').value;
+            const lang = document.getElementById('lang').value;
+            
+            if (!baseUrl || !surveyId) {
+                showMessage('❌ กรุณาระบุ URL และ Survey ID', 'error');
+                return;
+            }
+            
+            const url = `${baseUrl}/index.php/${surveyId}?lang=${lang}`;
+            loadIframe(url);
+        }
+        
+        // Load with token
+        function loadWithToken() {
+            log('🔐 Loading iframe with token...', 'info');
+            startTime = Date.now();
+            
+            const baseUrl = document.getElementById('base-url').value;
+            const surveyId = document.getElementById('survey-id').value;
+            const token = document.getElementById('token').value;
+            const lang = document.getElementById('lang').value;
+            
+            if (!baseUrl || !surveyId) {
+                showMessage('❌ กรุณาระบุ URL และ Survey ID', 'error');
+                return;
+            }
+            
+            let url = `${baseUrl}/index.php/${surveyId}?lang=${lang}`;
+            if (token) {
+                url += `&token=${token}`;
+            }
+            
+            loadIframe(url);
+        }
+        
+        // Load preview mode
+        function loadPreview() {
+            log('👁️ Loading preview mode...', 'info');
+            startTime = Date.now();
+            
+            const baseUrl = document.getElementById('base-url').value;
+            const surveyId = document.getElementById('survey-id').value;
+            const lang = document.getElementById('lang').value;
+            
+            if (!baseUrl || !surveyId) {
+                showMessage('❌ กรุณาระบุ URL และ Survey ID', 'error');
+                return;
+            }
+            
+            const url = `${baseUrl}/index.php/survey/index/action/previewgroup/sid/${surveyId}?lang=${lang}`;
+            loadIframe(url);
+        }
+        
+        // Load iframe with URL
+        function loadIframe(url) {
+            const iframe = document.getElementById('limesurvey-iframe');
+            const container = document.getElementById('iframe-container');
+            
+            updateStatus('loading', '🔄 กำลังโหลด...');
+            document.getElementById('current-url').textContent = url;
+            
+            container.classList.add('active');
+            
+            // Set iframe source
+            iframe.src = url;
+            
+            // Handle load event
+            iframe.onload = function() {
+                const loadTime = ((Date.now() - startTime) / 1000).toFixed(2);
+                document.getElementById('load-time').textContent = loadTime + ' วินาที';
+                
+                updateStatus('success', '✅ โหลดสำเร็จ');
+                showMessage(`✅ LimeSurvey โหลดสำเร็จใน ${loadTime} วินาที`, 'success');
+                iframeLoaded = true;
+                
+                log(`✅ Iframe loaded successfully in ${loadTime}s`, 'success');
+                
+                // Try to detect if content is accessible
+                testIframeAccess();
+            };
+            
+            // Handle error event
+            iframe.onerror = function(error) {
+                updateStatus('error', '❌ เกิดข้อผิดพลาด');
+                showMessage('❌ ไม่สามารถโหลด LimeSurvey ได้', 'error');
+                log('❌ Iframe load error: ' + error, 'error');
+            };
+        }
+        
+        // Clear iframe
+        function clearIframe() {
+            const iframe = document.getElementById('limesurvey-iframe');
+            const container = document.getElementById('iframe-container');
+            
+            iframe.src = 'about:blank';
+            container.classList.remove('active');
+            updateStatus('', '⏳ รอการโหลด');
+            document.getElementById('current-url').textContent = '-';
+            document.getElementById('load-time').textContent = '-';
+            
+            showMessage('🗑️ ล้าง iframe แล้ว', 'info');
+            log('🗑️ Iframe cleared', 'info');
+        }
+        
+        // Test direct link
+        function testDirectLink() {
+            const baseUrl = document.getElementById('base-url').value;
+            const surveyId = document.getElementById('survey-id').value;
+            const url = `${baseUrl}/index.php/${surveyId}`;
+            
+            window.open(url, '_blank');
+            log('🔗 Opened direct link: ' + url, 'info');
+        }
+        
+        // Test CORS
+        function testCORS() {
+            const iframe = document.getElementById('limesurvey-iframe');
+            
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                showMessage('✅ CORS: สามารถเข้าถึง iframe ได้', 'success');
+                log('✅ CORS test passed - can access iframe', 'success');
+            } catch (error) {
+                showMessage('❌ CORS: ไม่สามารถเข้าถึง iframe (ข้อจำกัดความปลอดภัย)', 'error');
+                log('❌ CORS test failed: ' + error.message, 'error');
+            }
+        }
+        
+        // Test iframe access
+        function testIframeAccess() {
+            try {
+                const iframe = document.getElementById('limesurvey-iframe');
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                
+                if (iframeDoc) {
+                    log('📄 Iframe document accessible', 'success');
+                    
+                    // Try to find forms
+                    const forms = iframeDoc.querySelectorAll('form');
+                    if (forms.length > 0) {
+                        log(`📝 Found ${forms.length} form(s) in iframe`, 'success');
+                    }
+                }
+            } catch (error) {
+                log('🔒 Cannot access iframe content (CORS restriction)', 'warning');
+            }
+        }
+        
+        // Extract data from iframe
+        function extractData() {
+            if (!iframeLoaded) {
+                showMessage('❌ กรุณาโหลด iframe ก่อน', 'error');
+                return;
+            }
+            
+            const iframe = document.getElementById('limesurvey-iframe');
+            
+            try {
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                
+                // Try to find form data
+                const forms = iframeDoc.querySelectorAll('form');
+                if (forms.length > 0) {
+                    const formData = {};
+                    const inputs = forms[0].querySelectorAll('input, select, textarea');
+                    
+                    inputs.forEach(input => {
+                        if (input.name) {
+                            formData[input.name] = input.value;
+                        }
+                    });
+                    
+                    console.log('📥 Extracted data:', formData);
+                    showMessage(`✅ ดึงข้อมูลได้ ${Object.keys(formData).length} ฟิลด์`, 'success');
+                    log(`📥 Extracted ${Object.keys(formData).length} fields`, 'success');
+                    
+                    // Show extracted data
+                    alert('ดูข้อมูลที่ดึงได้ใน Console (F12)');
+                } else {
+                    showMessage('❌ ไม่พบ form ใน iframe', 'error');
+                }
+                
+            } catch (error) {
+                showMessage('❌ ไม่สามารถดึงข้อมูลได้ (CORS)', 'error');
+                log('❌ Cannot extract data: ' + error.message, 'error');
+                
+                // Try postMessage method
+                tryPostMessage();
+            }
+        }
+        
+        // Try postMessage communication
+        function tryPostMessage() {
+            log('📡 Trying postMessage method...', 'info');
+            
+            const iframe = document.getElementById('limesurvey-iframe');
+            
+            // Send message to iframe
+            iframe.contentWindow.postMessage({
+                action: 'requestData',
+                source: 'test-page'
+            }, '*');
+            
+            // Listen for response
+            window.addEventListener('message', function(event) {
+                log(`📨 Received message from: ${event.origin}`, 'info');
+                console.log('Message data:', event.data);
+            });
+        }
+        
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            log('🎯 Test page ready', 'success');
+            
+            // Auto-load if survey ID is present
+            const surveyId = document.getElementById('survey-id').value;
+            if (surveyId) {
+                log('📊 Survey ID detected: ' + surveyId, 'info');
+            }
+        });
+    </script>
+</body>
+</html>
