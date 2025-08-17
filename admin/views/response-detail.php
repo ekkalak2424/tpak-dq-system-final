@@ -1213,21 +1213,27 @@ $question_labels = array(); // Keep for backward compatibility
             </div> <!-- End content-main -->
         </div> <!-- End tab-original -->
         
-        <!-- Native Tab Content - IFRAME VERSION -->
+        <!-- Native Tab Content - HYBRID SYSTEM -->
         <div id="tab-native" class="tab-content">
-            <div class="iframe-integration-header">
-                <h3>🎯 ระบบแก้ไขแบบสอบถาม LimeSurvey Iframe</h3>
-                <p>ดึงแบบสอบถามมาจาก LimeSurvey โดยตรงและบันทึกลงฐานข้อมูล WordPress</p>
+            <div class="hybrid-integration-header">
+                <h3>🎯 LimeSurvey Hybrid System</h3>
+                <p>ระบบผสมระหว่าง iframe display และ API data management</p>
+                <p><strong>🆕 ใหม่!</strong> แก้ปัญหา CORS และให้ประสิทธิภาพสูงกว่า</p>
                 
                 <div class="integration-controls">
-                    <button type="button" class="button button-primary" id="load-iframe">
-                        🚀 โหลด LimeSurvey
+                    <button type="button" class="button button-primary button-hero hybrid-load-survey" 
+                            data-survey-id="<?php echo esc_attr($lime_survey_id); ?>"
+                            data-token="">
+                        🚀 เริ่มใช้ Hybrid System
                     </button>
-                    <button type="button" class="button button-secondary" id="save-responses">
-                        💾 บันทึกคำตอบ
-                    </button>
-                    <button type="button" class="button" id="edit-mode">
-                        ✏️ โหมดแก้ไข
+                    
+                    <a href="<?php echo admin_url('admin.php?page=tpak-hybrid-system&survey_id=' . $lime_survey_id . '&response_id=' . $response_id); ?>" 
+                       class="button button-secondary">
+                        🔗 เปิดหน้า Hybrid System แยก
+                    </a>
+                    
+                    <button type="button" class="button" onclick="window.open('https://survey.tpak.or.th/index.php/<?php echo $lime_survey_id; ?>', '_blank')">
+                        🌐 เปิด LimeSurvey ในแท็บใหม่
                     </button>
                 </div>
                 
@@ -1247,39 +1253,34 @@ $question_labels = array(); // Keep for backward compatibility
                 </div>
             </div>
             
-            <div id="iframe-survey-container" style="display: none;">
-                <div class="iframe-wrapper">
-                    <iframe id="limesurvey-iframe" 
-                            src=""
-                            style="width: 100%; height: 800px; border: 1px solid #ddd; border-radius: 8px;"
-                            onload="handleIframeLoad()">
-                    </iframe>
-                </div>
-                
-                <div class="iframe-controls">
-                    <button type="button" class="button button-primary" onclick="extractAndSaveData()">
-                        💾 บันทึกข้อมูลจาก LimeSurvey
-                    </button>
-                    <button type="button" class="button" onclick="refreshIframe()">
-                        🔄 รีเฟรช
-                    </button>
-                </div>
+            <!-- Hybrid System Integration -->
+            <div id="hybrid-iframe-container" class="hybrid-iframe-section"></div>
+            <div id="hybrid-notifications"></div>
+            <div id="hybrid-loading" style="display: none;"></div>
+            <div id="hybrid-response-container"></div>
+            
+            <div class="hybrid-quick-actions" style="margin-top: 20px; display: none;">
+                <button type="button" class="button button-primary hybrid-fetch-response">
+                    📥 ดึงข้อมูลจาก API
+                </button>
+                <button type="button" class="button hybrid-toggle-edit">
+                    ✏️ โหมดแก้ไข
+                </button>
+                <button type="button" class="button button-secondary hybrid-sync-back">
+                    🔄 Sync กลับไป LimeSurvey
+                </button>
             </div>
             
-            <div id="saved-responses-display" style="display: none;">
-                <h4>📝 คำตอบที่บันทึกแล้ว</h4>
-                <div id="responses-content"></div>
-                <div class="edit-controls">
-                    <button type="button" class="button button-primary" onclick="enableEditMode()">
-                        ✏️ เข้าสู่โหมดแก้ไข
-                    </button>
-                    <button type="button" class="button button-secondary" onclick="loadSavedData()">
-                        🔄 โหลดข้อมูลที่บันทึกไว้
-                    </button>
-                    <button type="button" class="button" onclick="showAuditTrail()">
-                        📊 ประวัติการแก้ไข
-                    </button>
-                </div>
+            <div class="hybrid-info-notice" style="margin-top: 20px; padding: 15px; background: #e7f3ff; border: 1px solid #0073aa; border-radius: 8px;">
+                <h4 style="margin-top: 0; color: #0073aa;">💡 วิธีใช้ Hybrid System:</h4>
+                <ol style="margin: 10px 0; padding-left: 20px;">
+                    <li>คลิค "🚀 เริ่มใช้ Hybrid System" เพื่อโหลด iframe</li>
+                    <li>กรอกแบบสอบถามใน iframe หรือเปิดในแท็บใหม่</li>
+                    <li>หลังกรอกเสร็จ คลิค "📥 ดึงข้อมูลจาก API"</li>
+                    <li>แก้ไขข้อมูลใน WordPress ได้ทันที</li>
+                    <li>Sync กลับไป LimeSurvey เมื่อต้องการ</li>
+                </ol>
+                <p><strong>ข้อดี:</strong> ไม่มีปัญหา CORS, แก้ไขได้, Sync 2 ทาง</p>
             </div>
             
             <!-- Edit Mode Interface -->

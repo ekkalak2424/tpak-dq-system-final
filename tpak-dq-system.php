@@ -91,6 +91,9 @@ class TPAK_DQ_System {
         // Iframe Survey Integration
         require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-iframe-survey-handler.php';
         
+        // LimeSurvey Hybrid System
+        require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'includes/class-limesurvey-hybrid-system.php';
+        
         // Admin files
         if (is_admin()) {
             require_once TPAK_DQ_SYSTEM_PLUGIN_DIR . 'admin/class-admin-menu.php';
@@ -142,6 +145,9 @@ class TPAK_DQ_System {
             
             // Initialize new Iframe Survey Handler
             new TPAK_Iframe_Survey_Handler();
+            
+            // Initialize LimeSurvey Hybrid System
+            TPAK_LimeSurvey_Hybrid_System::getInstance();
         }
         
         // Check if we need to flush rewrite rules
@@ -186,6 +192,12 @@ class TPAK_DQ_System {
             $user_manager = TPAK_Survey_User_Manager::getInstance();
             $user_manager->register_custom_roles();
             $user_manager->register_custom_capabilities();
+        }
+        
+        // Create Hybrid System database tables
+        if (class_exists('TPAK_LimeSurvey_Hybrid_System')) {
+            $hybrid_system = TPAK_LimeSurvey_Hybrid_System::getInstance();
+            $hybrid_system->create_database_tables();
         }
         
         // Flush rewrite rules to ensure custom post types are recognized

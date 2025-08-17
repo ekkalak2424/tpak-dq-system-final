@@ -91,6 +91,16 @@ class TPAK_DQ_Admin_Menu {
             array($this, 'import_lss_page')
         );
         
+        // Hybrid System submenu
+        add_submenu_page(
+            'tpak-dq-system',
+            __('Hybrid System (ใหม่!)', 'tpak-dq-system'),
+            __('🎯 Hybrid System', 'tpak-dq-system'),
+            'manage_options',
+            'tpak-hybrid-system',
+            array($this, 'hybrid_system_page')
+        );
+        
         // Survey Responses submenu
         add_submenu_page(
             'tpak-dq-system',
@@ -595,6 +605,18 @@ class TPAK_DQ_Admin_Menu {
     }
     
     /**
+     * Hybrid System page
+     */
+    public function hybrid_system_page() {
+        // Ensure hybrid system is loaded
+        if (!class_exists('TPAK_LimeSurvey_Hybrid_System')) {
+            wp_die('Hybrid System not loaded');
+        }
+        
+        include TPAK_DQ_SYSTEM_PLUGIN_DIR . 'admin/views/hybrid-interface.php';
+    }
+    
+    /**
      * Save settings
      */
     private function save_settings() {
@@ -637,6 +659,10 @@ class TPAK_DQ_Admin_Menu {
         $options['limesurvey_username'] = sanitize_text_field($_POST['limesurvey_username']);
         $options['limesurvey_password'] = sanitize_text_field($_POST['limesurvey_password']);
         $options['cron_interval'] = sanitize_text_field($_POST['cron_interval']);
+        
+        // Save credentials for hybrid system
+        update_option('tpak_limesurvey_username', $options['limesurvey_username']);
+        update_option('tpak_limesurvey_password', $options['limesurvey_password']);
         $options['survey_id'] = sanitize_text_field($_POST['survey_id']);
         error_log('TPAK DQ System: survey_id saved as: ' . $options['survey_id']);
         $options['email_notifications'] = isset($_POST['email_notifications']) ? true : false;

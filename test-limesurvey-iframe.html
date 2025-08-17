@@ -335,6 +335,22 @@
                     📝 แสดง Logs
                 </button>
             </div>
+            
+            <div class="cors-info" style="margin-top: 20px; padding: 15px; background: #f8d7da; border: 1px solid #f5c6cb; border-radius: 5px;">
+                <h5 style="margin: 0 0 10px 0; color: #721c24;">⚠️ ข้อจำกัด CORS ที่พบ:</h5>
+                <p style="margin: 5px 0; color: #721c24;">❌ ไม่สามารถเข้าถึงข้อมูลใน iframe ได้โดยตรง เนื่องจาก:</p>
+                <ul style="margin: 10px 0; padding-left: 20px; color: #721c24;">
+                    <li>Domain ต่างกัน: <strong>dq.tpak.or.th</strong> vs <strong>survey.tpak.or.th</strong></li>
+                    <li>Browser บล็อกการเข้าถึงข้ามโดเมนเพื่อความปลอดภัย</li>
+                </ul>
+                <h5 style="margin: 15px 0 10px 0; color: #155724;">✅ วิธีแก้ไขที่เป็นไปได้:</h5>
+                <ol style="margin: 10px 0; padding-left: 20px; color: #155724;">
+                    <li><strong>Server-side proxy:</strong> ให้ PHP ดึงข้อมูลแทน JavaScript</li>
+                    <li><strong>LimeSurvey API:</strong> ใช้ Remote Control API แทน iframe</li>
+                    <li><strong>PostMessage API:</strong> ถ้า LimeSurvey รองรับ</li>
+                    <li><strong>Same domain:</strong> ย้าย WordPress ไปที่ survey.tpak.or.th</li>
+                </ol>
+            </div>
         </div>
         
         <div class="status-bar">
@@ -358,7 +374,48 @@
             <div class="iframe-wrapper">
                 <iframe id="limesurvey-iframe" name="limesurvey-iframe"></iframe>
             </div>
+            
+            <div class="alternative-solutions" style="margin-top: 20px; padding: 20px; background: #d4edda; border: 1px solid #c3e6cb; border-radius: 8px;">
+                <h4 style="color: #155724; margin-bottom: 15px;">💡 ทางเลือกแทน iframe:</h4>
+                
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px;">
+                    <div style="padding: 15px; background: white; border-radius: 5px;">
+                        <h5 style="color: #0073aa; margin-bottom: 10px;">🔧 วิธีที่ 1: PHP Proxy</h5>
+                        <p style="font-size: 14px; margin-bottom: 10px;">ให้ WordPress ดึงข้อมูลผ่าน PHP แทน:</p>
+                        <button class="button button-primary" onclick="showPHPProxyCode()">
+                            📋 ดูโค้ด PHP Proxy
+                        </button>
+                    </div>
+                    
+                    <div style="padding: 15px; background: white; border-radius: 5px;">
+                        <h5 style="color: #0073aa; margin-bottom: 10px;">🔌 วิธีที่ 2: LimeSurvey API</h5>
+                        <p style="font-size: 14px; margin-bottom: 10px;">ใช้ Remote Control API:</p>
+                        <button class="button button-primary" onclick="showAPICode()">
+                            📋 ดูโค้ด API
+                        </button>
+                    </div>
+                    
+                    <div style="padding: 15px; background: white; border-radius: 5px;">
+                        <h5 style="color: #0073aa; margin-bottom: 10px;">📝 วิธีที่ 3: Form Submit</h5>
+                        <p style="font-size: 14px; margin-bottom: 10px;">ให้ผู้ใช้กรอกใน LimeSurvey แล้วดึงผลลัพธ์:</p>
+                        <button class="button button-primary" onclick="showFormMethod()">
+                            📋 ดูวิธีการ
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
+        
+        <div id="code-modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); 
+                                    background: white; padding: 30px; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+                                    max-width: 800px; max-height: 80vh; overflow-y: auto; z-index: 9999;">
+            <button onclick="closeModal()" style="position: absolute; top: 10px; right: 10px; background: #dc3545; color: white; 
+                                                   border: none; padding: 5px 10px; border-radius: 5px; cursor: pointer;">✕</button>
+            <div id="modal-content"></div>
+        </div>
+        
+        <div id="modal-overlay" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+                                       background: rgba(0,0,0,0.5); z-index: 9998;" onclick="closeModal()"></div>
         
         <div class="log-area" id="log-area" style="display: none;">
             <div><strong>📝 Console Logs:</strong></div>
@@ -649,6 +706,162 @@
             });
         }
         
+        // Show PHP Proxy code
+        function showPHPProxyCode() {
+            const code = `
+<h3>🔧 PHP Proxy Method</h3>
+<pre style="background: #2b2b2b; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto;">
+<code>&lt;?php
+// WordPress AJAX handler สำหรับดึงข้อมูลจาก LimeSurvey
+add_action('wp_ajax_fetch_limesurvey_data', 'fetch_limesurvey_data');
+
+function fetch_limesurvey_data() {
+    $survey_id = $_POST['survey_id'];
+    $response_id = $_POST['response_id'];
+    
+    // ดึงข้อมูลจาก LimeSurvey API
+    $url = 'https://survey.tpak.or.th/index.php/admin/remotecontrol';
+    
+    $request = array(
+        'method' => 'get_response_by_id',
+        'params' => array(
+            'sSessionKey' => get_session_key(),
+            'iSurveyID' => $survey_id,
+            'iResponseID' => $response_id
+        ),
+        'id' => 1
+    );
+    
+    $response = wp_remote_post($url, array(
+        'body' => json_encode($request),
+        'headers' => array('Content-Type' => 'application/json')
+    ));
+    
+    $data = json_decode(wp_remote_retrieve_body($response), true);
+    
+    // ส่งข้อมูลกลับไปที่ JavaScript
+    wp_send_json_success($data);
+}
+?&gt;</code>
+</pre>
+<p style="margin-top: 15px;"><strong>ข้อดี:</strong> ไม่มีปัญหา CORS, สามารถประมวลผลข้อมูลใน PHP ได้</p>
+<p><strong>ข้อเสีย:</strong> ต้องเขียนโค้ด PHP เพิ่มเติม</p>
+            `;
+            showModal(code);
+        }
+        
+        // Show API code
+        function showAPICode() {
+            const code = `
+<h3>🔌 LimeSurvey Remote Control API</h3>
+<pre style="background: #2b2b2b; color: #f8f8f2; padding: 15px; border-radius: 5px; overflow-x: auto;">
+<code>// 1. Get session key
+$curl = curl_init();
+curl_setopt_array($curl, array(
+    CURLOPT_URL => 'https://survey.tpak.or.th/index.php/admin/remotecontrol',
+    CURLOPT_RETURNTRANSFER => true,
+    CURLOPT_POST => true,
+    CURLOPT_POSTFIELDS => json_encode(array(
+        'method' => 'get_session_key',
+        'params' => array('username', 'password'),
+        'id' => 1
+    )),
+    CURLOPT_HTTPHEADER => array('Content-Type: application/json')
+));
+$session = json_decode(curl_exec($curl), true);
+
+// 2. Export responses
+$export_request = array(
+    'method' => 'export_responses',
+    'params' => array(
+        'sSessionKey' => $session['result'],
+        'iSurveyID' => 836511,
+        'sDocumentType' => 'json',
+        'sLanguageCode' => 'th',
+        'sCompletionStatus' => 'all'
+    ),
+    'id' => 2
+);
+
+// 3. Get specific response
+$response_request = array(
+    'method' => 'get_response_by_token',
+    'params' => array(
+        'sSessionKey' => $session['result'],
+        'iSurveyID' => 836511,
+        'sToken' => 'response_token'
+    ),
+    'id' => 3
+);</code>
+</pre>
+<p style="margin-top: 15px;"><strong>API Endpoints ที่ใช้ได้:</strong></p>
+<ul>
+    <li>get_session_key - เข้าสู่ระบบ</li>
+    <li>export_responses - ดึงคำตอบทั้งหมด</li>
+    <li>get_response_by_token - ดึงคำตอบตาม token</li>
+    <li>update_response - อัพเดทคำตอบ</li>
+</ul>
+            `;
+            showModal(code);
+        }
+        
+        // Show form method
+        function showFormMethod() {
+            const code = `
+<h3>📝 Form Submit Method</h3>
+<div style="padding: 15px;">
+    <h4>ขั้นตอนการทำงาน:</h4>
+    <ol>
+        <li><strong>ให้ผู้ใช้กรอกแบบสอบถามใน LimeSurvey โดยตรง</strong>
+            <br>- เปิด LimeSurvey ในหน้าต่างใหม่
+            <br>- ผู้ใช้กรอกและส่งแบบสอบถาม
+        </li>
+        <li><strong>ดึงข้อมูลผลลัพธ์ผ่าน API</strong>
+            <br>- ใช้ response ID หรือ token
+            <br>- ดึงข้อมูลมาแสดงใน WordPress
+        </li>
+        <li><strong>บันทึกลงฐานข้อมูล WordPress</strong>
+            <br>- เก็บข้อมูลในตาราง wp_tpak_iframe_survey_data
+            <br>- สามารถแก้ไขได้ใน WordPress
+        </li>
+    </ol>
+    
+    <h4>โค้ดตัวอย่าง:</h4>
+    <pre style="background: #2b2b2b; color: #f8f8f2; padding: 15px; border-radius: 5px;">
+<code>// เปิด LimeSurvey ในหน้าต่างใหม่
+window.open('https://survey.tpak.or.th/index.php/836511', '_blank');
+
+// หลังจากกรอกเสร็จ ดึงข้อมูลผ่าน AJAX
+jQuery.ajax({
+    url: ajaxurl,
+    type: 'POST',
+    data: {
+        action: 'get_limesurvey_response',
+        token: 'USER_TOKEN'
+    },
+    success: function(response) {
+        // แสดงและแก้ไขข้อมูลใน WordPress
+    }
+});</code>
+    </pre>
+</div>
+            `;
+            showModal(code);
+        }
+        
+        // Show modal
+        function showModal(content) {
+            document.getElementById('modal-content').innerHTML = content;
+            document.getElementById('code-modal').style.display = 'block';
+            document.getElementById('modal-overlay').style.display = 'block';
+        }
+        
+        // Close modal
+        function closeModal() {
+            document.getElementById('code-modal').style.display = 'none';
+            document.getElementById('modal-overlay').style.display = 'none';
+        }
+        
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
             log('🎯 Test page ready', 'success');
@@ -658,6 +871,11 @@
             if (surveyId) {
                 log('📊 Survey ID detected: ' + surveyId, 'info');
             }
+            
+            // Show CORS warning
+            setTimeout(function() {
+                showMessage('⚠️ พบข้อจำกัด CORS - iframe แสดงผลได้แต่ไม่สามารถดึงข้อมูลโดยตรง กรุณาดูทางเลือกด้านล่าง', 'error');
+            }, 2000);
         });
     </script>
 </body>
